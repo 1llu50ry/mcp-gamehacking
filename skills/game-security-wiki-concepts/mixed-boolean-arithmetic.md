@@ -1,0 +1,55 @@
+---
+title: Mixed Boolean-Arithmetic
+kind: concept
+topics: [reverse-engineering, anti-cheat]
+sources:
+  - wiki/sources/skills/reverse-engineering.md
+  - wiki/sources/descriptions/mizt0__mixed-boolean-transform.md
+  - wiki/sources/descriptions/gmh5225__qsynthesis.md
+  - wiki/sources/descriptions/fvrmatteo__DrillAndJoin.md
+  - wiki/sources/descriptions/dmaivel__covirt.md
+  - wiki/sources/descriptions/bliutech__mbased.md
+  - wiki/sources/descriptions/astean1001__ProMBA.md
+  - wiki/sources/descriptions/amruth-sn__kong.md
+  - wiki/sources/descriptions/ThatLing__limba.md
+  - wiki/sources/descriptions/SynthesisLab__MBA.md
+  - wiki/sources/descriptions/MBA-research__mba-wasm.md
+  - wiki/sources/descriptions/LostOxygen__gnn_deobfuscation.md
+  - wiki/sources/descriptions/JonathanSalwan__VMProtect-devirtualization.md
+  - wiki/sources/descriptions/HexRaysSA__goomba.md
+  - wiki/sources/descriptions/DenuvoSoftwareSolutions__GAMBA.md
+  - wiki/sources/descriptions/19h__chernobog.md
+  - wiki/sources/descriptions/mrphrazer__msynth.md
+  - wiki/sources/descriptions/mrphrazer__binary-cartography.md
+  - wiki/sources/README-categories.md
+updated: 2026-09-23
+confidence: high
+---
+
+# Mixed Boolean-Arithmetic
+
+**MBA** obfuscation replaces simple arithmetic with equivalent expressions mixing bitwise (`&`, `|`, `^`, `~`) and integer (`+`, `-`, `*`) operators. Common in VMProtect, Themida, custom LLVM passes, and AC compile-time obfuscators. Static decompilers often emit unreadable pseudocode until expressions are simplified. (source: wiki/sources/skills/reverse-engineering.md)
+
+## Variants
+
+- **Linear MBA:** e.g. `x + y = (x ^ y) + 2*(x & y)` — single-degree boolean/arithmetic mix.
+- **Polynomial MBA:** higher-degree expressions over the same operator set — harder for pattern matchers.
+
+## Recovery approaches
+
+1. **Algebraic simplification** — coefficient reconstruction and term cancellation ([[cobra]]; SSPAM, MBA-Blast, SiMBA in the broader corpus); practical MBA expression reduction via [[mbased]] (source: wiki/sources/descriptions/bliutech__mbased.md); GPU-accelerated CUDA MBA evaluation and simplification via [[mba]] (SynthesisLab; multiple kernel implementations; JSON I/O) (source: wiki/sources/descriptions/SynthesisLab__MBA.md); Hex-Rays decompiler-time linear and non-linear MBA simplification via [[goomba]] (HexRaysSA; C++ plugin; algebraic heuristics + optional fingerprint-oracle support; Z3-verified soundness; IDA Pro / Hex-Rays workflows) (source: wiki/sources/descriptions/HexRaysSA__goomba.md); Hikari LLVM MBA recovery via [[chernobog]] (19h; C++ Hex-Rays plugin; Z3 symbolic reasoning + extensive MBA simplification rules alongside CFF and encrypted-data recovery) (source: wiki/sources/descriptions/19h__chernobog.md); Python linear/nonlinear MBA simplification with bitwise expression factory and benchmark datasets via [[gamba]] (DenuvoSoftwareSolutions; NeuReduce/QSynth/Syntia experiment corpora; research paper + slides) (source: wiki/sources/descriptions/DenuvoSoftwareSolutions__GAMBA.md).
+2. **Program synthesis** — oracle-guided expression search with SMT equivalence checks in IDA via [[qsynthesis]] (Python; Hex-Rays integration) (source: wiki/sources/descriptions/gmh5225__qsynthesis.md); exact finite-domain Drill & Join synthesis plus Bitwuzla equivalence proofs for 64-bit opaque predicates and MBA-style expressions via [[drill-and-join]] (C++17 header-only; SMT-guided bit dependency reduction) (source: wiki/sources/descriptions/fvrmatteo__DrillAndJoin.md); program synthesis plus term rewriting for linear/polynomial MBA deobfuscation via [[promba]] (astean1001; VM-protector contexts) (source: wiki/sources/descriptions/astean1001__ProMBA.md); agentic LLM-orchestrated deobfuscation via [[kong]] (in-process Ghidra; call-graph analysis; algebraic simplification, pattern matching, symbolic execution) (source: wiki/sources/descriptions/amruth-sn__kong.md).
+3. **Backward slicing + oracle lookup** — slice MBA regions, query msynth-style tables ([[obfuscation-analysis]]); standalone Python MBA simplifier [[msynth]] walks expression ASTs with pre-computed oracle tables, algebraic rewrites, and Smir stochastic synthesis on Miasm (optional SMT verification; SiMBA/GAMBA lineage) (source: wiki/sources/descriptions/mrphrazer__msynth.md); hands-on protected-binary deobfuscation curriculum via [[binary-cartography]] (Docker RE labs; Miasm + msynth symbolic workflows) (source: wiki/sources/descriptions/mrphrazer__binary-cartography.md).
+4. **SMT/bitvector solvers** — prove equivalence or find simplifying substitutions ([[stp]], Z3 backends).
+5. **Sample generation for testing** — synthesize MBA expressions to validate simplifier pipelines ([[mutaben]], [[mba-obfuscator]]); source-level constant/arithmetic replacement with Z3-verified polynomial MBA via [[mixed-boolean-transform]] (C++; Eigen3 + GMP) (source: wiki/sources/descriptions/mizt0__mixed-boolean-transform.md); compile-time control-flow obfuscation that MBA-encodes jump targets with per-build randomized rewrite rules via [[limba]] (C++20; Clang/clang-cl; ThatLing) (source: wiki/sources/descriptions/ThatLing__limba.md). VM-based protectors such as [[covirt]] embed MBA transforms inside stack-VM obfuscation passes for protected regions (source: wiki/sources/descriptions/dmaivel__covirt.md).
+6. **Interactive web tooling** — browser-based Rust/WASM MBA obfuscation, linear congruence solving, permutation polynomial generation, and expression simplification via [[mba-wasm]] (MathJax UI; MBA-research) (source: wiki/sources/descriptions/MBA-research__mba-wasm.md).
+7. **Machine learning** — graph neural network models trained to deobfuscate MBA expressions via [[gnn-deobfuscation]] (Python; Loki/MBABlast/MBAObfuscator datasets by variable count and operation depth; LostOxygen) (source: wiki/sources/descriptions/LostOxygen__gnn_deobfuscation.md).
+8. **LLVM lift + optimizer passes** — dynamic VMProtect pure-function recovery via [[vmprotect-devirtualization]] synthesizes recovered expressions to LLVM IR so standard LLVM optimizations can simplify embedded MBA noise after Triton symbolic analysis (JonathanSalwan; source: wiki/sources/descriptions/JonathanSalwan__VMProtect-devirtualization.md).
+
+## Detection context
+
+MBA-heavy regions often co-occur with [[control-flow-flattening]] and opaque predicates. Binary Ninja heuristics in [[obfuscation-detection]] and analysis passes in [[obfuscation-analysis]] help locate MBA blocks before manual simplification.
+
+## Related
+
+[[cobra]] · [[mbased]] · [[mba]] · [[goomba]] · [[chernobog]] · [[gamba]] · [[msynth]] · [[mba-wasm]] · [[gnn-deobfuscation]] · [[promba]] · [[kong]] · [[qsynthesis]] · [[drill-and-join]] · [[mutaben]] · [[mba-obfuscator]] · [[mixed-boolean-transform]] · [[limba]] · [[covirt]] · [[vmprotect-devirtualization]] · [[obfuscation-analysis]] · [[stp]] · [[control-flow-flattening]] · [[overviews/reverse-engineering]] · [[overviews/anti-cheat]]

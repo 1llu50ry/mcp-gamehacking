@@ -1,0 +1,66 @@
+---
+title: Hardware Input Injection
+kind: concept
+topics: [game-hacking, anti-cheat]
+sources:
+  - wiki/sources/skills/anti-cheat.md
+  - wiki/sources/skills/game-hacking.md
+  - wiki/sources/descriptions/gmh5225__Overwatch2-colorbot-Cheats.md
+  - wiki/sources/descriptions/ekknod__logitech-cve.md
+  - wiki/sources/descriptions/ZhaoKunqi__simple-eft-superman-training-bot.md
+  - wiki/sources/descriptions/KelvinMsft__UsbMon.md
+  - wiki/sources/descriptions/ConWan30__QorTroller.md
+  - wiki/sources/descriptions/Chaoses-Ib__IbInputSimulator.md
+  - wiki/sources/descriptions/BatogiX__logitech-cve.md
+  - wiki/sources/descriptions/ablanchard-dev__dexcheck.md
+  - wiki/sources/descriptions/guvenada__Titanium-Macro.md
+updated: 2026-09-27
+confidence: medium
+---
+
+# Hardware Input Injection
+
+Input paths that emit **protocol-conformant HID reports** (USB keyboard/mouse) or driver-filtered events instead of direct `SendInput` / `mouse_event` calls. Common in AI visual cheat pipelines where aim logic runs off-box or aims to reduce user-mode injection telemetry. Individual reports may look ordinary; **descriptors, timing, topology, firmware, and gameplay behavior** can still be observable. (source: wiki/sources/skills/game-hacking.md)
+
+## Device classes
+
+| Class | Mechanism | Trade-offs |
+|-------|-----------|------------|
+| KMBox Net/B Pro | TCP/UDP or serial → USB HID | Dual-PC friendly; Net uses MAC/index/CMD framing (verify per firmware) |
+| Arduino / Teensy | Serial commands → ATmega32U4 HID | Low cost; custom firmware |
+| Logitech driver abuse | Inject into G HUB/LGS; internal move APIs | No extra hardware; version-patched |
+
+Logitech-focused driver/CVE research such as [[logitech-cve]] spans ekknod C/C++ driver-development PoCs (cheat / triggerbot & aimbot) and BatogiX Rust typed libraries over Logitech virtual driver IOCTL handles (input-emulation research, automation, vulnerable-driver attack-surface analysis). (source: wiki/sources/descriptions/ekknod__logitech-cve.md) (source: wiki/sources/descriptions/BatogiX__logitech-cve.md) Unified multi-backend Windows input libraries such as [[ib-input-simulator]] (Chaoses-Ib; Logitech, Razer Synapse, MouClassInputInjection, DD virtual devices; AHK integration; driver-backed keyboard/mouse when user-mode APIs are blocked) sit beside single-vendor PoCs like [[razer-rzctl]]. (source: wiki/sources/descriptions/Chaoses-Ib__IbInputSimulator.md)
+| interception.sys | Filter driver inject | Known signature; widely flagged; full macro record/replay stacks such as [[titanium-macro]] (guvenada; Python/PyQt6; Interception wrapper; raw HID trajectories + scan codes; sub-ms performance-counter timing; Bézier humanization; OpenCV/Tesseract vision scripting) illustrate the filter-driver macro lane (source: wiki/sources/descriptions/guvenada__Titanium-Macro.md) |
+| KVM middleman | Hardware between mouse and host | Complex setup; limited host software |
+
+KMBox Net example command families (firmware-dependent): connect, `mouse_move`, interpolated `mouse_automove`, Bézier `mouse_beizer`, button/wheel events; encrypted `enc_*` variants resist passive packet sniffing.
+
+## Illustrative detection-surface ordering
+
+Not a universal stealth ranking—measure per title and AC generation:
+
+1. Dedicated HID hardware — fewer software artifacts; device/behavior signals remain
+2. KVM middleman — limited host footprint if timing/descriptors match
+3. Vendor-driver abuse — process/module/version artifacts
+4. Known filter drivers — driver identity and load path
+5. User-mode injection APIs — direct syscall/API telemetry
+
+## USB HID report analysis
+
+Hardware injectors emit genuine HID reports, but defensive analysis can compare:
+
+- **Report rate / timing** — simplistic injectors may show programmed periodicity or burst patterns; sophisticated injectors and legitimate software-assisted input can also be bursty—compare against matched devices, polling rates, sensitivity, and movement tasks.
+- **Delta distribution** — requires calibration per device and task before conclusions.
+
+Protocol-conformant hardware injection may be **indistinguishable from a normal mouse** from an individual HID report alone; descriptors, timing, provenance, and gameplay behavior provide imperfect signals. Device signatures identify known implementations but are not durable attribution. Dual-machine capture avoids a cheat process on the gaming PC but still leaves capture/input-device effects and may leave network or device telemetry depending on design. (source: wiki/sources/skills/anti-cheat.md)
+
+## Network indicators (KMBox Net)
+
+KMBox Net uses UDP on the local network; consistent-size high-frequency UDP packets from a secondary device to the injector IP can be contextual evidence when a collector receives relevant traffic. Shared LAN or public address alone provides neither visibility into every inter-device exchange nor evidence of prohibited use—see [[network-environment-evidence]]. (source: wiki/sources/skills/anti-cheat.md)
+
+Defensive pairing: [[ai-aimbot-detection]] (hardware enumeration, input micro-signatures, server replay) and [[input-provenance]] (telemetry trust labels). Consent-based screenshare PC checks such as [[dexcheck]] (ablanchard-dev; read-only PowerShell ~40 probes for CoD/Warzone; Cronus/XIM-style input device and capture-hardware enumeration alongside DMA/PCIe probes) and [[alibi]] (Sutaigne; XIM/Cronus/ReaSnow console-rig scan) support moderator-supervised vetting when server-side attestation is unavailable. (source: wiki/sources/descriptions/ablanchard-dev__dexcheck.md) Hardware-rooted controller attestation stacks such as [[qortroller]] (ConWan30; VAPI protocol; DualShock bridge; PoEP presence challenges; Circom/Groth16 verified-human proofs; session receipts; anti-cheat research) aim to prove live human gamepad input rather than spoofed HID or scripted macros. (source: wiki/sources/descriptions/ConWan30__QorTroller.md) Kernel USB/HID monitoring frameworks such as [[usbmon]] (KelvinMsft; driver hooks IRP/IOCTL/URB paths and parses HID reports for tracing input into consumer processes) support reverse engineering of hardware input behavior and HID-based attack or detection surfaces. (source: wiki/sources/descriptions/KelvinMsft__UsbMon.md) Offensive smoothing samples: [[human-mouse-movement]], [[pine]]. End-to-end colorbot + Arduino Leonardo serial HID samples such as [[overwatch2-colorbot-cheats]] (Python screen purple-outline detection → aim deltas → 115200-baud serial → chunked `Mouse.move()`; cheat / game:overwatch2) illustrate the Arduino/Teensy class in a zero-memory visual pipeline. (source: wiki/sources/descriptions/gmh5225__Overwatch2-colorbot-Cheats.md) EFT training-routine automation such as [[simple-eft-superman-training-bot]] (ZhaoKunqi; Arduino HID-capable boards; keyboard/mouse emulation for repetitive in-game movement cycles; `.ino` sketches + Python coordinate helper; cheat / game:eft) illustrates the same Arduino class for title-specific skill-grinding rather than AI visual aim. (source: wiki/sources/descriptions/ZhaoKunqi__simple-eft-superman-training-bot.md)
+
+## Related
+
+[[titanium-macro]] · [[ib-input-simulator]] · [[logitech-cve]] · [[razer-rzctl]] · [[qortroller]] · [[dexcheck]] · [[alibi]] · [[kernel-mouse]] · [[usbmon]] · [[input-provenance]] · [[network-environment-evidence]] · [[ai-aimbot-detection]] · [[overviews/game-hacking]] · [[overviews/anti-cheat]]
