@@ -984,29 +984,50 @@ server.tool(
     const src = await safeRead(join(DIRS.skills, name, "source.txt"));
     if (!src) return err(`No source.txt for "${name}".`);
 
-    const filePathRegex = /^={3,}\s*(?:File|PATH):\s*(.+?)(?:\s*={3,})?$/gim;
-    const paths: string[] = [];
-    let match;
+    // source.txt embeds the tree in a fenced block right after a "Source Tree:" marker.
+    const fenced = src.match(/Source Tree:\s*```[a-z]*\r?\n([\s\S]*?)\r?\n```/i);
+    if (fenced) {
+      const lines = fenced[1].split("\n").map((l) => l.replace(/\r$/, ""));
+      const treeLines = lines.filter((l) => /[├└]──/.test(l));
 
-    while ((match = filePathRegex.exec(src)) !== null) {
+      if (treeLines.length) {
+        const root = (lines.find((l) => l.trim() && !/[├└]/.test(l)) ?? "").trim();
+        // Tree indent is 4 columns per level; the prefix is drawn with │ ├ └ ─ and spaces.
+        const indents = treeLines.map((l) => Math.floor(l.match(/^[│├└─\s]*/)![0].length / 4));
+
+        // An entry is a directory when the next entry sits one level deeper.
+        let dirs = 0;
+        for (let i = 0; i < treeLines.length - 1; i++) {
+          if (indents[i + 1] > indents[i]) dirs++;
+        }
+
+        const shown = treeLines.slice(0, max_entries);
+        const truncated = treeLines.length > max_entries;
+        const files = treeLines.length - dirs;
+
+        return ok(
+          `# File Tree: ${name}\n\n` +
+            `${treeLines.length} entries (${files} files, ${dirs} directories)` +
+            `${root ? `\nRoot: \`${root}\`` : ""}` +
+            `${truncated ? `\nShowing first ${max_entries} of ${treeLines.length}.` : ""}\n\n` +
+            "```\n" +
+            (root ? root + "\n" : "") +
+            shown.join("\n") +
+            (truncated ? "\n…" : "") +
+            "\n```"
+        );
+      }
+    }
+
+    // Fallback for sources that use explicit file markers instead of a drawn tree.
+    // NOTE: a bare markdown bullet (`- http://host.net`) must NOT count as a path,
+    // so the marker must be an explicit `file:`/`path:` label.
+    const paths: string[] = [];
+    const markerRegex = /^(?:={3,}|[/#;]+)\s*(?:File|PATH|file|path|source):\s*(.+?)(?:\s*={3,})?\s*$/gim;
+    let match;
+    while ((match = markerRegex.exec(src)) !== null) {
       paths.push(match[1].trim());
       if (paths.length >= max_entries) break;
-    }
-
-    if (!paths.length) {
-      const lineRegex = /^[-─]+\s*(.+\.[a-zA-Z]{1,5})\s*[-─]*$/gm;
-      while ((match = lineRegex.exec(src)) !== null) {
-        paths.push(match[1].trim());
-        if (paths.length >= max_entries) break;
-      }
-    }
-
-    if (!paths.length) {
-      const extRegex = /^(?:\/\/|#|;)\s*(?:file|path|source):\s*(.+)/gim;
-      while ((match = extRegex.exec(src)) !== null) {
-        paths.push(match[1].trim());
-        if (paths.length >= max_entries) break;
-      }
     }
 
     if (!paths.length) return err(`Could not extract file tree from "${name}". Source may not use standard file markers.`);
