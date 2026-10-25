@@ -54,41 +54,63 @@ interface SkillIndex {
 
 let _index: Map<string, SkillIndex> | null = null;
 let _indexTime = 0;
+let _indexBuild: Promise<Map<string, SkillIndex>> | null = null;
 const INDEX_TTL = 120_000;
+const INDEX_CHUNK = 64;
 
-async function getIndex(): Promise<Map<string, SkillIndex>> {
-  const now = Date.now();
-  if (_index && now - _indexTime < INDEX_TTL) return _index;
-
+async function buildIndex(): Promise<Map<string, SkillIndex>> {
   const entries = await readdir(DIRS.skills, { withFileTypes: true });
   const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
   const idx = new Map<string, SkillIndex>();
 
-  const batch = dirs.map(async (name) => {
-    const content = await safeRead(join(DIRS.skills, name, "SKILL.md"));
-    if (!content) return;
-    const parsed = parseFrontmatter(content);
-    const hasSource = await fileExists(join(DIRS.skills, name, "source.txt"));
-    const topics = parsed.meta.topics ?? [];
-    const searchText = [
-      name, parsed.meta.name, parsed.meta.description, ...topics,
-      ...(parsed.meta.games ?? []), ...(parsed.meta.engines ?? []),
-    ].join(" ").toLowerCase();
+  // Bounded concurrency. A single Promise.all over ~4k directories opens
+  // thousands of handles at once; reads that fail under that pressure are
+  // swallowed by safeRead and the skill silently vanishes from the index.
+  for (let i = 0; i < dirs.length; i += INDEX_CHUNK) {
+    const chunk = dirs.slice(i, i + INDEX_CHUNK);
+    await Promise.all(
+      chunk.map(async (name) => {
+        const content = await safeRead(join(DIRS.skills, name, "SKILL.md"));
+        if (!content) return;
+        const parsed = parseFrontmatter(content);
+        const hasSource = await fileExists(join(DIRS.skills, name, "source.txt"));
+        const topics = parsed.meta.topics ?? [];
+        const searchText = [
+          name, parsed.meta.name, parsed.meta.description, ...topics,
+          ...(parsed.meta.games ?? []), ...(parsed.meta.engines ?? []),
+        ].join(" ").toLowerCase();
 
-    idx.set(name, {
-      name,
-      description: parsed.meta.description,
-      type: parsed.meta.type ?? "unknown",
-      topics,
-      hasSource,
-      searchText,
-    });
-  });
+        idx.set(name, {
+          name,
+          description: parsed.meta.description,
+          type: parsed.meta.type ?? "unknown",
+          topics,
+          hasSource,
+          searchText,
+        });
+      })
+    );
+  }
 
-  await Promise.all(batch);
-  _index = idx;
-  _indexTime = now;
   return idx;
+}
+
+async function getIndex(): Promise<Map<string, SkillIndex>> {
+  const now = Date.now();
+  if (_index && now - _indexTime < INDEX_TTL) return _index;
+  // Single-flight: concurrent callers await the build already in progress
+  // instead of each starting their own, which produced partial indexes.
+  if (_indexBuild) return _indexBuild;
+
+  _indexBuild = buildIndex();
+  try {
+    const idx = await _indexBuild;
+    _index = idx;
+    _indexTime = Date.now();
+    return idx;
+  } finally {
+    _indexBuild = null;
+  }
 }
 
 // Component caches
