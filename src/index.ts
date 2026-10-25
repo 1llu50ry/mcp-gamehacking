@@ -3,7 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { readdir, readFile, stat } from "fs/promises";
 import { join, resolve } from "path";
-import { createReadStream } from "fs";
+import { createReadStream, readFileSync } from "fs";
 import { createInterface } from "readline";
 
 const ROOT = resolve(import.meta.dirname, "..");
@@ -342,9 +342,16 @@ function scoreSkill(idx: SkillIndex, keywords: string[]): number {
 // SERVER
 // ============================================================
 
+// package.json is the source of truth for the version, so the MCP
+// serverInfo cannot drift from the published package version.
+const PKG_VERSION = z
+  .object({ version: z.string() })
+  .parse(JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")))
+  .version;
+
 const server = new McpServer({
   name: "mcp-gamehacking",
-  version: "3.0.0",
+  version: PKG_VERSION,
 });
 
 // ============================================================
