@@ -137,7 +137,10 @@ function parseFrontmatter(content: string): ParsedFile {
   const raw = match[1];
   const body = match[2].trim();
 
-  const str = (key: string) => raw.match(new RegExp(`^${key}:\\s*"?(.+?)"?$`, "m"))?.[1]?.trim();
+  // Keys may sit at column 0 (`name:`) or nested under `metadata:` (`  type:`),
+  // so leading whitespace is allowed. Top-level keys still win because the regex
+  // scans left-to-right and they precede the metadata block.
+  const str = (key: string) => raw.match(new RegExp(`^\\s*${key}:\\s*"?(.+?)"?$`, "m"))?.[1]?.trim();
   const arr = (key: string) => {
     const m = raw.match(new RegExp(`${key}:\\s*\\[([^\\]]*)\\]`));
     return m ? m[1].split(",").map((t) => t.trim().replace(/^['"]|['"]$/g, "")).filter(Boolean) : undefined;
