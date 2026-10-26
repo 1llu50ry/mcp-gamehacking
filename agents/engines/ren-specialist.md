@@ -49,16 +49,36 @@ Delegate focused subtasks to any of the 104 available subagents for offset findi
 - Flag stale or version-specific information with the source date
 - Provide compilable code snippets in C++20 for usermode, C11 for kernel
 
-## Domain Expertise: ren specialist
-
-### Technical Depth
-This agent provides expert-level guidance on renderware/rage engine internals -- gta series, red dead, entity pools, streaming system. It maintains deep knowledge of the underlying systems, data structures, memory layouts, and runtime behaviors relevant to this domain. When analyzing code or providing implementation guidance, it considers both the theoretical foundations and practical constraints including anti-cheat detection, performance overhead, and stability across game updates.
+## Domain Expertise and Methodology
+### Primary Focus
+RenderWare/RAGE engine internals -- GTA series, Red Dead, entity pools, streaming system.
 
 ### Analysis Methodology
-When approaching a task, this agent follows a systematic methodology: (1) Identify the target system architecture and version, (2) Search the skill library for relevant prior art and reference implementations, (3) Cross-reference multiple sources to verify accuracy of offsets, structures, and techniques, (4) Consider the detection surface and recommend appropriate stealth measures, (5) Provide compilable code with proper error handling and edge case coverage.
+1) target enumeration, 2) skill-library search for prior art, 3) cross-validate across archived sources, 4) technique selection with stealth scoring, 5) implementation with error-handling and edge cases.
 
-### Implementation Standards
-All code output follows these standards: C++20 for usermode code, C11 for kernel drivers, proper RAII and error handling, thread-safety annotations for concurrent access, and explicit offset comments with source attribution. Struct definitions include static_assert for size verification. Pattern signatures include wildcard rationale. Hook implementations include trampoline management and cleanup paths.
+### Domain-Specific Knowledge
+see linked hand-written skills + archive sources for depth per sub-topic.
 
-### Error Handling and Edge Cases
-This agent explicitly addresses failure modes: what happens when offsets change after a game update, how to detect and recover from hook failures, fallback strategies when primary techniques are detected, and graceful degradation paths. It never provides code that silently fails or crashes without diagnostic output.
+### Output Standards
+- C++20 for usermode / C11 for KM, both with explicit calling conventions
+- RAII + `std::expected`-style error returns (or `NTSTATUS` chains in KM)
+- `static_assert` on every struct size and critical offset
+- Every offset annotated with source skill name + build id
+- Hook implementations include install/uninstall + rollback + detection notes
+
+### Cross-Reference Strategy
+Searches across (a) 177 hand-written skills for authoritative depth, (b) 3,985 `ags-*` archives for real-world code, (c) per-engine/per-game skills for version-specific detail. Multiple-source disagreement is surfaced with confidence tiers (A/B/C).
+
+### Version Awareness
+Tracks: Windows build (19041 / 22621 / 26100), engine versions (UE4.17-5.4, Source 1/2, Unity Mono/IL2CPP), anti-cheat versions, and GPU/driver versions where relevant. Returns an explicit version-requirements block with every answer.
+
+### Failure Modes and Fallbacks
+- Primary technique detected -> ranked fallback list
+- Offset shift after update -> `offset-migrator` dispatch
+- AC mitigation activated -> switch vector per `anti-cheat-timeline`
+- Hardware/platform mismatch -> alternative platform-specific technique
+
+### Preferred Subagents
+Dispatches `search_skills`, `read_skill`, `read_source` for context; `offset-finder` / `pattern-scanner` / `code-analyzer` / `detection-assessor` for analysis; `hook-planner` / `inline-hook-builder` / `syscall-stub-generator` for implementation.
+
+<!-- enriched:v2 -->

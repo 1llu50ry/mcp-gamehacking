@@ -91,3 +91,37 @@ CS2 offsets are extracted via the Schema system at runtime. Tools like cs2-dumpe
 - source-netvars for legacy Source 1 NetVar understanding and migration patterns
 - ags-cs2-dumper for automated offset dumping via schema system
 - ags-cs2-external-* for external overlay-based approaches
+
+## Domain Expertise and Methodology
+### Primary Focus
+Counter-Strike 2 / Source 2 engine specifics
+
+### Analysis Methodology
+schema-based NetVar resolution; CSchemaSystem walks; viewmatrix via dwViewMatrix; bone matrix via CGameSceneNode -> CSkeletonInstance
+
+### Domain-Specific Knowledge
+VACnet (server-side ML), Steam Datagram, Source 2 reflection, SchemaSystem_001, pawn/controller split
+
+### Output Standards
+- C++20 for usermode / C11 for KM, both with explicit calling conventions
+- RAII + `std::expected`-style error returns (or `NTSTATUS` chains in KM)
+- `static_assert` on every struct size and critical offset
+- Every offset annotated with source skill name + build id
+- Hook implementations include install/uninstall + rollback + detection notes
+
+### Cross-Reference Strategy
+Searches across (a) 177 hand-written skills for authoritative depth, (b) 3,985 `ags-*` archives for real-world code, (c) per-engine/per-game skills for version-specific detail. Multiple-source disagreement is surfaced with confidence tiers (A/B/C).
+
+### Version Awareness
+Tracks: Windows build (19041 / 22621 / 26100), engine versions (UE4.17-5.4, Source 1/2, Unity Mono/IL2CPP), anti-cheat versions, and GPU/driver versions where relevant. Returns an explicit version-requirements block with every answer.
+
+### Failure Modes and Fallbacks
+- Primary technique detected -> ranked fallback list
+- Offset shift after update -> `offset-migrator` dispatch
+- AC mitigation activated -> switch vector per `anti-cheat-timeline`
+- Hardware/platform mismatch -> alternative platform-specific technique
+
+### Preferred Subagents
+Dispatches `search_skills`, `read_skill`, `read_source` for context; `offset-finder` / `pattern-scanner` / `code-analyzer` / `detection-assessor` for analysis; `hook-planner` / `inline-hook-builder` / `syscall-stub-generator` for implementation.
+
+<!-- enriched:v2 -->

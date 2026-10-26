@@ -1,0 +1,42 @@
+name: Bug report
+description: Something is broken.
+title: "[bug] "
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      placeholder: "`analyze_binary` on an ELF returned 'parse failed'."
+    validations: { required: true }
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. node dist/index.js
+        2. call tool `analyze_binary` with path=/path/to/binary
+        3. see error
+    validations: { required: true }
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+    validations: { required: true }
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: "4.6.0 / commit a1b2c3d"
+    validations: { required: true }
+  - type: input
+    id: os
+    attributes:
+      label: Platform
+      placeholder: "Windows 11 24H2 / Node 20.11"
+    validations: { required: true }
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / stack
+      render: text

@@ -1,10 +1,26 @@
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { randomUUID } from "node:crypto";
+import { createServer } from "node:http";
 import { z } from "zod";
 import { readdir, readFile, stat } from "fs/promises";
 import { join, resolve } from "path";
 import { createReadStream } from "fs";
 import { createInterface } from "readline";
+import { registerReTools } from "./retools.js";
+import { registerNativeReTools } from "./native-re.js";
+import { registerNativeFormatsTools } from "./native-formats.js";
+import { registerAdvancedParsers } from "./native-advanced.js";
+import { registerWorkflowTools } from "./workflow-tools.js";
+import { registerAgentMesh } from "./agent-mesh.js";
+import { registerMcpHub } from "./mcp-hub.js";
+import { registerContainerParsers } from "./native-containers.js";
+import { registerMetaTools } from "./meta-tools.js";
+import { registerCompositeTools } from "./composite-tools.js";
+import { registerBm25Search } from "./bm25-search.js";
+import { registerAuditAndRate } from "./audit-rate.js";
+import { registerDynamicResources } from "./dynamic-resources.js";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const DIRS = {
@@ -1466,12 +1482,145 @@ for (const { singular, plural, dir } of componentTools) {
 }
 
 // ============================================================
+// RE / DEBUG MCP INTEGRATIONS
+// ============================================================
+// Register bridges and launchers for Ghidra, IDA Pro, Binary Ninja,
+// radare2, x64dbg, WinDbg, Cheat Engine, Frida, Hopper, REA,
+// Vibe-RE, JADX, angr, Capstone, PCILeech, Memflow, Scylla, dnSpy,
+// ReClass, Volatility, Wireshark, mitmproxy, dotPeek, Unicorn,
+// pyghidra-mcp --gui, ret-sync. See src/retools.ts.
+registerReTools(server, ROOT);
+
+// Native TypeScript RE tools -- PE parse, AoB scan, entropy,
+// strings, hash-ID, signature maker, file summary. Always
+// available (no external deps). See src/native-re.ts.
+registerNativeReTools(server);
+
+// Native TypeScript binary-format parsers -- ELF, Mach-O (fat +
+// thin), DEX, WebAssembly, plus a format-identify magic sniffer
+// that recognises PE, ELF, Mach-O, DEX, WASM, ZIP/APK/JAR, 7-Zip,
+// gzip, zstd, LZ4, PDF, scripts, Switch NSO/NCA, Xbox 360 XEX,
+// PS4/PS5 FSELF. See src/native-formats.ts.
+registerNativeFormatsTools(server);
+
+// Advanced native parsers -- Minidump, PDB70 (RSDS), Rich Header,
+// C++ demangler (MSVC + Itanium), Unity AssetBundle, UE4/UE5 .pak,
+// IL2CPP global-metadata.dat, Switch NSO. See src/native-advanced.ts.
+registerAdvancedParsers(server);
+
+// Workflow tools -- offset_diff, offset_merge, cross-build
+// signature validator, AC risk matrix, cheat-sheet generator.
+// See src/workflow-tools.ts.
+registerWorkflowTools(server);
+
+// Agent Mesh -- lets several MCP clients (Claude, ChatGPT via
+// Codex, Cursor, custom agents) share a workspace through this
+// server: register, DM + channel broadcast, task hand-off,
+// adversarial voting, shared KV knowledge-base, named locks.
+// Persistence: JSON files under <project>/.agent-mesh/ (or
+// MCP_AGENT_MESH_DIR). See src/agent-mesh.ts.
+await registerAgentMesh(server, ROOT);
+
+// MCP Hub -- aggregate multiple backend MCP servers. Our server
+// becomes a CLIENT to other MCPs (ghidra-mcp, ida-pro-mcp,
+// x64dbg-mcp, binja-mcp) and re-exposes their tools via
+// `hub_call`. `smart_decompile` dispatches to the first available
+// decompiler backend; `hub_consensus_call` fans out across
+// backends. See src/mcp-hub.ts.
+registerMcpHub(server);
+
+// Native container parsers -- ZIP / APK (+signing block), .NET
+// CLR header + metadata root, Windows catalog PKCS#7 sniff.
+registerContainerParsers(server);
+
+// Repo-wide meta tools -- fs_sandbox_status, wiki_link_check,
+// training_jsonl_export, symsrv_download, pattern_mine,
+// mesh_orchestrate.
+registerMetaTools(server, ROOT);
+
+// Composite tools -- analyze_binary (one-shot deep triage),
+// pe_debug_dir, compare_binaries.
+registerCompositeTools(server);
+
+// BM25 full-text search over the skill library (10-min TTL
+// cached inverted index; ~1 sec cold build on 4,200 skills).
+registerBm25Search(server, ROOT);
+
+// Audit log + rate limiter (opt-in).
+registerAuditAndRate(server, ROOT);
+
+// MCP Resource templates for URI-addressable skill/plugin/agent
+// content: gamehacking://skills/{name}, gamehacking://ags/{name}/source,
+// gamehacking://plugins/{category}/{name}, etc.
+registerDynamicResources(server, ROOT);
+
+// ============================================================
 // MAIN
 // ============================================================
 
 async function main() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  const mode = process.env.MCP_TRANSPORT ?? "stdio";
+  if (mode === "http" || mode === "sse" || mode === "streamable-http") {
+    const port = Number(process.env.MCP_HTTP_PORT ?? 7777);
+    const host = process.env.MCP_HTTP_HOST ?? "127.0.0.1";
+    const transports = new Map<string, StreamableHTTPServerTransport>();
+    const httpServer = createServer(async (req, res) => {
+      // /healthz: readiness probe
+      if (req.method === "GET" && req.url === "/healthz") {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ status: "ok", pid: process.pid, uptime: process.uptime(), version: "4.3.0" }));
+        return;
+      }
+      // /metrics: Prometheus-style
+      if (req.method === "GET" && req.url === "/metrics") {
+        const mu = process.memoryUsage();
+        const metrics = [
+          `# HELP mcp_gamehacking_rss_bytes Process RSS`,
+          `# TYPE mcp_gamehacking_rss_bytes gauge`,
+          `mcp_gamehacking_rss_bytes ${mu.rss}`,
+          `# HELP mcp_gamehacking_heap_used_bytes V8 heap used`,
+          `# TYPE mcp_gamehacking_heap_used_bytes gauge`,
+          `mcp_gamehacking_heap_used_bytes ${mu.heapUsed}`,
+          `# HELP mcp_gamehacking_uptime_seconds Process uptime`,
+          `# TYPE mcp_gamehacking_uptime_seconds counter`,
+          `mcp_gamehacking_uptime_seconds ${process.uptime().toFixed(3)}`,
+          `# HELP mcp_gamehacking_active_transports Active HTTP MCP sessions`,
+          `# TYPE mcp_gamehacking_active_transports gauge`,
+          `mcp_gamehacking_active_transports ${transports.size}`,
+        ].join("\n") + "\n";
+        res.writeHead(200, { "content-type": "text/plain; version=0.0.4" });
+        res.end(metrics);
+        return;
+      }
+      // MCP endpoint: use streamable HTTP transport
+      if (req.url === "/mcp" || req.url?.startsWith("/mcp?") || req.url?.startsWith("/mcp/")) {
+        try {
+          const sessionId = (req.headers["mcp-session-id"] as string | undefined) ?? randomUUID();
+          let transport = transports.get(sessionId);
+          if (!transport) {
+            transport = new StreamableHTTPServerTransport({ sessionIdGenerator: () => sessionId });
+            transports.set(sessionId, transport);
+            await server.connect(transport);
+            transport.onclose = () => transports.delete(sessionId);
+          }
+          await transport.handleRequest(req, res);
+          return;
+        } catch (e) {
+          res.writeHead(500);
+          res.end(`transport error: ${(e as Error).message}`);
+          return;
+        }
+      }
+      res.writeHead(404);
+      res.end("not found. endpoints: /mcp, /healthz, /metrics");
+    });
+    httpServer.listen(port, host, () => {
+      console.error(`[mcp-gamehacking] HTTP transport on http://${host}:${port}/mcp (health: /healthz, metrics: /metrics)`);
+    });
+  } else {
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+  }
 }
 
 main().catch(console.error);

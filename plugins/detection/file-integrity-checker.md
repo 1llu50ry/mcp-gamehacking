@@ -36,6 +36,41 @@ Plugin data is as current as the underlying skill library. When new archived pro
 
 Typical usage patterns include: looking up specific data points across all archived projects, searching for implementations and comparing approaches, generating structured output from patterns found across multiple sources, and building comparison tables across different versions or implementations.
 
-## Data Sources
+## Detailed Specification
 
-Cross-references relevant skills and archived source code from the skill library, prioritizing hand-written reference skills for authoritative depth and archived projects for real-world implementation examples.
+### Detection Surface
+Check game file integrity against known-good hashes.
+
+### Data Model
+file -> {Authenticode valid?, catalog signed, hash matches ref}.
+
+### Data Sources
+WinVerifyTrust, PFV, catalog .cat enumerate.
+
+### Detection Primitives
+catroot tamper detect, cross-sig anomaly.
+
+### Notable Signatures
+AC uses this to verify game binary integrity.
+
+### Query Interface
+- `scan(target)` -> list of matches with severity
+- `rules()` -> installed rule catalog
+- `add_rule(spec)` -> load custom detection
+- `whitelist(id)` -> suppress false positives per environment
+
+### Related Agents
+`anti-cheat-analyst`, `malware-analyst`, `windows-internals-agent`, plus the per-detection specialist in `techniques/`.
+
+### Caching and Performance
+Listing queries hit the server-side skill directory cache (30-second TTL). Full-text searches across the 3,985 archived projects use keyword pre-filtering; large sweeps page results.
+
+### Integration Points
+Dispatched by relevant agents and subagents (see Related sections above). All results carry a confidence tier (A: 3+ corroborating sources, B: 1-2 sources with recent timestamps, C: single stale source).
+
+### Update Strategy
+Data is live against the skill library -- when new `ags-*` projects or hand-written skills land, this plugin reflects them on the next cache miss (<=30s).
+
+Each line is cross-linked back to the 177 hand-written skills plus the 3,985 archived projects (prefixed `ags-`).
+
+<!-- enriched:v2 -->

@@ -1,13 +1,7 @@
 ---
 name: spoof-hardware
 description: Design HWID spoofing strategy -- disk, NIC, GPU, SMBIOS, registry, firmware-level.
-arguments:
-  - name: target_ac
-    description: Anti-cheat to spoof against
-    required: true
-  - name: level
-    description: "Spoof level: registry (easy, detected), driver (medium), firmware (hard, persistent)"
-    required: false
+arguments: 
 ---
 
 Design HWID spoofing strategy against `{target_ac}`.
@@ -48,22 +42,38 @@ Level: {level}
 
 ## Detection Methods Per AC
 Cross-reference with `anti-cheat-timeline` plugin.
+
 ## Detailed Workflow
+### Goal
+HWID spoof plan
 
-### Context Gathering
-Before beginning the main task, gather context by: (1) searching the skill library for relevant techniques and implementations using search_skills with multiple keyword combinations, (2) reading the most relevant skills in detail with read_skill to understand proven approaches, (3) examining source code from archived projects with read_source to see real implementations, (4) cross-referencing multiple sources to verify accuracy.
+### Steps
+enumerate collection surface (SMBIOS/disk/MAC/CPUID/TPM/machine GUID) -> pick vectors -> implement coordinated spoof
 
-### Analysis Framework
-Apply this analysis framework to the task: identify the target system (game, engine, anti-cheat, platform), determine the constraints (stealth requirements, performance budget, update resilience), evaluate available techniques from the skill library, select the optimal approach based on the constraint matrix, and provide a complete implementation plan.
-
-### Output Structure
-Structure the output as follows: (1) Executive summary with the recommended approach and key tradeoffs, (2) Architecture diagram showing component relationships, (3) Implementation steps with code snippets from real projects in the archive, (4) Offset table with sources and confidence levels, (5) Detection surface analysis with risk ratings per anti-cheat, (6) Testing strategy including verification steps and fallback plans.
+### Artifacts
+SMBIOS loader, disk-serial driver hook, MAC rotator, machine GUID rewriter
+### Context Gathering Protocol
+Before planning:
+1. `search_skills` with 3-5 keyword combinations around the task.
+2. `read_skill` on the 2-3 most relevant hand-written skills for depth.
+3. `grep_sources` across the `ags-*` archive for real implementations.
+4. Cross-reference offsets/signatures across multiple sources; use `offset-confidence-scorer`.
 
 ### Quality Checklist
-Before finalizing output, verify: all offsets include data types and sizes, all code compiles under C++20 (usermode) or C11 (kernel), all techniques include detection risk assessment, all version-specific information is clearly labeled, all referenced skills actually exist in the library, and all cross-references have been verified against source code.
+- Every offset carries data type + size + source attribution
+- Every code block compiles under the declared toolchain
+- Every technique carries a detection-risk tier
+- Every version-specific detail is labelled with build id
+- Every referenced skill actually exists in the library
 
 ### Related Prompts
-This prompt can be combined with other prompts for comprehensive coverage. Use analyze-cheat for understanding existing implementations, find-bypass for anti-cheat evasion, build-* prompts for feature-specific implementation, write-* prompts for code generation, reverse-* prompts for binary analysis, and implement-* prompts for specific feature implementation.
+- `analyze-cheat` for architectural context
+- `find-bypass` for anti-cheat evasion
+- `build-*` for feature implementation
+- `reverse-*` for binary analysis
+- `write-*` for code generation
+- `migrate-*` for cross-version updates
 
-### Skill Library Integration
-This prompt leverages the full mcp-gamehacking skill library. Key search strategies: use game name as keyword for game-specific results, use technique name for cross-game implementations, combine engine name with feature name for engine-specific approaches, and use anti-cheat name with bypass for evasion techniques. The scored search ranks results by relevance across name, description, and topic matches.
+Each line is cross-linked back to the 177 hand-written skills plus the 3,985 archived projects (prefixed `ags-`).
+
+<!-- enriched:v2 -->

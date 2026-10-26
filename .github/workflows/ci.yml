@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+
+jobs:
+  test:
+    name: test (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['18', '20', '22']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm ci || npm install
+      - run: npx tsc
+      - run: node --test tests/*.test.mjs
+
+  smoke:
+    name: smoke (MCP tools/list)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci || npm install
+      - run: npx tsc
+      - name: tools/list smoke test
+        run: |
+          echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' \
+            | timeout 15 node dist/index.js \
+            | grep -c '"name"' \
+            | tee tool_count.txt
+          test "$(cat tool_count.txt)" -ge 50 || (echo "expected >= 50 tools, got $(cat tool_count.txt)"; exit 1)
+
+  format:
+    name: format (prettier check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci || npm install
+      - name: install prettier
+        run: npm install --no-save prettier@3
+      - name: prettier --check
+        run: npx prettier --check "src/**/*.ts" "tests/**/*.mjs"
+        continue-on-error: true

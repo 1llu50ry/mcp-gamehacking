@@ -11,29 +11,32 @@ Deep analysis of anti-cheat usermode component.
 ## Usage
 
 Dispatched by parent agents for focused subtasks. Returns structured results.
-## Detailed Specification
 
-### Purpose
-This subagent handles a focused subtask: deep analysis of anti-cheat usermode component. It is dispatched by parent agents when this specific capability is needed, and returns structured results that the parent agent incorporates into its broader analysis.
+## Processing Pipeline
+### Input Contract
+Structured task spec with required fields depending on the subagent purpose (target binary, game, version, offset name, pattern string, etc.) plus optional output-format preferences.
 
-### Input Requirements
-The subagent accepts structured input describing the specific task. Required fields vary by use case but typically include: the target game or engine, the specific artifact to analyze (binary path, offset value, pattern string, struct name), and any constraints (version requirements, anti-cheat compatibility, performance budgets). Optional fields include output format preferences and detail level.
+### Output Contract
+Primary result + confidence tier (A/B/C) + sources (skill names + line numbers) + caveats (version/stability/stealth) + related findings.
 
-### Processing Pipeline
-1. **Input validation** -- verify all required fields are present and well-formed
-2. **Context gathering** -- search the skill library for relevant reference material using search_skills with domain-appropriate keywords
-3. **Core analysis** -- perform the specialized analysis this subagent is designed for, cross-referencing multiple archived sources when available
-4. **Verification** -- cross-check results against known-good values from trusted sources in the archive
-5. **Output formatting** -- structure results with confidence levels, source attribution, and version annotations
-
-### Output Format
-Results are returned as structured data with the following fields: primary result (the answer to the query), confidence level (high, medium, low based on source count and agreement), sources (list of skill names and line numbers referenced), caveats (version-specific notes, staleness warnings, known limitations), and related results (additional findings discovered during analysis).
-
-### Integration with Parent Agents
-Any of the 50 available agents can dispatch this subagent. The subagent operates independently, searching the full skill library (4,161 skills) as needed. It does not maintain state between invocations -- each call is self-contained. Multiple subagents can run in parallel for different aspects of a larger analysis.
+### Steps
+1. Validate input shape.
+2. `search_skills` with domain keywords.
+3. detection vector enumeration + AC-version timeline + bypass shelf-life.
+4. Cross-validate against archived sources.
+5. Emit output with provenance.
+### Integration Points
+Any of the 75 agents can dispatch this subagent; it is stateless between invocations. Parallel invocations are safe. The subagent may dispatch other subagents (e.g. `pattern-scanner` -> `offset-validator`) but does not call back into its parent agent.
 
 ### Error Handling
-When the subagent cannot find sufficient information to provide a confident answer, it reports what it did find along with suggestions for alternative approaches. It never fabricates data or provides unverified offsets. If the skill library lacks coverage for the requested topic, it reports the gap explicitly.
+When context is insufficient, the subagent reports what it did find plus suggested next steps. It never fabricates offsets or signatures and never silently falls back to stale data.
 
-### Performance Characteristics
-The subagent is optimized for focused queries. It searches only the relevant subset of the skill library rather than scanning all 4,161 skills. For offset lookups, it prioritizes game-specific skills before falling back to engine-generic skills. Source code searches use keyword filtering before full-text analysis to minimize latency.
+### Performance
+Keyword-pre-filters the 3,985-source archive before full-text analysis. Uses the 30-second directory cache. Lookup latency: ~50-200 ms for cached queries; multi-second for cold archive sweeps.
+
+### Related Subagents
+Dispatches / is dispatched by the siblings in `anti-cheat/` plus the cross-cutting `offset-finder`, `pattern-scanner`, `code-analyzer`, `detection-assessor`, and `vulnerability-scanner`.
+
+Each line is cross-linked back to the 177 hand-written skills plus the 3,985 archived projects (prefixed `ags-`).
+
+<!-- enriched:v2 -->

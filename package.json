@@ -1,14 +1,18 @@
 {
   "name": "mcp-gamehacking",
-  "version": "4.0.0",
-  "description": "MCP server for game hacking & reverse engineering — 4,100+ skills, 75 agents, 161 subagents, 114 plugins, 148 prompts, full-text grep, offset cross-ref, similarity search, offset export, function finder",
+  "version": "4.6.0",
+  "bin": {
+    "mcp-gamehacking": "bin/mcp-gamehacking.mjs"
+  },
+  "description": "MCP server for game hacking & reverse engineering — 4,200+ skills, 78 agents, 163 subagents, 117 plugins, 150 prompts, full-text grep, offset cross-ref, similarity search, offset export, function finder, native TS binary parsers (PE/ELF/Mach-O/DEX/WASM) and launchable RE/debug MCP integrations for 43 backends (Ghidra, IDA, Binary Ninja, radare2, x64dbg, WinDbg, Cheat Engine, Frida, Hopper, REA, Vibe-RE, JADX, angr, Capstone, PCILeech, Memflow, Scylla, dnSpy, ReClass, Volatility, Wireshark, mitmproxy, Ghidrathon, BinDiff, Diaphora, Qiling, unidbg, Reko, QEMU-trace, LLDB, GDB, Burp, YARA, ClrMD, Dolphin-DME, Cemu-IPC, and more)",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
-    "inspect": "npx @modelcontextprotocol/inspector node dist/index.js"
+    "inspect": "npx @modelcontextprotocol/inspector node dist/index.js",
+    "test": "tsc && node --test tests/*.test.mjs"
   },
   "keywords": [
     "mcp",

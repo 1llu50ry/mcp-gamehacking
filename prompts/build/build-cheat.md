@@ -1,19 +1,7 @@
 ---
 name: build-cheat
 description: Design a cheat architecture for a specific game with feature requirements.
-arguments:
-  - name: game
-    description: Target game name
-    required: true
-  - name: engine
-    description: "Game engine: ue4, ue5, unity-mono, unity-il2cpp, source, custom"
-    required: true
-  - name: features
-    description: "Comma-separated: esp, aimbot, triggerbot, radar, wallhack, skinchanger, misc"
-    required: true
-  - name: stealth
-    description: "Stealth level: low (dev/testing), medium (casual), high (competitive), max (tournament)"
-    required: false
+arguments: 
 ---
 
 Design a complete cheat architecture for `{game}` ({engine}) with features: {features}.
@@ -48,21 +36,36 @@ For each requested feature:
 - Pattern signatures for auto-updating
 
 ## Detailed Workflow
+### Goal
+full cheat skeleton
 
-### Context Gathering
-Before beginning the main task, gather context by: (1) searching the skill library for relevant techniques and implementations using search_skills with multiple keyword combinations, (2) reading the most relevant skills in detail with read_skill to understand proven approaches, (3) examining source code from archived projects with read_source to see real implementations, (4) cross-referencing multiple sources to verify accuracy.
+### Steps
+feature matrix (ESP/aim/trigger/misc) -> engine SDK -> hook strategy -> config/UI -> loader + comm channel -> stealth layer
 
-### Analysis Framework
-Apply this analysis framework to the task: identify the target system (game, engine, anti-cheat, platform), determine the constraints (stealth requirements, performance budget, update resilience), evaluate available techniques from the skill library, select the optimal approach based on the constraint matrix, and provide a complete implementation plan.
-
-### Output Structure
-Structure the output as follows: (1) Executive summary with the recommended approach and key tradeoffs, (2) Architecture diagram showing component relationships, (3) Implementation steps with code snippets from real projects in the archive, (4) Offset table with sources and confidence levels, (5) Detection surface analysis with risk ratings per anti-cheat, (6) Testing strategy including verification steps and fallback plans.
+### Artifacts
+complete repo with build system, SDK, loader, DLL/driver
+### Context Gathering Protocol
+Before planning:
+1. `search_skills` with 3-5 keyword combinations around the task.
+2. `read_skill` on the 2-3 most relevant hand-written skills for depth.
+3. `grep_sources` across the `ags-*` archive for real implementations.
+4. Cross-reference offsets/signatures across multiple sources; use `offset-confidence-scorer`.
 
 ### Quality Checklist
-Before finalizing output, verify: all offsets include data types and sizes, all code compiles under C++20 (usermode) or C11 (kernel), all techniques include detection risk assessment, all version-specific information is clearly labeled, all referenced skills actually exist in the library, and all cross-references have been verified against source code.
+- Every offset carries data type + size + source attribution
+- Every code block compiles under the declared toolchain
+- Every technique carries a detection-risk tier
+- Every version-specific detail is labelled with build id
+- Every referenced skill actually exists in the library
 
 ### Related Prompts
-This prompt can be combined with other prompts for comprehensive coverage. Use analyze-cheat for understanding existing implementations, find-bypass for anti-cheat evasion, build-* prompts for feature-specific implementation, write-* prompts for code generation, reverse-* prompts for binary analysis, and implement-* prompts for specific feature implementation.
+- `analyze-cheat` for architectural context
+- `find-bypass` for anti-cheat evasion
+- `build-*` for feature implementation
+- `reverse-*` for binary analysis
+- `write-*` for code generation
+- `migrate-*` for cross-version updates
 
-### Skill Library Integration
-This prompt leverages the full mcp-gamehacking skill library. Key search strategies: use game name as keyword for game-specific results, use technique name for cross-game implementations, combine engine name with feature name for engine-specific approaches, and use anti-cheat name with bypass for evasion techniques. The scored search ranks results by relevance across name, description, and topic matches.
+Each line is cross-linked back to the 177 hand-written skills plus the 3,985 archived projects (prefixed `ags-`).
+
+<!-- enriched:v2 -->

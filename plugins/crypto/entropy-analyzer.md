@@ -36,6 +36,38 @@ Plugin data is as current as the underlying skill library. When new archived pro
 
 Typical usage patterns include: looking up specific data points across all archived projects, searching for implementations and comparing approaches, generating structured output from patterns found across multiple sources, and building comparison tables across different versions or implementations.
 
-## Data Sources
+## Detailed Specification
 
-Cross-references relevant skills and archived source code from the skill library, prioritizing hand-written reference skills for authoritative depth and archived projects for real-world implementation examples.
+### Target Primitive
+Analyze binary entropy to identify encrypted, compressed, or packed sections.
+
+### Signature / Fingerprint
+Shannon entropy over sliding window; packed/encrypted sections have entropy > 7.2.
+
+### Recovery Technique
+per-section + per-page entropy, chi-squared vs uniform distribution.
+
+### Companion Tools
+pefile.get_entropy(), binwalk, ssdeep, DIE/Exeinfo PE.
+
+### Query Interface
+- `scan(binary)` -> candidate matches with VA + confidence
+- `extract_key(binary, va)` -> raw key bytes with context
+- `verify(key, sample)` -> round-trip encrypt/decrypt check
+- `related_impls()` -> archive projects implementing the same primitive
+
+### Related Skills
+Combine with `anti-disassembly-techniques`, `control-flow-flattening`, and the specific algorithm skill in the hand-written library.
+
+### Caching and Performance
+Listing queries hit the server-side skill directory cache (30-second TTL). Full-text searches across the 3,985 archived projects use keyword pre-filtering; large sweeps page results.
+
+### Integration Points
+Dispatched by relevant agents and subagents (see Related sections above). All results carry a confidence tier (A: 3+ corroborating sources, B: 1-2 sources with recent timestamps, C: single stale source).
+
+### Update Strategy
+Data is live against the skill library -- when new `ags-*` projects or hand-written skills land, this plugin reflects them on the next cache miss (<=30s).
+
+Each line is cross-linked back to the 177 hand-written skills plus the 3,985 archived projects (prefixed `ags-`).
+
+<!-- enriched:v2 -->
