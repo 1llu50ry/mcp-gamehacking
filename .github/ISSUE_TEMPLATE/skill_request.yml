@@ -1,0 +1,26 @@
+name: Skill request
+description: Ask us to document a technique, anti-cheat, game engine, or binary format as a skill.
+title: "[skill] "
+labels: [skill, good-first-issue]
+body:
+  - type: input
+    id: topic
+    attributes:
+      label: Topic
+      placeholder: "e.g. 'UE5 Verse VM internals' or 'CS2 VACnet 3.0 reversing'"
+    validations: { required: true }
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      placeholder: "What should the skill cover? What should it NOT cover?"
+    validations: { required: true }
+  - type: textarea
+    id: sources
+    attributes:
+      label: Reference material (links / repos / whitepapers)
+  - type: input
+    id: skill_name
+    attributes:
+      label: Suggested skill name (kebab-case)
+      placeholder: "ue5-verse-vm-internals"

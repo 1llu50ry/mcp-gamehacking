@@ -36,6 +36,36 @@ Plugin data is as current as the underlying skill library. When new archived pro
 
 Typical usage patterns include: looking up specific data points across all archived projects, searching for implementations and comparing approaches, generating structured output from patterns found across multiple sources, and building comparison tables across different versions or implementations.
 
-## Data Sources
+## Detailed Specification
 
-Cross-references relevant skills and archived source code from the skill library, prioritizing hand-written reference skills for authoritative depth and archived projects for real-world implementation examples.
+### Target Anti-Cheat
+- **Driver / usermode components:** GameMon.des / nProtect.sys
+- **Operating mode:** kernel + user; popular in KR MMOs (Lineage, MapleStory, BDO)
+
+### Detection Surface
+code-section integrity, speedhack detection, debugger detection, process scan.
+
+### Version Timeline
+GameGuard INCA; frequent packer rotations.
+
+### Bypass Windows
+driver unload, usermode hook neutralization, external DMA.
+
+### Related Skills and Projects
+Linked skills: `nprotect`, `gameguard`.
+
+### Data Model
+Each entry is `(detection_vector, driver_component, OS build range, countermeasure, references[])`. Vectors are tagged `kernel|usermode|telemetry|behavioural|hardware`. Countermeasures carry a `shelf_life` field annotated against the `anti-cheat-timeline` plugin.
+
+### Caching and Performance
+Listing queries hit the server-side skill directory cache (30-second TTL). Full-text searches across the 3,985 archived projects use keyword pre-filtering; large sweeps page results.
+
+### Integration Points
+Dispatched by relevant agents and subagents (see Related sections above). All results carry a confidence tier (A: 3+ corroborating sources, B: 1-2 sources with recent timestamps, C: single stale source).
+
+### Update Strategy
+Data is live against the skill library -- when new `ags-*` projects or hand-written skills land, this plugin reflects them on the next cache miss (<=30s).
+
+Each line is cross-linked back to the 177 hand-written skills plus the 3,985 archived projects (prefixed `ags-`).
+
+<!-- enriched:v2 -->

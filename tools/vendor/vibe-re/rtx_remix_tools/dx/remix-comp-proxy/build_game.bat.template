@@ -1,0 +1,15 @@
+@echo off
+:: Per-game build script.
+::
+:: NEW WORKFLOW: Copy the entire rtx_remix_tools/dx/remix-comp-proxy/ folder to
+:: patches/<GameName>/ (excluding build/). Edit src/comp/ directly.
+:: Then run: build.bat release --name <GameName>
+::
+:: This file is kept as a reference only. The game folder already contains
+:: the real build.bat (the master build script).
+
+echo This template is no longer used. Each game folder contains the full
+echo remix-comp-proxy framework with the master build.bat included.
+echo.
+echo Usage: build.bat release --name MyGame
+exit /b 1

@@ -49,3 +49,6 @@ Because this project interfaces with system processes, debuggers, and AI agents 
 1. **Environment Isolation:** Run the MCP server and target executables inside isolated environments (such as dedicated virtual machines or sandboxed containers) to prevent unintended side effects on your host system.
 2. **Principle of Least Privilege:** Avoid running the MCP server with elevated privileges (`Administrator` / `root`) unless explicitly required by the debugging context.
 3. **Audit Third-Party Prompts & Skills:** Inspect custom agent prompts, skill definitions, and external knowledge bases for dangerous system commands (`exec`, file overwrites) before integrating them into your agent workflow.
+4. **Path Sandbox (v4.5+):** When exposing the server over HTTP, set `MCP_FS_ALLOW=/path/a,/path/b` to restrict file-reading tools (`pe_parse`, `elf_parse`, `aob_scan`, `zip_parse`, `analyze_binary`, …) to the directories you intend. Set `MCP_FS_DENY=...` to blacklist specific subtrees. Verify current config with the `fs_sandbox_status` tool.
+5. **Rate Limiter (v4.6+, opt-in):** `MCP_RATE_LIMIT=1` enables token-bucket limiting per `(tool, agent)`. Tune per-tool with `MCP_RATE_LIMIT_<TOOL>=<perSec>`.
+6. **Audit Log (v4.6+):** The server appends every `audit_log` call (and `rate_limit_check`) to `.audit/audit.jsonl`. Rotate the directory per deploy.

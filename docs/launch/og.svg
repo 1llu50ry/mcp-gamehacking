@@ -1,0 +1,246 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#132436"/>
+      <stop offset="1" stop-color="#09131F"/>
+    </linearGradient>
+    <linearGradient id="orange" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#F18808"/>
+      <stop offset="1" stop-color="#F5A623"/>
+    </linearGradient>
+    <linearGradient id="panelbg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1A2D44"/>
+      <stop offset="1" stop-color="#132436"/>
+    </linearGradient>
+    <linearGradient id="selrow" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2D3F5F"/>
+      <stop offset="1" stop-color="#132436"/>
+    </linearGradient>
+    <style>
+      .mono { font-family: "Consolas", "Fira Code", "JetBrains Mono", ui-monospace, Menlo, monospace; }
+      .sans { font-family: "Inter", -apple-system, "Segoe UI", sans-serif; }
+    </style>
+    <pattern id="gridlines" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M24 0H0V24" fill="none" stroke="#1C3049" stroke-width="0.5"/>
+    </pattern>
+  </defs>
+
+  <!-- Base background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#gridlines)"/>
+
+  <!-- Faint IDA graph-view on the right (flowchart hint) -->
+  <g opacity="0.14" stroke="#F18808" fill="none" stroke-width="1.5">
+    <rect x="760"  y="60"  width="130" height="46" rx="3"/>
+    <rect x="620"  y="170" width="130" height="46" rx="3"/>
+    <rect x="900"  y="170" width="130" height="46" rx="3"/>
+    <rect x="760"  y="280" width="130" height="46" rx="3"/>
+    <rect x="620"  y="390" width="130" height="46" rx="3"/>
+    <rect x="900"  y="390" width="130" height="46" rx="3"/>
+    <path d="M825 106 L685 170 M825 106 L965 170 M685 216 L825 280 M965 216 L825 280 M825 326 L685 390 M825 326 L965 390"/>
+  </g>
+
+  <!-- Top bar: logo stripe (IDA style ribbon) -->
+  <rect x="0" y="0" width="1200" height="4" fill="url(#orange)"/>
+
+  <!-- Project tag -->
+  <g transform="translate(60,56)">
+    <rect x="0" y="0" width="190" height="28" rx="2" fill="#F18808"/>
+    <text x="95" y="20" text-anchor="middle" class="mono" font-size="14" font-weight="800" fill="#09131F" letter-spacing="2">MCP · HEX · RE</text>
+  </g>
+
+  <!-- Project name -->
+  <text x="60" y="140" class="sans" font-size="54" font-weight="900" fill="#F0F6FC" letter-spacing="-1.5">mcp-gamehacking</text>
+  <text x="60" y="138" class="sans" font-size="54" font-weight="900" fill="none" stroke="url(#orange)" stroke-width="0.5" opacity="0.6" letter-spacing="-1.5">mcp-gamehacking</text>
+
+  <!-- Tagline (IDA Pro-style serif-mono mix) -->
+  <text x="60" y="178" class="sans" font-size="20" font-weight="500" fill="#C9D1D9">
+    The multi-agent reverse-engineering platform.
+  </text>
+  <text x="60" y="206" class="mono" font-size="14" fill="#8B9BAD">
+    Claude · Codex · Cursor · 59 backends · one MCP connection
+  </text>
+
+  <!-- Version pills -->
+  <g transform="translate(60,232)">
+    <rect x="0" y="0" width="60" height="22" rx="2" fill="#1A2D44" stroke="#2D4A6E"/>
+    <text x="30" y="15" text-anchor="middle" class="mono" font-size="11" fill="#F18808" font-weight="700">v4.6</text>
+    <rect x="68" y="0" width="52" height="22" rx="2" fill="#1A2D44" stroke="#2D4A6E"/>
+    <text x="94" y="15" text-anchor="middle" class="mono" font-size="11" fill="#7CE38B" font-weight="700">MIT</text>
+    <rect x="128" y="0" width="150" height="22" rx="2" fill="#1A2D44" stroke="#2D4A6E"/>
+    <text x="203" y="15" text-anchor="middle" class="mono" font-size="11" fill="#58A6FF" font-weight="700">0 npm vulnerabilities</text>
+    <rect x="286" y="0" width="130" height="22" rx="2" fill="#1A2D44" stroke="#2D4A6E"/>
+    <text x="351" y="15" text-anchor="middle" class="mono" font-size="11" fill="#C9D1D9" font-weight="700">Node 18/20/22</text>
+  </g>
+
+  <!-- IDA-style pseudocode window -->
+  <g transform="translate(60,290)">
+    <!-- Window chrome -->
+    <rect x="0" y="0" width="660" height="300" rx="4" fill="#0B1D2F" stroke="#2D4A6E"/>
+    <rect x="0" y="0" width="660" height="26" rx="4" fill="#1A2D44"/>
+    <rect x="0" y="18" width="660" height="8" fill="#1A2D44"/>
+    <text x="12" y="18" class="mono" font-size="12" fill="#C9D1D9">▸ Pseudocode-A  —  sub_401F30 (Analyze_Binary)</text>
+    <text x="630" y="18" class="mono" font-size="12" fill="#8B9BAD">— ☒</text>
+
+    <!-- Line gutter -->
+    <rect x="0" y="26" width="40" height="274" fill="#152537"/>
+    <g class="mono" font-size="12" fill="#4A6681" text-anchor="end">
+      <text x="32" y="48">1</text><text x="32" y="68">2</text><text x="32" y="88">3</text>
+      <text x="32" y="108">4</text><text x="32" y="128">5</text><text x="32" y="148">6</text>
+      <text x="32" y="168">7</text><text x="32" y="188">8</text><text x="32" y="208">9</text>
+      <text x="32" y="228">10</text><text x="32" y="248">11</text><text x="32" y="268">12</text>
+      <text x="32" y="288">13</text>
+    </g>
+
+    <!-- Yellow current-line highlight -->
+    <rect x="40" y="214" width="620" height="16" fill="#F18808" opacity="0.14"/>
+
+    <!-- Code -->
+    <g class="mono" font-size="13">
+      <text x="50" y="48" fill="#58A6FF">void</text>
+      <text x="86" y="48" fill="#F0F6FC"> __fastcall </text>
+      <text x="175" y="48" fill="#A371F7">analyze_binary</text>
+      <text x="298" y="48" fill="#F0F6FC">(</text>
+      <text x="305" y="48" fill="#58A6FF">const char</text>
+      <text x="383" y="48" fill="#F0F6FC"> *</text>
+      <text x="394" y="48" fill="#C9D1D9">path</text>
+      <text x="428" y="48" fill="#F0F6FC">)</text>
+
+      <text x="50" y="68" fill="#F0F6FC">{</text>
+
+      <text x="66" y="88" fill="#7CE38B">  Buffer    </text>
+      <text x="150" y="88" fill="#C9D1D9">buf </text>
+      <text x="186" y="88" fill="#F0F6FC">=</text>
+      <text x="196" y="88" fill="#A371F7"> readFile</text>
+      <text x="259" y="88" fill="#F0F6FC">(</text>
+      <text x="266" y="88" fill="#C9D1D9">path</text>
+      <text x="298" y="88" fill="#F0F6FC">);</text>
+
+      <text x="66" y="108" fill="#7CE38B">  Format    </text>
+      <text x="150" y="108" fill="#C9D1D9">fmt </text>
+      <text x="186" y="108" fill="#F0F6FC">=</text>
+      <text x="196" y="108" fill="#A371F7"> identifyMagic</text>
+      <text x="296" y="108" fill="#F0F6FC">(</text>
+      <text x="303" y="108" fill="#C9D1D9">buf</text>
+      <text x="326" y="108" fill="#F0F6FC">);</text>
+
+      <text x="66" y="128" fill="#7CE38B">  PeInfo    </text>
+      <text x="150" y="128" fill="#C9D1D9">pe  </text>
+      <text x="186" y="128" fill="#F0F6FC">=</text>
+      <text x="196" y="128" fill="#A371F7"> parsePE</text>
+      <text x="252" y="128" fill="#F0F6FC">(</text>
+      <text x="259" y="128" fill="#C9D1D9">buf</text>
+      <text x="282" y="128" fill="#F0F6FC">);</text>
+      <text x="310" y="128" fill="#4A6681">// headers · imports · exports</text>
+
+      <text x="66" y="148" fill="#7CE38B">  Rich      </text>
+      <text x="150" y="148" fill="#C9D1D9">rich</text>
+      <text x="186" y="148" fill="#F0F6FC">=</text>
+      <text x="196" y="148" fill="#A371F7"> parseRich</text>
+      <text x="270" y="148" fill="#F0F6FC">(</text>
+      <text x="277" y="148" fill="#C9D1D9">buf</text>
+      <text x="300" y="148" fill="#F0F6FC">);</text>
+      <text x="328" y="148" fill="#4A6681">// MSVC build fingerprint</text>
+
+      <text x="66" y="168" fill="#7CE38B">  Debug     </text>
+      <text x="150" y="168" fill="#C9D1D9">dbg </text>
+      <text x="186" y="168" fill="#F0F6FC">=</text>
+      <text x="196" y="168" fill="#A371F7"> parseDebugDir</text>
+      <text x="296" y="168" fill="#F0F6FC">(</text>
+      <text x="303" y="168" fill="#C9D1D9">buf</text>
+      <text x="326" y="168" fill="#F0F6FC">);</text>
+      <text x="354" y="168" fill="#4A6681">// RSDS GUID → symsrv</text>
+
+      <text x="66" y="188" fill="#7CE38B">  f32       </text>
+      <text x="150" y="188" fill="#C9D1D9">H   </text>
+      <text x="186" y="188" fill="#F0F6FC">=</text>
+      <text x="196" y="188" fill="#A371F7"> shannon</text>
+      <text x="251" y="188" fill="#F0F6FC">(</text>
+      <text x="258" y="188" fill="#C9D1D9">buf</text>
+      <text x="281" y="188" fill="#F0F6FC">);</text>
+      <text x="310" y="188" fill="#4A6681">// entropy per 64 KiB window</text>
+
+      <text x="66" y="208" fill="#7CE38B">  CryptoHits</text>
+      <text x="150" y="208" fill="#C9D1D9">ck </text>
+      <text x="186" y="208" fill="#F0F6FC">=</text>
+      <text x="196" y="208" fill="#A371F7"> findKnownConstants</text>
+      <text x="326" y="208" fill="#F0F6FC">(</text>
+      <text x="333" y="208" fill="#C9D1D9">buf</text>
+      <text x="356" y="208" fill="#F0F6FC">);</text>
+
+      <text x="66" y="228" fill="#F18808">  return</text>
+      <text x="117" y="228" fill="#F0F6FC"> compose</text>
+      <text x="172" y="228" fill="#F0F6FC">(</text>
+      <text x="179" y="228" fill="#C9D1D9">fmt</text>
+      <text x="202" y="228" fill="#F0F6FC">,</text>
+      <text x="211" y="228" fill="#C9D1D9"> pe</text>
+      <text x="229" y="228" fill="#F0F6FC">,</text>
+      <text x="238" y="228" fill="#C9D1D9"> rich</text>
+      <text x="268" y="228" fill="#F0F6FC">,</text>
+      <text x="277" y="228" fill="#C9D1D9"> dbg</text>
+      <text x="302" y="228" fill="#F0F6FC">,</text>
+      <text x="311" y="228" fill="#C9D1D9"> H</text>
+      <text x="322" y="228" fill="#F0F6FC">,</text>
+      <text x="331" y="228" fill="#C9D1D9"> ck</text>
+      <text x="349" y="228" fill="#F0F6FC">);</text>
+
+      <text x="50" y="248" fill="#F0F6FC">}</text>
+
+      <text x="50" y="276" fill="#4A6681">// one MCP call → full triage</text>
+    </g>
+  </g>
+
+  <!-- Right panel: stats + ribbon -->
+  <g transform="translate(760,290)">
+    <!-- IDA-style "Functions window" header -->
+    <rect x="0" y="0" width="380" height="26" rx="4" fill="#1A2D44"/>
+    <rect x="0" y="18" width="380" height="8" fill="#1A2D44"/>
+    <text x="12" y="18" class="mono" font-size="12" fill="#F18808">▸ Capabilities</text>
+
+    <!-- Functions-list style rows -->
+    <g class="mono" font-size="13" fill="#C9D1D9">
+      <rect x="0" y="30" width="380" height="22" fill="url(#selrow)"/>
+      <text x="12" y="46" fill="#F18808">111</text>
+      <text x="56" y="46">native MCP tools</text>
+
+      <text x="12" y="76" fill="#F18808">59</text>
+      <text x="56" y="76">RE / debug backends</text>
+
+      <rect x="0" y="86" width="380" height="22" fill="url(#selrow)"/>
+      <text x="12" y="102" fill="#F18808">4,200+</text>
+      <text x="86" y="102">curated skills</text>
+
+      <text x="12" y="132" fill="#F18808">15</text>
+      <text x="56" y="132">mesh tools  (DM · tasks · votes · KB)</text>
+
+      <rect x="0" y="142" width="380" height="22" fill="url(#selrow)"/>
+      <text x="12" y="158" fill="#F18808">6</text>
+      <text x="56" y="158">hub tools  (smart_decompile · fan-out)</text>
+
+      <text x="12" y="188" fill="#F18808">10+</text>
+      <text x="56" y="188">native parsers  (PE · ELF · Mach-O · DEX · WASM)</text>
+
+      <rect x="0" y="198" width="380" height="22" fill="url(#selrow)"/>
+      <text x="12" y="214" fill="#F18808">∞</text>
+      <text x="56" y="214">transports  (stdio · streamable HTTP)</text>
+
+      <text x="12" y="244" fill="#7CE38B">✓</text>
+      <text x="56" y="244">multi-arch Docker · CI · npm · ghcr</text>
+    </g>
+
+    <!-- Backends ticker -->
+    <g transform="translate(0,266)">
+      <rect x="0" y="0" width="380" height="30" rx="3" fill="#1A2D44" stroke="#2D4A6E"/>
+      <text x="12" y="20" class="mono" font-size="11" fill="#8B9BAD">
+        Ghidra · IDA · Binja · r2 · x64dbg · WinDbg · Frida · angr · YARA
+      </text>
+    </g>
+  </g>
+
+  <!-- Bottom status bar: IDA-style AU:idle style -->
+  <rect x="0" y="602" width="1200" height="28" fill="#1A2D44" stroke="#2D4A6E"/>
+  <circle cx="24" cy="616" r="4" fill="#7CE38B"/>
+  <text x="36" y="620" class="mono" font-size="11" fill="#C9D1D9">AU: idle</text>
+  <text x="140" y="620" class="mono" font-size="11" fill="#8B9BAD">Down  Disk: 0  Idea! 111 tools · 59 backends · 4.2k skills</text>
+  <text x="1140" y="620" class="mono" font-size="11" fill="#F18808" text-anchor="end" font-weight="700">github.com/whory/mcp-gamehacking</text>
+</svg>

@@ -1,8 +1,130 @@
-# mcp-gamehacking
+<div align="center">
 
-MCP (Model Context Protocol) server for game hacking & reverse engineering. A structured knowledge base of **4,100+ skills** with full source code archives, specialized agents, and workflow tools -- designed to be plugged into Claude, Cursor, or any MCP-compatible client.
+# 🎮 mcp-gamehacking
 
-**MCP-server for game hacking and reverse engineering.** Structured knowledge base of **4,100+ skills** with full source code archives, specialized agents, and tools -- connects to Claude, Cursor, or any MCP-compatible client.
+### The MCP server that turns Claude, Codex, and Cursor into a reverse-engineering team.
+
+**111 MCP tools · 59 RE/debug backends · 4,200+ skills · multi-agent mesh · zero-dep native parsers**
+
+[![tests](https://img.shields.io/badge/tests-20%2F20-success)](tests/) [![tools](https://img.shields.io/badge/MCP%20tools-111-blue)](src/) [![backends](https://img.shields.io/badge/RE%20backends-59-blueviolet)](src/retools.ts) [![skills](https://img.shields.io/badge/skills-4%2C200%2B-orange)](skills/) [![docker](https://img.shields.io/badge/docker-multi--arch-informational)](Dockerfile) [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![audit](https://img.shields.io/badge/npm%20audit-0-brightgreen)](package.json)
+
+[Quickstart](#30-second-quickstart) · [Architecture](docs/architecture.md) · [Comparison](#comparison) · [Agent Mesh](docs/agent-mesh.md) · [MCP Hub](docs/mcp-hub.md) · [Ethics](#ethics--responsible-use)
+
+[English](README.md) · [Русский](README-ru.md) · [简体中文](README-zh.md)
+
+</div>
+
+---
+
+## Why this exists
+
+Reverse engineering a modern game involves five static tools (Ghidra, IDA, Binary Ninja, radare2, Hopper), three debuggers (x64dbg, WinDbg, GDB/LLDB), a hex-editor, a memory scanner (Cheat Engine), an instrumentation framework (Frida), and a stack of format parsers (PE, ELF, Mach-O, DEX, Minidump, Unity AssetBundle, UE `.pak`). Switching between them costs hours. Teaching a model to drive even one of them well costs more.
+
+**This server:**
+
+1. **Aggregates 59 existing RE / debug MCP backends** behind one connection — `smart_decompile` picks IDA when running, falls back to Ghidra, then Binja, then RetDec.
+2. **Ships 111 native MCP tools** so most answers don't need an external backend at all — PE / ELF / Mach-O / DEX / WASM / Minidump / ZIP / .NET / IL2CPP metadata parsers, AoB signature scan, Shannon entropy, crypto-constant identification, PDB70 → Microsoft symbol server URL.
+3. **Lets Claude, Codex, and Cursor collaborate** through a shared mesh — DM, channels, task handoff, adversarial voting, shared KV knowledge-base, named locks for coordination. Zero-dep JSON persistence.
+4. **Curates 4,200+ skills** — 246 hand-written deep references on anti-cheat (BattlEye, EAC, Vanguard, VAC, FACEIT, Byfron, Ricochet, mhyprot) and 3,985 archived open-source projects with full source dumps.
+
+If you're on security-research, cheat-detection, defensive-engineering, or game-SDK work — this collapses a day of tool-shuffling into one MCP connection.
+
+## 30-second quickstart
+
+```bash
+# clone + build
+git clone https://github.com/whory/mcp-gamehacking && cd mcp-gamehacking
+npm install && npx tsc
+npm test            # 20/20 should pass
+
+# wire into Claude Code / Codex / Cursor (stdio mode)
+# (add this JSON to your client's MCP config)
+#   { "mcp-gamehacking": { "command": "node", "args": ["/path/to/dist/index.js"] } }
+
+# OR run over HTTP (Docker-friendly)
+docker compose up
+
+# OR drive it from the CLI (no MCP client needed)
+./bin/mcp-gamehacking.mjs stats
+./bin/mcp-gamehacking.mjs search battleye
+./bin/mcp-gamehacking.mjs tools    # list every registered MCP tool
+```
+
+Point your MCP client at it, then ask any of:
+
+- *"Analyze `C:\game\binary.exe` and tell me what packer it uses."* → calls `analyze_binary` (entropy + Rich Header + Debug Directory + imports + crypto constants)
+- *"Decompile `0x401000` using every connected backend and spot disagreements."* → `hub_consensus_call matcher=decompile`
+- *"Alice, hand off driver.sys unpacking to Bob; Cursor review the result."* → mesh orchestration
+- *"BM25 search 'battleye shellcode detection'."* → `bm25_search` ranks 4,230 docs by BM25 relevance
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph clients[" MCP clients "]
+    C1[Claude Code]
+    C2[Codex / ChatGPT]
+    C3[Cursor]
+    C4[Copilot CLI]
+    C5[custom]
+  end
+
+  subgraph server[" mcp-gamehacking (this repo) "]
+    direction TB
+    T[111 MCP tools]
+    M[Agent Mesh<br/>DM · channels · tasks · votes · KB · locks]
+    H[MCP Hub<br/>smart_decompile · consensus_call]
+    N[Native parsers<br/>PE · ELF · Mach-O · DEX · WASM · Minidump · ZIP · .NET]
+    S[Skill library<br/>4,200+ docs · BM25]
+  end
+
+  subgraph backends[" 59 RE / debug MCP backends "]
+    B1[Ghidra · IDA · Binja]
+    B2[x64dbg · WinDbg · GDB · LLDB]
+    B3[Cheat Engine · Frida]
+    B4[PCILeech · Memflow]
+    B5[Volatility · YARA · angr]
+  end
+
+  C1 & C2 & C3 & C4 & C5 -->|stdio or HTTP| server
+  server -->|hub_connect| B1 & B2 & B3 & B4 & B5
+```
+
+## Verticals
+
+The game-hacking framing is historical — the tooling covers every RE discipline:
+
+| Vertical | Why this project fits | Docs |
+|---|---|---|
+| 🎮 **Game security + anti-cheat** | 4,200+ hand-written skills across BattlEye, EAC, Vanguard, VAC, FACEIT, Byfron, Ricochet, mhyprot, Hyperion. | this README |
+| 🦠 **Malware analysis** | PE / minidump / Rich Header / Debug Directory parsers + 59-backend hub (YARA, Volatility, angr, Qiling). | [docs/verticals/malware-analysis.md](docs/verticals/malware-analysis.md) |
+| 📱 **Mobile security (iOS + Android)** | Mach-O (fat + arm64e) + DEX + APK parsers + Hopper + Frida + JADX + Magisk + idevice MCPs. | [docs/verticals/mobile-security.md](docs/verticals/mobile-security.md) |
+| 🔧 **Firmware / IoT** | ELF + Qiling + Unicorn + angr for embedded. | [docs/verticals/firmware-iot.md](docs/verticals/firmware-iot.md) |
+| 🏁 **CTF / exploit development** | pwndbg + GEF + angr + AFL++ + honggfuzz + LibAFL + Unicorn + ret-sync all behind one hub. | [docs/verticals/ctf-pwn.md](docs/verticals/ctf-pwn.md) |
+
+## Comparison
+
+| Project | Scope | Tools | Backends | Multi-agent | Skills archive |
+|---|---|---:|---:|:---:|---:|
+| **mcp-gamehacking** (this repo) | Game RE + anti-cheat + mesh orchestration | **111** | **59** | ✅ | **4,200+** |
+| [GhidraMCP](https://github.com/LaurieWired/GhidraMCP) | Ghidra bridge | 5 | 1 | — | — |
+| [ida-pro-mcp](https://github.com/mrexodia/ida-pro-mcp) | IDA bridge | ~50 | 1 | — | — |
+| [SuperghidraMCP](https://github.com/yuatemycat/SuperGhidraMCP) | pyghidra | 38 | 1 | — | — |
+| [REA](https://rea.tools) | Cross-stack RE (native + Electron + .NET) | ~40 | 3 | — | — |
+| [Vibe-RE](https://github.com/wit-x/Vibe-Reverse-Engineering) | PE triage pipeline | ~30 | 1 | — | — |
+
+## Ethics & responsible use
+
+This project exists for **security research, cheat detection, defensive engineering, game-preservation, and reverse-engineering education**. Specifically:
+
+- Anti-cheat engineers use it to understand bypass vectors and harden their systems.
+- Red teams use it on binaries they are authorized to analyze.
+- Students use it to learn how PE / ELF / IL2CPP / UE4 / Source2 actually work.
+- Preservation groups use it to document archived game ecosystems.
+
+**It is not a cheat.** It writes no code into any game. It automates no play. Use it against binaries you own or are authorized to analyze. Do not use it to grief, de-fraud, or harm other players.
+
+Read [SECURITY.md](SECURITY.md) for responsible disclosure. By contributing you agree to [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 ---
 
@@ -104,7 +226,7 @@ MCP (Model Context Protocol) server for game hacking & reverse engineering. A st
 
 ---
 
-## Tools (16 total)
+## Tools (111 total)
 
 ### Workflow Tools
 
@@ -132,6 +254,122 @@ MCP (Model Context Protocol) server for game hacking & reverse engineering. A st
 | `list_subagents` / `read_subagent` | Browse and read subagent definitions |
 | `list_plugins` / `read_plugin` | Browse and read plugin definitions |
 | `list_prompts` / `read_prompt` | Browse and read prompt templates |
+
+### RE / Debug MCP Integrations (v4.1)
+
+Launch and drive **43** external RE and debugging MCP servers directly from this server. Supported backends: **GhidraMCP, SuperghidraMCP (pyghidra-mcp, +gui), Ghidrathon MCP, ida-pro-mcp, Hex-Rays IDA MCP, Binary Ninja MCP, radare2 MCP, x64dbg MCP Server, WinDbg MCP, Cheat Engine MCP, Frida MCP, Hopper MCP, REA, Vibe-RE, JADX MCP, angr MCP, Capstone MCP, PCILeech/MemProcFS MCP, Memflow MCP, Scylla MCP, dnSpyEx MCP, ReClass.NET MCP, Volatility3 MCP, Wireshark/tshark MCP, mitmproxy MCP, dotPeek MCP, Unicorn MCP, ret-sync MCP, BinDiff MCP, Diaphora MCP, Qiling MCP, unidbg MCP, Reko (OpenReality) MCP, QEMU trace MCP, LLDB MCP, GDB MCP, Burp MCP, YARA MCP, ClrMD MCP, Binja-Ghidra sync MCP, Dolphin DME MCP, Cemu IPC MCP**.
+
+| Tool | Description |
+|------|------------|
+| `list_re_backends` | List every known RE/debug MCP backend (filter by kind/os/tag) |
+| `describe_re_backend` | Full detail for one backend (install, launch, HTTP endpoint, config snippet) |
+| `pick_re_backend` | Recommend backend(s) for a described task |
+| `re_mcp_config` | Emit a Claude Desktop / Claude Code / Cursor / Codex MCP config snippet |
+| `launch_re_backend` | Spawn a backend as a managed child process |
+| `stop_re_backend` | Terminate a backend (SIGTERM → SIGKILL after grace) |
+| `re_backend_status` | Process status + recent stdout/stderr tail |
+| `re_backend_health` | HTTP reachability probe for every backend that declares an endpoint |
+| `re_http_call` | Proxy an HTTP request to a running backend |
+| `x64dbg_cmd` | Send a command to a running x64dbg plugin (GetDebugState, SetBreakpoint, …) |
+| `ghidra_decompile` | Decompile a function via a running pyghidra-mcp / superghidra-mcp |
+| `cheat_engine_aob` | AoB (array-of-bytes) scan through a running Cheat Engine bridge |
+| `frida_eval` | Evaluate a Frida JS snippet in a target process |
+| `vibe_re_run` | Run a Vibe-RE Python module (`retools.disasm`, `retools.callgraph`, `livetools.analyze`, …) from vendored `tools/vendor/vibe-re` |
+| `ida_run_script` | Run an IDAPython script headless via `idat64` |
+| `ghidra_run_script` | Run a Ghidra script via `analyzeHeadless` |
+| `install_re_backend` | Run the install commands from the catalog for one backend (with `dryRun` preview) |
+
+### Native TypeScript RE Tools (always available)
+
+Zero-dependency Node TypeScript. No Python, no Ghidra, no IDA needed.
+
+| Tool | Description |
+|------|------------|
+| `pe_parse` | Parse PE/PE+ -- machine, bits, timestamp, sections (name/VA/size/entropy), imports (DLL + names), exports, overlay, Authenticode |
+| `elf_parse` | Parse ELF (32/64, little-endian) -- machine, segments, sections, DT_NEEDED, SONAME, interpreter |
+| `macho_parse` | Parse Mach-O (thin + fat) -- CPU, filetype, segments, load commands, LC_LOAD_DYLIB list |
+| `dex_parse` | Parse Android DEX -- version, counts, first class names |
+| `wasm_parse` | Parse WebAssembly -- version, section layout (standard + custom) |
+| `file_identify` | Magic-byte sniff: PE, ELF, Mach-O (thin+fat), DEX, WASM, ZIP/APK/JAR, 7-Zip, gzip, zstd, LZ4, PDF, scripts, Switch NSO/NCA, Xbox 360 XEX, PS4/PS5 FSELF |
+| `aob_scan` | IDA-style AoB signature scan over any file (`48 8B ?? ?? ?? ?? ?? E8`) |
+| `entropy_scan` | Sliding-window Shannon entropy; flag windows above threshold (packed/encrypted detection) |
+| `string_extract` | ASCII + UTF-16LE strings with minimum-length filter |
+| `hash_identify` | Scan for MD5/SHA-1/SHA-256/CRC-32/FNV-1a/ChaCha20/Blowfish/AES crypto constants with byte offsets |
+| `signature_make` | Make an IDA-style byte signature for a region of a file (with uniqueness check) |
+| `file_summary` | Size, SHA-256, Shannon H, magic bytes, head/tail hex |
+
+Vendored tool trees live under `tools/vendor/` (currently `vibe-re`, `ida-pro-mcp`). External backends install via `install_re_backend` or `describe_re_backend` → "Install" section. `tools/launchers/install-all.{ps1,sh}` bootstraps every pip/npm backend in one shot.
+
+### Advanced Native Parsers
+
+| Tool | Description |
+|------|------------|
+| `minidump_parse` | Parse Windows minidump (.dmp): streams, modules, threads, exception, system info |
+| `pdb70_identify` | RSDS record -> GUID + age + PDB path + Microsoft symbol server URL |
+| `rich_header_parse` | Rich header entries (MSVC build fingerprint) |
+| `demangle` | MSVC + Itanium (GCC/Clang) C++ name demangler |
+| `assetbundle_parse` | Unity AssetBundle header (UnityFS/Web/Raw/Archive) |
+| `pak_parse` | UE4/UE5 .pak footer (magic 0x5A6F12E1, index offset+size+SHA1) |
+| `il2cpp_metadata_parse` | Unity IL2CPP global-metadata.dat header (unencrypted) |
+| `nso_parse` | Switch NSO header (segments + module id) |
+
+### Workflow Tools
+
+| Tool | Description |
+|------|------------|
+| `offset_diff` | Diff two offset JSON maps (added/removed/changed) |
+| `offset_merge` | Merge N offset sources with voting quorum |
+| `sig_validate_cross_build` | Check an AoB signature is unique across several builds |
+| `ac_risk_report` | Risk matrix: technique × AC → tier (A/B/C/X) |
+| `generate_cheat_sheet` | Markdown cheat sheet per game |
+
+### Agent Mesh — multi-agent collaboration
+
+Lets Claude Code, Codex/ChatGPT, Cursor, Copilot, Gemini CLI and custom bots share one workspace through MCP: register, DM + channel broadcast, task handoff with status machine, adversarial voting on findings, shared KV knowledge base, named locks. Persistence to JSON (zero npm deps). See [docs/agent-mesh.md](docs/agent-mesh.md).
+
+Tools (15): `mesh_agent_register`, `mesh_agent_list`, `mesh_agent_heartbeat`, `mesh_send`, `mesh_read`, `mesh_task_create`, `mesh_task_update`, `mesh_task_list`, `mesh_task_vote`, `mesh_kb_set`, `mesh_kb_get`, `mesh_lock_acquire`, `mesh_lock_release`, `mesh_lock_list`, `mesh_stats`.
+
+### MCP Hub — aggregate backend MCPs
+
+Our server connects to other MCPs (ghidra, ida, x64dbg, binja, radare2, cheat-engine, frida, …) as a CLIENT and re-exposes their tools. Composable: `smart_decompile` picks the first available decompiler backend; `hub_consensus_call` fans out across backends for adversarial comparison. See [docs/mcp-hub.md](docs/mcp-hub.md).
+
+Tools (6): `hub_connect`, `hub_list`, `hub_call`, `hub_disconnect`, `smart_decompile`, `hub_consensus_call`.
+
+### CLI
+
+```bash
+mcp-gamehacking stats                 # library counts
+mcp-gamehacking lookup battleye       # print SKILL.md
+mcp-gamehacking search anti-cheat     # keyword search
+mcp-gamehacking tools                 # list every MCP tool
+mcp-gamehacking health [url]          # probe /healthz
+mcp-gamehacking serve                 # start the MCP server
+```
+
+### Path sandbox (security)
+
+File-reading tools (`pe_parse`, `elf_parse`, `aob_scan`, `zip_parse`, …) obey `MCP_FS_ALLOW` and `MCP_FS_DENY`. Default is open mode. Set `MCP_FS_ALLOW=/path/a,/path/b` to restrict reads when exposing the server over HTTP.
+
+### HTTP transport, health, metrics
+
+Set `MCP_TRANSPORT=http` to run the server over Streamable HTTP instead of stdio:
+
+```bash
+MCP_TRANSPORT=http MCP_HTTP_PORT=7777 MCP_HTTP_HOST=127.0.0.1 node dist/index.js
+# → MCP endpoint:  POST http://127.0.0.1:7777/mcp
+# → readiness:     GET  http://127.0.0.1:7777/healthz
+# → Prometheus:    GET  http://127.0.0.1:7777/metrics
+```
+
+### Tests
+
+```
+npm test
+```
+
+Node's built-in test runner over `tests/*.test.mjs` (17 cases covering pattern parse, AoB scan, Shannon, string extraction, crypto-constant ID, signature make, PE parse, WASM parse, ELF rejection).
+
+CI runs on push + PR (Node 18/20/22 matrix): [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
 ---
 

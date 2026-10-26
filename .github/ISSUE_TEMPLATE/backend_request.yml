@@ -1,0 +1,36 @@
+name: RE/debug backend request
+description: Ask us to add another MCP backend to the hub catalog.
+title: "[backend] "
+labels: [backend, enhancement]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: Backend name
+      placeholder: "e.g. 'CodeQL MCP' or 'ReClass.NET MCP v2'"
+    validations: { required: true }
+  - type: input
+    id: url
+    attributes:
+      label: Upstream URL
+      placeholder: "https://github.com/..."
+    validations: { required: true }
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options: [static, dynamic, both]
+    validations: { required: true }
+  - type: checkboxes
+    id: os
+    attributes:
+      label: Supported OS
+      options:
+        - { label: Windows }
+        - { label: Linux }
+        - { label: macOS }
+  - type: textarea
+    id: unique
+    attributes:
+      label: What does it do that other backends don't?
+    validations: { required: true }

@@ -1,0 +1,10 @@
+# CODEOWNERS -- default review assignment.
+# One owner per path; GitHub picks the most specific match.
+
+*                     @whory
+/src/                 @whory
+/skills/              @whory
+/docs/                @whory
+/.github/             @whory
+/Dockerfile           @whory
+/docker-compose.yml   @whory

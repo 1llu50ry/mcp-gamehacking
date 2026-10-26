@@ -31,25 +31,40 @@ Find structures containing a specific field or offset.
 - **Source Engine**: Source 1, Source 2 (CBaseEntity, C_BasePlayer, IClientEntity, etc.)
 - **Unity**: Mono, IL2CPP (Il2CppClass, Il2CppObject, MethodInfo, etc.)
 - **id Tech**: entity systems, BSP structures
+
 ## Detailed Specification
 
-### Data Model
-This plugin provides structured access to: known game engine structures across versions -- ue4/ue5, source, unity il2cpp field layouts and offsets. Data is sourced from the full skill library (4,161 skills including 3,985 with complete source code archives) and organized for efficient lookup and cross-referencing.
+### Target Engine
+cross-engine aggregator
+
+### Key Classes / Globals
+UE4/UE5 UObject hierarchy, Source CBaseEntity, Unity GameObject/Transform/Component, IL2CPP MetaData types
+
+### Core API Surface
+indexed by engine + version + struct name.
+
+### Field Offsets
+normalized field names across versions; migration deltas annotated.
 
 ### Query Interface
-The plugin supports multiple query patterns: exact lookup by name or identifier, fuzzy search by keywords or description, filtered listing by category or type, cross-reference queries that combine data from multiple sources, and diff queries that compare values between versions or projects.
+- `class(name)` -> metadata, parents, VTable, fields
+- `field(class, name)` -> type + offset
+- `vtable(class)` -> ordered slot list
+- `find_by_signature(pattern)` -> class match from binary
+- `generate_header(class, version)` -> C++ header via `sdk-header-generator`
 
-### Data Quality
-All data returned by this plugin includes provenance information: which skill or archived project the data was extracted from, when that source was last updated, and whether multiple sources agree on the value. Confidence ratings help consumers decide whether to trust a result or seek additional verification.
+### Related Code Generators
+`sdk-header-generator`, `offset-header-generator`, `vtable-header-generator`, `enum-generator`.
 
 ### Caching and Performance
-The plugin uses the server-side skill directory cache (30-second TTL) for listing operations. Individual skill reads are not cached and always return current data. For bulk operations (searching across all 3,985 archived sources), the plugin uses keyword pre-filtering to avoid reading every source file.
+Listing queries hit the server-side skill directory cache (30-second TTL). Full-text searches across the 3,985 archived projects use keyword pre-filtering; large sweeps page results.
 
 ### Integration Points
-This plugin is available to all 50 agents and 104 subagents. It is commonly used by: the relevant game-specific or engine-specific agent for domain queries, the offset-finder subagent for cross-referencing, the detection-assessor subagent for evaluating technique safety, and the code-analyzer subagent for classifying implementations.
+Dispatched by relevant agents and subagents (see Related sections above). All results carry a confidence tier (A: 3+ corroborating sources, B: 1-2 sources with recent timestamps, C: single stale source).
 
 ### Update Strategy
-Plugin data is as current as the underlying skill library. When new archived projects are added or hand-written skills are updated, the plugin automatically reflects these changes on the next query (after the 30-second cache expires). No manual index rebuilding is required.
+Data is live against the skill library -- when new `ags-*` projects or hand-written skills land, this plugin reflects them on the next cache miss (<=30s).
 
-### Usage Examples
-Typical usage patterns include: looking up a specific game offset and finding all archived projects that reference it, searching for implementations of a technique and comparing their approaches, generating code templates based on patterns found across multiple sources, and building comparison tables of detection methods across anti-cheat systems.
+Each line is cross-linked back to the 177 hand-written skills plus the 3,985 archived projects (prefixed `ags-`).
+
+<!-- enriched:v2 -->
