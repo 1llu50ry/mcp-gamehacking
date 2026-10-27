@@ -1665,7 +1665,7 @@ async function main() {
       // /healthz: readiness probe
       if (req.method === "GET" && req.url === "/healthz") {
         res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({ status: "ok", pid: process.pid, uptime: process.uptime(), version: "4.3.0" }));
+        res.end(JSON.stringify({ status: "ok", pid: process.pid, uptime: process.uptime(), version: PKG_VERSION }));
         return;
       }
       // /metrics: Prometheus-style
@@ -1703,12 +1703,18 @@ async function main() {
           await transport.handleRequest(req, res);
           return;
         } catch (e) {
-          res.writeHead(500);
-          res.end(`transport error: ${(e as Error).message}`);
+          // CodeQL js/xss-through-exception: exception messages can be
+          // influenced by request content. Serve the error body as
+          // text/plain so no HTML interpretation can happen, and strip
+          // any carriage returns / newlines just in case a message
+          // contains header-injection bait.
+          const msg = (e as Error).message.replace(/[\r\n]+/g, " ");
+          res.writeHead(500, { "content-type": "text/plain; charset=utf-8" });
+          res.end(`transport error: ${msg}`);
           return;
         }
       }
-      res.writeHead(404);
+      res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
       res.end("not found. endpoints: /mcp, /healthz, /metrics");
     });
     httpServer.listen(port, host, () => {
