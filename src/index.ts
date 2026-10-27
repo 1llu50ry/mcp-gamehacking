@@ -21,6 +21,7 @@ import { registerCompositeTools } from "./composite-tools.js";
 import { registerBm25Search } from "./bm25-search.js";
 import { registerAuditAndRate } from "./audit-rate.js";
 import { registerDynamicResources } from "./dynamic-resources.js";
+import { registerNativeDisasm } from "./native-disasm.js";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const DIRS = {
@@ -1651,6 +1652,9 @@ registerAuditAndRate(server, ROOT);
 // gamehacking://plugins/{category}/{name}, etc.
 registerDynamicResources(server, ROOT);
 
+// Native x86-64 mini-disassembler (prologue/epilogue coverage).
+registerNativeDisasm(server);
+
 // ============================================================
 // MAIN
 // ============================================================
@@ -1660,16 +1664,40 @@ async function main() {
   if (mode === "http" || mode === "sse" || mode === "streamable-http") {
     const port = Number(process.env.MCP_HTTP_PORT ?? 7777);
     const host = process.env.MCP_HTTP_HOST ?? "127.0.0.1";
+    // Optional bearer-token auth for the HTTP transport. Set MCP_AUTH_TOKEN
+    // to require `Authorization: Bearer <token>` on /mcp (and the HTTP
+    // JSON-RPC path). /healthz is always open so a load balancer can poll
+    // without credentials; /metrics is gated when auth is on so running
+    // tool counts and uptime aren't leaked to unauth'd probes.
+    const AUTH_TOKEN = process.env.MCP_AUTH_TOKEN ?? "";
+    const authRequired = AUTH_TOKEN.length > 0;
+    const checkAuth = (req: import("node:http").IncomingMessage): boolean => {
+      if (!authRequired) return true;
+      const h = req.headers.authorization;
+      if (!h || typeof h !== "string") return false;
+      if (!h.startsWith("Bearer ")) return false;
+      const got = h.slice("Bearer ".length).trim();
+      // Constant-time compare to avoid trivial timing leaks on the token.
+      if (got.length !== AUTH_TOKEN.length) return false;
+      let diff = 0;
+      for (let i = 0; i < got.length; i++) diff |= got.charCodeAt(i) ^ AUTH_TOKEN.charCodeAt(i);
+      return diff === 0;
+    };
     const transports = new Map<string, StreamableHTTPServerTransport>();
     const httpServer = createServer(async (req, res) => {
-      // /healthz: readiness probe
+      // /healthz: readiness probe — always open
       if (req.method === "GET" && req.url === "/healthz") {
         res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({ status: "ok", pid: process.pid, uptime: process.uptime(), version: PKG_VERSION }));
+        res.end(JSON.stringify({ status: "ok", pid: process.pid, uptime: process.uptime(), version: PKG_VERSION, auth: authRequired ? "on" : "off" }));
         return;
       }
-      // /metrics: Prometheus-style
+      // /metrics: Prometheus-style — gated when auth is on
       if (req.method === "GET" && req.url === "/metrics") {
+        if (!checkAuth(req)) {
+          res.writeHead(401, { "content-type": "text/plain; charset=utf-8", "www-authenticate": "Bearer" });
+          res.end("unauthorized");
+          return;
+        }
         const mu = process.memoryUsage();
         const metrics = [
           `# HELP mcp_gamehacking_rss_bytes Process RSS`,
@@ -1689,8 +1717,13 @@ async function main() {
         res.end(metrics);
         return;
       }
-      // MCP endpoint: use streamable HTTP transport
+      // MCP endpoint: use streamable HTTP transport. Gated when auth is on.
       if (req.url === "/mcp" || req.url?.startsWith("/mcp?") || req.url?.startsWith("/mcp/")) {
+        if (!checkAuth(req)) {
+          res.writeHead(401, { "content-type": "text/plain; charset=utf-8", "www-authenticate": "Bearer" });
+          res.end("unauthorized");
+          return;
+        }
         try {
           const sessionId = (req.headers["mcp-session-id"] as string | undefined) ?? randomUUID();
           let transport = transports.get(sessionId);

@@ -31,6 +31,9 @@ If you're on security-research, cheat-detection, defensive-engineering, or game-
 
 ## 30-second quickstart
 
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/1llu50ry/mcp-gamehacking?quickstart=1)
+
+
 ```bash
 # clone + build
 git clone https://github.com/1llu50ry/mcp-gamehacking && cd mcp-gamehacking
