@@ -1,0 +1,225 @@
+{% extends "vector_search/base.html" %}
+
+{% block title %}Vector Search Status - D2Docs{% endblock %}
+
+{% block content %}
+<div class="vector-search-container">
+    <div class="page-header">
+        <h1>Vector Search Service Status</h1>
+        <p class="lead">Monitor the health and performance of the semantic search system</p>
+    </div>
+
+    {% if error %}
+    <div class="error-message">
+        <h4>Status Check Failed</h4>
+        <p>Unable to retrieve service status: {{ error }}</p>
+    </div>
+    {% else %}
+
+    <!-- Service Health Status -->
+    <div class="status-section" style="margin-bottom: 30px;">
+        <h2>Service Health</h2>
+        <div class="health-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-top: 15px;">
+            {% if health_status %}
+            <div class="health-item" style="background: {% if service_healthy %}#d4edda{% else %}#f8d7da{% endif %}; padding: 15px; border-radius: 8px;">
+                <h4 style="margin: 0 0 8px 0; color: {% if service_healthy %}#155724{% else %}#721c24{% endif %};">
+                    Overall Status
+                </h4>
+                <div style="font-size: 18px; font-weight: bold;">
+                    {{ health_status.status|title }}
+                </div>
+                <small style="color: #6c757d;">{{ health_status.timestamp|date:"M j, Y H:i:s" }}</small>
+            </div>
+
+            <div class="health-item" style="background: {% if health_status.database_connected %}#d4edda{% else %}#f8d7da{% endif %}; padding: 15px; border-radius: 8px;">
+                <h4 style="margin: 0 0 8px 0;">Database</h4>
+                <div style="font-size: 18px; font-weight: bold;">
+                    {% if health_status.database_connected %}Connected{% else %}Disconnected{% endif %}
+                </div>
+            </div>
+
+            <div class="health-item" style="background: {% if health_status.embedding_service_available %}#d4edda{% else %}#f8d7da{% endif %}; padding: 15px; border-radius: 8px;">
+                <h4 style="margin: 0 0 8px 0;">Embedding Service</h4>
+                <div style="font-size: 18px; font-weight: bold;">
+                    {% if health_status.embedding_service_available %}Available{% else %}Unavailable{% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Embedding Statistics -->
+    {% if metrics and embedding_stats %}
+    <div class="stats-section" style="margin-bottom: 30px;">
+        <h2>Embedding Statistics</h2>
+        <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-top: 15px;">
+            <div class="stat-card" style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e9ecef;">
+                <div style="font-size: 28px; font-weight: bold; color: #007bff; margin-bottom: 5px;">
+                    {{ embedding_stats.total_functions }}
+                </div>
+                <div style="color: #6c757d;">Total Functions</div>
+            </div>
+
+            <div class="stat-card" style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e9ecef;">
+                <div style="font-size: 28px; font-weight: bold; color: #28a745; margin-bottom: 5px;">
+                    {{ embedding_stats.functions_with_embeddings }}
+                </div>
+                <div style="color: #6c757d;">With Embeddings</div>
+            </div>
+
+            <div class="stat-card" style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e9ecef;">
+                <div style="font-size: 28px; font-weight: bold; color: #dc3545; margin-bottom: 5px;">
+                    {{ embedding_stats.functions_without_embeddings }}
+                </div>
+                <div style="color: #6c757d;">Without Embeddings</div>
+            </div>
+
+            <div class="stat-card" style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e9ecef;">
+                <div style="font-size: 28px; font-weight: bold; color: #ffc107; margin-bottom: 5px;">
+                    {{ embedding_stats.coverage_percent|floatformat:1 }}%
+                </div>
+                <div style="color: #6c757d;">Coverage</div>
+            </div>
+        </div>
+
+        <!-- Progress bar for coverage -->
+        <div style="margin-top: 20px;">
+            <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 8px;">
+                <span style="font-weight: 600;">Embedding Coverage Progress</span>
+                <span style="color: #6c757d;">{{ embedding_stats.coverage_percent|floatformat:1 }}%</span>
+            </div>
+            <div style="background: #e9ecef; height: 8px; border-radius: 4px; overflow: hidden;">
+                <div style="background: linear-gradient(90deg, #28a745, #20c997); height: 100%; width: {{ embedding_stats.coverage_percent }}%; transition: width 0.3s ease;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Performance Metrics -->
+    <div class="performance-section" style="margin-bottom: 30px;">
+        <h2>Performance Metrics</h2>
+        <div class="metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-top: 15px;">
+            <div class="metric-card" style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e9ecef;">
+                <h4 style="margin: 0 0 10px 0; color: #495057;">Search Performance</h4>
+                <div style="font-size: 20px; font-weight: bold; color: #17a2b8; margin-bottom: 5px;">
+                    {{ metrics.avg_search_time_ms|floatformat:1 }}ms
+                </div>
+                <div style="color: #6c757d;">Average Search Time</div>
+            </div>
+
+            <div class="metric-card" style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e9ecef;">
+                <h4 style="margin: 0 0 10px 0; color: #495057;">Cache Efficiency</h4>
+                <div style="font-size: 20px; font-weight: bold; color: #fd7e14; margin-bottom: 5px;">
+                    {{ metrics.cache_hit_rate_percent|floatformat:1 }}%
+                </div>
+                <div style="color: #6c757d;">Cache Hit Rate</div>
+            </div>
+
+            <div class="metric-card" style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e9ecef;">
+                <h4 style="margin: 0 0 10px 0; color: #495057;">Usage Statistics</h4>
+                <div style="font-size: 20px; font-weight: bold; color: #6610f2; margin-bottom: 5px;">
+                    {{ metrics.total_searches_today }}
+                </div>
+                <div style="color: #6c757d;">Searches Today</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Actions Section -->
+    <div class="actions-section" style="margin-bottom: 30px;">
+        <h2>Administrative Actions</h2>
+        <div class="action-buttons" style="display: flex; gap: 15px; margin-top: 15px; flex-wrap: wrap;">
+            {% if service_healthy %}
+            <button onclick="refreshStatus()" class="btn-action" style="background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer;">
+                🔄 Refresh Status
+            </button>
+
+            {% if embedding_stats.functions_without_embeddings > 0 %}
+            <button onclick="startBatchProcessing()" class="btn-action" style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer;">
+                ⚡ Process Missing Embeddings
+            </button>
+            {% endif %}
+
+            <a href="{% url 'vector_search:search' %}" class="btn-action" style="background: #17a2b8; color: white; text-decoration: none; padding: 10px 20px; border-radius: 6px; display: inline-block;">
+                🔍 Go to Search
+            </a>
+            {% else %}
+            <div style="background: #f8d7da; color: #721c24; padding: 15px; border-radius: 6px;">
+                Service is currently unavailable. Please check the service logs and ensure all dependencies are running.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- System Information -->
+    {% if health_status %}
+    <div class="system-info" style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
+        <h3>System Information</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 15px;">
+            <div>
+                <h4>Service Details</h4>
+                <ul style="list-style: none; padding: 0;">
+                    <li><strong>Service:</strong> {{ health_status.service }}</li>
+                    <li><strong>Version:</strong> {{ health_status.version }}</li>
+                    <li><strong>Status:</strong> {{ health_status.status|title }}</li>
+                </ul>
+            </div>
+            <div>
+                <h4>Last Updated</h4>
+                <ul style="list-style: none; padding: 0;">
+                    <li><strong>Timestamp:</strong> {{ health_status.timestamp|date:"M j, Y H:i:s" }}</li>
+                    <li><strong>Database:</strong> {% if health_status.database_connected %}✅ Connected{% else %}❌ Disconnected{% endif %}</li>
+                    <li><strong>Embeddings:</strong> {% if health_status.embedding_service_available %}✅ Available{% else %}❌ Unavailable{% endif %}</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% endif %}
+</div>
+
+<script>
+async function refreshStatus() {
+    window.location.reload();
+}
+
+async function startBatchProcessing() {
+    const button = event.target;
+    button.disabled = true;
+    button.textContent = '⏳ Starting...';
+
+    try {
+        const response = await fetch('/vector-search/api/embeddings/batch-process/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                batch_size: 50,
+                max_functions: 1000
+            })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.started) {
+            alert(`✅ Batch processing started!\n\n${result.message}\n\nEstimated time: ${Math.round(result.estimated_time_seconds / 60)} minutes`);
+
+            // Refresh the page after a short delay
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+        } else {
+            alert(`❌ Failed to start batch processing:\n${result.error || 'Unknown error'}`);
+        }
+    } catch (error) {
+        console.error('Batch processing error:', error);
+        alert('❌ Network error occurred while starting batch processing.');
+    } finally {
+        button.disabled = false;
+        button.textContent = '⚡ Process Missing Embeddings';
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,38 @@
+{
+  "name": "@tencentdb-agent-memory/memory-sdk-ts-v2",
+  "version": "1.0.1-beta.1",
+  "description": "TypeScript SDK for TencentDB Agent Memory (v3 strict-isolation API + /v3/skill/*)",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./v3": {
+      "import": "./dist/v3/index.js",
+      "types": "./dist/v3/index.d.ts"
+    }
+  },
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "tsc",
+    "prepack": "npm run clean && npm run build",
+    "prepublishOnly": "npm run clean && npm run build",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "files": ["dist/", "src/", "README.md"],
+  "license": "MIT",
+  "author": "TencentDB Agent Memory Team",
+  "engines": { "node": ">=18.0.0" },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  },
+  "dependencies": {
+    "undici": "^6.21.3"
+  }
+}

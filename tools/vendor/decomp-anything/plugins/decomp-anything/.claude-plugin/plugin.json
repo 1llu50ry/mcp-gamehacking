@@ -1,0 +1,10 @@
+{
+  "name": "decomp-anything",
+  "version": "0.11.0",
+  "description": "Reverse-engineer games, programs, apps and more with decomp.anything: the original compilers, a byte-for-byte judge, helper agents, REA analysis projects and a live view.",
+  "author": {"name": "decomp.anything contributors", "url": "https://github.com/giveen/decomp.anything"},
+  "homepage": "https://github.com/giveen/decomp.anything",
+  "repository": "https://github.com/giveen/decomp.anything",
+  "license": "MIT",
+  "keywords": ["decompilation", "reverse-engineering", "matching-decomp", "games", "rom", "windows", "linux", "n64", "gamecube", "wii", "ps2", "gba", "nds", "rea"]
+}

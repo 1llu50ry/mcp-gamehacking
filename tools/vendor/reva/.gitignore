@@ -1,0 +1,22 @@
+.gradle
+build/
+dist/
+bin/
+*.egg-info
+*.pyc
+*.class
+.venv
+.vim/
+.DS_Store
+.mypy_cache/
+__pycache__
+
+# Java heap dump files
+*.hprof
+
+# ReVa local project directories
+.reva/
+.claude/worktrees
+
+# Local superpowers spec workspace
+docs/superpowers/

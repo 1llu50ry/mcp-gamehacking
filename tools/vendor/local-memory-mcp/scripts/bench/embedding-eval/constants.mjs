@@ -1,0 +1,9 @@
+export const SEED = 0x479;
+export const OWNER = "bench";
+export const REPO = "bench-queue";
+export const BATCH_SIZE = 32;
+export const LEASE_MS = 60000;
+export const SHORT_LEASE_MS = 50;
+export const POISON_THRESHOLD = 5;
+export const BACKOFF_BASE_MS = 1000;
+export const BACKOFF_MAX_MS = 60000;

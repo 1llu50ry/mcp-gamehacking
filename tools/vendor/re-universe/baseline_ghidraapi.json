@@ -1,0 +1,12 @@
+{
+    "service_name": "GhidraAPI",
+    "metric_name": "response_time_ms",
+    "baseline_value": 17,
+    "min_value": 17,
+    "max_value": 19,
+    "success_rate": 100,
+    "warning_threshold": 25,
+    "critical_threshold": 51,
+    "measurement_date": "2026-02-20T09:45:29-07:00",
+    "iterations": 5
+}

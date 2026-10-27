@@ -1,0 +1,72 @@
+[project]
+name = "decompnet"
+version = "0.11.0"
+description = "decomp.anything: a fork of decomp.wtf that uses AI agents to reverse-engineer games, programs, apps, web pages, firmware and files. Runs locally."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "sam wolfs", email = "appelsiensam@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "capstone>=5.0.9",
+    "mcp>=2.3.0",
+    "pyelftools>=0.33",
+    "splat64[mips]>=0.50.1",
+    "spimdisasm>=1.42.4",
+    "rabbitizer>=1.16.2",
+    "httpx>=0.28",
+    "uvicorn>=0.30",
+    "ninja>=1.11",  # builds GameCube/Wii (dtk) and other ninja-based decomp projects
+    "truststore>=0.10; sys_platform == 'win32'",  # HTTPS verified by Windows itself (see decompnet/__init__.py)
+    "zstandard>=0.23; sys_platform == 'linux'",  # the .zst runtime old compilers need, without the zstd command
+]
+
+[project.urls]
+Homepage = "https://github.com/giveen/decomp.anything"
+Source = "https://github.com/giveen/decomp.anything"
+
+[project.scripts]
+decompnet = "decompnet.cli:main"
+decomp = "decompnet.app.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12.18,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.17.1",
+]
+
+[tool.ruff]
+# The codebase is written to ~140 columns; E501 enforces that, not 88.
+line-length = 140
+target-version = "py312"
+# The demo projects are self-contained build scripts (their own style, their own tools); CI lints the app.
+extend-exclude = ["projects"]
+
+[tool.ruff.lint]
+# Curated explicitly so a ruff upgrade cannot silently turn new rules on (or off) in CI.
+select = [
+    "E",      # pycodestyle errors, including E501 at the line length above
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes: undefined names (it found a real one), unused imports and variables
+    "B",       # bugbear: mutable defaults, loop-variable capture, zip() without strict, ...
+    "UP",     # pyupgrade: modern typing and string formatting
+    "I",      # import sorting
+    "SIM",    # simplifications
+    "RUF",    # ruff's own rules: unused noqa, collection and pytest patterns
+    "C4",     # comprehension mistakes
+    "PIE",    # misc lint
+    "FURB",   # refurbished: regex flag aliases and the like
+    "ASYNC",  # blocking calls in async functions
+    "EXE",    # shebang without the executable bit
+    "BLE",    # blind except; the project already documents its deliberate ones with # noqa
+]
+
+[tool.pytest.ini_options]
+# the room tests drive the room server through Starlette's TestClient, which warns about the timeouts real clients use
+filterwarnings = ["ignore:You should not use the 'timeout' argument with the TestClient"]

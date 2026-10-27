@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Version Column Blue Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a1a; color: #fff; }
+        table { border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #444; padding: 8px; text-align: center; min-width: 80px; }
+        th { background-color: #333; color: #fff; }
+        .addr-cell { color: #ccc; }
+        .addr-cell.exact-match { color: #6969ff !important; font-weight: 600 !important; }
+        .addr-cell.missing { color: #666; }
+        .selected-version { background-color: #0066cc !important; color: white; }
+        select { padding: 5px; margin: 10px; }
+        .test-section { margin: 20px 0; padding: 15px; background: #333; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Version Column Blue Test</h1>
+
+    <div class="test-section">
+        <label for="versionSelect">Select Version:</label>
+        <select id="versionSelect" onchange="selectVersion(this.value)">
+            <option value="">-- Select Version --</option>
+            <option value="1.00">1.00</option>
+            <option value="1.01">1.01</option>
+            <option value="1.07">1.07</option>
+            <option value="1.10">1.10</option>
+        </select>
+        <p><strong>Expected behavior:</strong> Selected version column should be ALL blue, other columns blue only where functions match.</p>
+    </div>
+
+    <table id="functionTable">
+        <thead>
+            <tr>
+                <th>Function</th>
+                <th id="v1.00">1.00</th>
+                <th id="v1.01">1.01</th>
+                <th id="v1.07">1.07</th>
+                <th id="v1.10">1.10</th>
+            </tr>
+        </thead>
+        <tbody id="functionTableBody">
+        </tbody>
+    </table>
+
+    <script>
+        // Test data representing functions across versions
+        const testFunctionData = {
+            "FunctionA": {
+                "addresses": {
+                    "1.00": "0x10001000",
+                    "1.01": "0x10001100",
+                    "1.07": "0x20001000",
+                    "1.10": null  // Missing in 1.10
+                }
+            },
+            "FunctionB": {
+                "addresses": {
+                    "1.00": "0x10002000",
+                    "1.01": null,  // Missing in 1.01
+                    "1.07": "0x20002000",
+                    "1.10": "0x30002000"
+                }
+            },
+            "FunctionC": {
+                "addresses": {
+                    "1.00": null,  // Missing in 1.00
+                    "1.01": "0x10003100",
+                    "1.07": "0x20003000",
+                    "1.10": "0x30003000"
+                }
+            },
+            "FunctionD": {
+                "addresses": {
+                    "1.00": "0x10004000",
+                    "1.01": "0x10004100",
+                    "1.07": "0x20004000",
+                    "1.10": "0x30004000"
+                }
+            }
+        };
+
+        const versions = ["1.00", "1.01", "1.07", "1.10"];
+        let selectedVersion = null;
+
+        function selectVersion(version) {
+            selectedVersion = version;
+            console.log('Selected version:', version);
+
+            // Update column headers
+            versions.forEach(v => {
+                const headerEl = document.getElementById(`v${v}`);
+                if (v === version) {
+                    headerEl.classList.add('selected-version');
+                } else {
+                    headerEl.classList.remove('selected-version');
+                }
+            });
+
+            buildTable();
+        }
+
+        function buildTable() {
+            const tbody = document.getElementById('functionTableBody');
+            tbody.innerHTML = '';
+
+            Object.keys(testFunctionData).forEach(funcName => {
+                const func = testFunctionData[funcName];
+                const row = document.createElement('tr');
+
+                // Function name cell
+                const nameCell = document.createElement('td');
+                nameCell.textContent = funcName;
+                nameCell.style.textAlign = 'left';
+                nameCell.style.fontWeight = '600';
+                row.appendChild(nameCell);
+
+                // Address cells for each version
+                versions.forEach(version => {
+                    const cell = document.createElement('td');
+                    const addr = func.addresses[version];
+
+                    if (addr) {
+                        cell.textContent = addr;
+                        cell.className = 'addr-cell';
+
+                        // Apply blue color logic
+                        if (selectedVersion && addr) {
+                            if (version === selectedVersion) {
+                                // Selected version column: all functions are blue (baseline)
+                                cell.classList.add('exact-match');
+                            } else {
+                                // Other versions: blue only if function exists in BOTH selected version and this version
+                                if (func.addresses[selectedVersion]) {
+                                    cell.classList.add('exact-match');
+                                }
+                            }
+                        }
+                    } else {
+                        cell.textContent = '—';
+                        cell.className = 'addr-cell missing';
+                    }
+
+                    row.appendChild(cell);
+                });
+
+                tbody.appendChild(row);
+            });
+        }
+
+        // Build initial table
+        buildTable();
+
+        // Add explanation
+        document.body.insertAdjacentHTML('beforeend', `
+            <div class="test-section">
+                <h3>Test Cases:</h3>
+                <ul>
+                    <li><strong>Select 1.00:</strong> Entire 1.00 column should be blue, other versions blue only where they share functions with 1.00</li>
+                    <li><strong>Select 1.01:</strong> Entire 1.01 column blue, but FunctionB cell in other columns should NOT be blue (since FunctionB doesn't exist in 1.01)</li>
+                    <li><strong>Select 1.07:</strong> Entire 1.07 column blue, FunctionC in other versions should be blue where it exists</li>
+                </ul>
+                <p><strong>Key insight:</strong> Blue means "this function exists in the selected baseline version"</p>
+            </div>
+        `);
+    </script>
+</body>
+</html>

@@ -1,0 +1,71 @@
+/* ─── Drawer ──────────────────────────────────────────────────────────────── */
+.drawer-overlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(1, 12, 30, 0.55);
+	z-index: var(--z-overlay, 50);
+	backdrop-filter: blur(6px);
+	-webkit-backdrop-filter: blur(6px);
+}
+
+.mobile-overlay {
+	z-index: var(--z-mobile-overlay, 38);
+}
+
+.drawer-panel {
+	position: fixed;
+	top: 0;
+	right: 0;
+	height: 100dvh;
+	width: min(620px, 95vw);
+	background: rgba(255, 255, 255, 0.96);
+	backdrop-filter: blur(20px);
+	-webkit-backdrop-filter: blur(20px);
+	box-shadow:
+		-20px 0 60px rgba(0, 0, 0, 0.14),
+		-1px 0 0 rgba(14, 165, 233, 0.08);
+	z-index: var(--z-drawer, 51);
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	border-left: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.dark .drawer-panel {
+	background: rgba(6, 12, 28, 0.96);
+	border-color: rgba(148, 163, 184, 0.1);
+	box-shadow:
+		-20px 0 60px rgba(0, 0, 0, 0.5),
+		-1px 0 0 rgba(56, 189, 248, 0.12);
+}
+
+/* ─── Table Dark Mode Optimization ──────────────────────────────────────── */
+.dark table thead tr {
+	background: rgba(10, 18, 38, 0.9) !important;
+}
+
+.dark table th {
+	color: var(--color-text-muted);
+	border-bottom-color: rgba(148, 163, 184, 0.12) !important;
+}
+
+.dark table td {
+	border-bottom-color: rgba(148, 163, 184, 0.07) !important;
+	color: var(--color-text);
+}
+
+.dark table tbody tr:hover td {
+	background: rgba(14, 165, 233, 0.04);
+}
+
+.dark table tbody tr:nth-child(even) td {
+	background: rgba(8, 15, 32, 0.35);
+}
+
+.dark table tbody tr:nth-child(even):hover td {
+	background: rgba(14, 165, 233, 0.06);
+}
+
+.dark table input[type="checkbox"] {
+	accent-color: #0ea5e9;
+}

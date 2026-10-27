@@ -1,0 +1,178 @@
+import { describe, it, expect } from "vitest";
+import {
+	TABLE_MEMORIES,
+	TABLE_TASKS,
+	TABLE_HANDOFFS,
+	TABLE_CLAIMS,
+	TABLE_ACTION_LOG,
+	TABLE_MEMORY_SUMMARY,
+	TTL_MS_PER_HOUR,
+	TTL_MS_PER_DAY,
+	HYBRID_WEIGHTS,
+	RECENCY_HALF_LIFE_MS,
+	STANDARD_RECENCY_HALF_LIFE_MS,
+	DEFAULT_CONFIDENCE_THRESHOLDS,
+	STANDARD_CONFIDENCE_THRESHOLDS,
+	SEARCH_THRESHOLDS,
+	VECTOR_CANDIDATE_CAP,
+	MIN_CANDIDATES,
+	COLD_START_RECENT_LIMIT,
+	STANDARD_CANDIDATE_CAP,
+	STANDARD_CONFLICT_CANDIDATES,
+	SIMILARITY_ZERO_FALLBACK,
+	REPO_MATCH_BOOST,
+	MEMORY_CONFLICT_THRESHOLD,
+	MEMORY_CHECK_CONFLICTS_THRESHOLD,
+	STANDARD_CONFLICT_THRESHOLD,
+	DEFAULT_BATCH_SIZE,
+	BULK_UPDATE_CHUNK_SIZE,
+	WAL_CHECKPOINT_INTERVAL_MS,
+	INDEX_STALENESS_TTL_MS,
+	EMBEDDING_QUEUE_BATCH_SIZE,
+	EMBEDDING_QUEUE_POLL_INTERVAL_MS,
+	EMBEDDING_QUEUE_LEASE_MS,
+	EMBEDDING_QUEUE_POISON_THRESHOLD,
+	EMBEDDING_QUEUE_BACKOFF_BASE_MS,
+	EMBEDDING_QUEUE_BACKOFF_MAX_MS,
+	EMBEDDING_QUEUE_DONE_TTL_MS,
+	EMBEDDING_QUEUE_POISON_TTL_MS,
+	EMBEDDING_QUEUE_PURGE_INTERVAL_MS,
+	FILE_WATCH_INTERVAL_MS,
+	FILE_WATCH_INTERVAL_MIN_MS,
+	FILE_WATCH_TTL_MS,
+	KG_MAX_GRAPH_EDGES,
+	KG_MAX_CONTEXT_ENTITIES,
+	KG_CONTEXT_TEXT_TOKENS,
+	ACTION_LOG_MAX_ROWS,
+	ARCHITECTURE_TOP_LEVEL_EXPORTS_LIMIT,
+	DEAD_CODE_UNREFERENCED_MAX,
+	DEAD_CODE_HOTSPOTS_MAX,
+	DEAD_CODE_SCAN_LIMIT,
+	CODEBASE_SEARCH_DEFAULT_LIMIT,
+	CODE_SEARCH_DEFAULT_LIMIT,
+	CODE_SEARCH_SNIPPET_CHARS,
+	CODE_SEARCH_CACHE_MAX_FILES,
+	CODE_SEARCH_CACHE_MAX_BYTES,
+	CODE_SEARCH_READ_CONCURRENCY,
+	CODE_SEARCH_MAX_REGEX_LENGTH,
+	CODE_GRAPH_MAX_EDGES,
+	CODE_GRAPH_DEFAULT_NODE_LIMIT,
+	CODE_GRAPH_MAX_NODES,
+	FILE_CONTENT_MAX_LINES
+} from "../../utils/constants";
+
+const ENV_TUNABLE_POSITIVE_INTS = [
+	VECTOR_CANDIDATE_CAP,
+	MIN_CANDIDATES,
+	DEFAULT_BATCH_SIZE,
+	WAL_CHECKPOINT_INTERVAL_MS,
+	INDEX_STALENESS_TTL_MS,
+	EMBEDDING_QUEUE_BATCH_SIZE,
+	EMBEDDING_QUEUE_POLL_INTERVAL_MS,
+	EMBEDDING_QUEUE_LEASE_MS,
+	EMBEDDING_QUEUE_BACKOFF_MAX_MS,
+	EMBEDDING_QUEUE_PURGE_INTERVAL_MS,
+	FILE_WATCH_INTERVAL_MS,
+	FILE_WATCH_TTL_MS,
+	KG_MAX_GRAPH_EDGES,
+	KG_MAX_CONTEXT_ENTITIES,
+	KG_CONTEXT_TEXT_TOKENS,
+	ACTION_LOG_MAX_ROWS,
+	CODE_SEARCH_CACHE_MAX_FILES,
+	CODE_SEARCH_CACHE_MAX_BYTES,
+	CODE_SEARCH_MAX_REGEX_LENGTH,
+	CODE_GRAPH_MAX_EDGES,
+	FILE_CONTENT_MAX_LINES
+];
+
+describe("constants", () => {
+	it("defines canonical table names", () => {
+		expect(TABLE_MEMORIES).toBe("memories");
+		expect(TABLE_TASKS).toBe("tasks");
+		expect(TABLE_HANDOFFS).toBe("handoffs");
+		expect(TABLE_CLAIMS).toBe("claims");
+		expect(TABLE_ACTION_LOG).toBe("action_log");
+		expect(TABLE_MEMORY_SUMMARY).toBe("memory_summary");
+	});
+
+	it("derives day TTL from the hour TTL", () => {
+		expect(TTL_MS_PER_DAY).toBe(24 * TTL_MS_PER_HOUR);
+		expect(TTL_MS_PER_HOUR).toBe(3_600_000);
+	});
+
+	it("derives recency half-lives from the day TTL", () => {
+		expect(RECENCY_HALF_LIFE_MS).toBe(30 * TTL_MS_PER_DAY);
+		expect(STANDARD_RECENCY_HALF_LIFE_MS).toBe(180 * TTL_MS_PER_DAY);
+	});
+
+	it("hybrid weights are non-negative and sum to 1", () => {
+		const weights = Object.values(HYBRID_WEIGHTS);
+		for (const weight of weights) {
+			expect(weight).toBeGreaterThanOrEqual(0);
+			expect(weight).toBeLessThanOrEqual(1);
+		}
+		const sum = weights.reduce((acc, w) => acc + w, 0);
+		expect(sum).toBeCloseTo(1, 10);
+	});
+
+	it("confidence thresholds are ordered high > medium", () => {
+		expect(DEFAULT_CONFIDENCE_THRESHOLDS.high).toBeGreaterThan(DEFAULT_CONFIDENCE_THRESHOLDS.medium);
+		expect(STANDARD_CONFIDENCE_THRESHOLDS.high).toBeGreaterThan(STANDARD_CONFIDENCE_THRESHOLDS.medium);
+	});
+
+	it("search thresholds use lenient small-set values below strict large-set values", () => {
+		for (const kind of Object.keys(SEARCH_THRESHOLDS)) {
+			const set = SEARCH_THRESHOLDS[kind as keyof typeof SEARCH_THRESHOLDS];
+			expect(set.smallSet).toBeLessThan(set.largeSet);
+		}
+	});
+
+	it("pins the bulk chunk size to 500 (SQLite bound-variable invariant)", () => {
+		expect(BULK_UPDATE_CHUNK_SIZE).toBe(500);
+	});
+
+	it("pins fixed scalar constants", () => {
+		expect(COLD_START_RECENT_LIMIT).toBe(10);
+		expect(STANDARD_CANDIDATE_CAP).toBe(60);
+		expect(STANDARD_CONFLICT_CANDIDATES).toBe(80);
+		expect(SIMILARITY_ZERO_FALLBACK).toBe(0.16);
+		expect(REPO_MATCH_BOOST).toBe(0.1);
+		expect(MEMORY_CONFLICT_THRESHOLD).toBe(0.85);
+		expect(MEMORY_CHECK_CONFLICTS_THRESHOLD).toBe(0.55);
+		expect(STANDARD_CONFLICT_THRESHOLD).toBe(0.82);
+	});
+
+	it("pins embedding-queue constants", () => {
+		expect(EMBEDDING_QUEUE_POISON_THRESHOLD).toBe(5);
+		expect(EMBEDDING_QUEUE_BACKOFF_BASE_MS).toBe(1_000);
+		expect(EMBEDDING_QUEUE_DONE_TTL_MS).toBe(6 * TTL_MS_PER_HOUR);
+		expect(EMBEDDING_QUEUE_POISON_TTL_MS).toBe(7 * TTL_MS_PER_DAY);
+	});
+
+	it("pins codebase bounds", () => {
+		expect(CODE_SEARCH_SNIPPET_CHARS).toBe(80);
+		expect(CODE_SEARCH_READ_CONCURRENCY).toBe(16);
+		expect(ARCHITECTURE_TOP_LEVEL_EXPORTS_LIMIT).toBe(50);
+		expect(DEAD_CODE_UNREFERENCED_MAX).toBe(20);
+		expect(DEAD_CODE_HOTSPOTS_MAX).toBe(10);
+		expect(DEAD_CODE_SCAN_LIMIT).toBe(500);
+		expect(CODEBASE_SEARCH_DEFAULT_LIMIT).toBe(50);
+		expect(CODE_SEARCH_DEFAULT_LIMIT).toBe(10);
+		expect(CODE_GRAPH_DEFAULT_NODE_LIMIT).toBe(120);
+		expect(CODE_GRAPH_MAX_NODES).toBe(240);
+	});
+
+	it("keeps file-watcher bounds sane", () => {
+		expect(FILE_WATCH_INTERVAL_MIN_MS).toBe(1_000);
+		expect(FILE_WATCH_INTERVAL_MS).toBeGreaterThanOrEqual(FILE_WATCH_INTERVAL_MIN_MS);
+		expect(FILE_WATCH_TTL_MS).toBeGreaterThan(FILE_WATCH_INTERVAL_MS);
+	});
+
+	it("env-tunable constants are always positive finite integers", () => {
+		for (const value of ENV_TUNABLE_POSITIVE_INTS) {
+			expect(Number.isFinite(value)).toBe(true);
+			expect(Number.isInteger(value)).toBe(true);
+			expect(value).toBeGreaterThan(0);
+		}
+	});
+});

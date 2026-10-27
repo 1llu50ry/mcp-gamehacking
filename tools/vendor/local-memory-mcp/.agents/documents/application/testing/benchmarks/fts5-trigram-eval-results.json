@@ -1,0 +1,2960 @@
+{
+  "meta": {
+    "task": "TASK-295",
+    "date": "2026-08-09T02:54:19.135Z",
+    "node": "v24.18.0",
+    "betterSqlite3": "12.9.0",
+    "sqliteVersion": "3.53.0",
+    "pageSize": 4096,
+    "corpusRows": 8000,
+    "iterations": 300,
+    "corpusSource": "EN+ID+CJK sentences, tech identifiers, prefix-family stems, mid-word probes, café/WORKSPACE-BINARY case probes",
+    "productionShape": "buildFtsMatchQuery (every term suffixed `*`, phrases verbatim, AND, cap 8)"
+  },
+  "recall": {
+    "classSummary": [
+      {
+        "cls": "latin-token-initial",
+        "queries": 8,
+        "oracleRows": 27664,
+        "uni_recall10": 0.00459577868297069,
+        "uni_recall50": 0.02297889341485345,
+        "tri_recall10": 0.00459577868297069,
+        "tri_recall50": 0.02297889341485345,
+        "triRaw_recall10": 0.00459577868297069,
+        "triRaw_recall50": 0.02297889341485345,
+        "uni_found": 400,
+        "tri_found": 400,
+        "triRaw_found": 400
+      },
+      {
+        "cls": "latin-midword",
+        "queries": 6,
+        "oracleRows": 2100,
+        "uni_recall10": 0,
+        "uni_recall50": 0,
+        "tri_recall10": 0.03651365263176023,
+        "tri_recall50": 0.18256826315880115,
+        "triRaw_recall10": 0.03651365263176023,
+        "triRaw_recall50": 0.18256826315880115,
+        "uni_found": 0,
+        "tri_found": 250,
+        "triRaw_found": 250
+      },
+      {
+        "cls": "tech-ident",
+        "queries": 6,
+        "oracleRows": 1016,
+        "uni_recall10": 0.06455192167476002,
+        "uni_recall50": 0.3227596083738001,
+        "tri_recall10": 0.06455192167476002,
+        "tri_recall50": 0.3227596083738001,
+        "triRaw_recall10": 0.06455192167476002,
+        "triRaw_recall50": 0.3227596083738001,
+        "uni_found": 300,
+        "tri_found": 300,
+        "triRaw_found": 300
+      },
+      {
+        "cls": "hyphen",
+        "queries": 2,
+        "oracleRows": 306,
+        "uni_recall10": 0.05655273102026795,
+        "uni_recall50": 0.2705685331501202,
+        "tri_recall10": 0.05960151150807283,
+        "tri_recall50": 0.3041051185159739,
+        "triRaw_recall10": 0.05960151150807283,
+        "triRaw_recall50": 0.3041051185159739,
+        "uni_found": 100,
+        "tri_found": 100,
+        "triRaw_found": 100
+      },
+      {
+        "cls": "cjk",
+        "queries": 4,
+        "oracleRows": 1317,
+        "uni_recall10": 0.0248305950060336,
+        "uni_recall50": 0.124152975030168,
+        "tri_recall10": 0,
+        "tri_recall50": 0,
+        "triRaw_recall10": 0,
+        "triRaw_recall50": 0,
+        "uni_found": 100,
+        "tri_found": 0,
+        "triRaw_found": 0
+      },
+      {
+        "cls": "cjk-midrun",
+        "queries": 2,
+        "oracleRows": 132,
+        "uni_recall10": 0,
+        "uni_recall50": 0,
+        "tri_recall10": 0,
+        "tri_recall50": 0,
+        "triRaw_recall10": 0,
+        "triRaw_recall50": 0,
+        "uni_found": 0,
+        "tri_found": 0,
+        "triRaw_found": 0
+      },
+      {
+        "cls": "cjk-run3",
+        "queries": 2,
+        "oracleRows": 412,
+        "uni_recall10": 0.017857142857142856,
+        "uni_recall50": 0.08928571428571429,
+        "tri_recall10": 0.055735930735930736,
+        "tri_recall50": 0.2786796536796537,
+        "triRaw_recall10": 0.055735930735930736,
+        "triRaw_recall50": 0.2786796536796537,
+        "uni_found": 50,
+        "tri_found": 100,
+        "triRaw_found": 100
+      },
+      {
+        "cls": "cjk-3char",
+        "queries": 3,
+        "oracleRows": 294,
+        "uni_recall10": 0,
+        "uni_recall50": 0,
+        "tri_recall10": 0.06874298540965207,
+        "tri_recall50": 0.34371492704826034,
+        "triRaw_recall10": 0.06874298540965207,
+        "triRaw_recall50": 0.34371492704826034,
+        "uni_found": 0,
+        "tri_found": 100,
+        "triRaw_found": 100
+      },
+      {
+        "cls": "short",
+        "queries": 6,
+        "oracleRows": 16893,
+        "uni_recall10": 0.0037760504825239435,
+        "uni_recall50": 0.018880252412619716,
+        "tri_recall10": 0,
+        "tri_recall50": 0,
+        "triRaw_recall10": 0,
+        "triRaw_recall50": 0,
+        "uni_found": 250,
+        "tri_found": 0,
+        "triRaw_found": 0
+      },
+      {
+        "cls": "case",
+        "queries": 2,
+        "oracleRows": 4435,
+        "uni_recall10": 0.004872902399555583,
+        "uni_recall50": 0.024364511997777914,
+        "tri_recall10": 0.004872902399555583,
+        "tri_recall50": 0.024364511997777914,
+        "triRaw_recall10": 0.004872902399555583,
+        "triRaw_recall50": 0.024364511997777914,
+        "uni_found": 100,
+        "tri_found": 100,
+        "triRaw_found": 100
+      },
+      {
+        "cls": "diacritic",
+        "queries": 1,
+        "oracleRows": 0,
+        "uni_recall10": null,
+        "uni_recall50": null,
+        "tri_recall10": null,
+        "tri_recall50": null,
+        "triRaw_recall10": null,
+        "triRaw_recall50": null,
+        "uni_found": 50,
+        "tri_found": 0,
+        "triRaw_found": 0
+      },
+      {
+        "cls": "id",
+        "queries": 5,
+        "oracleRows": 2241,
+        "uni_recall10": 0.0414301606027966,
+        "uni_recall50": 0.20715080301398298,
+        "tri_recall10": 0.0414301606027966,
+        "tri_recall50": 0.20715080301398298,
+        "triRaw_recall10": 0.0414301606027966,
+        "triRaw_recall50": 0.20715080301398298,
+        "uni_found": 250,
+        "tri_found": 250,
+        "triRaw_found": 250
+      }
+    ],
+    "perQuery": [
+      {
+        "cls": "latin-token-initial",
+        "q": "vector",
+        "oracle": 2823,
+        "prod": "vector*",
+        "raw": "vector",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.003542330853701736
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.017711654268508677
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.003542330853701736
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.017711654268508677
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.003542330853701736
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.017711654268508677
+          }
+        }
+      },
+      {
+        "cls": "latin-token-initial",
+        "q": "memory",
+        "oracle": 8000,
+        "prod": "memory*",
+        "raw": "memory",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.00125
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.00625
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.00125
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.00625
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.00125
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.00625
+          }
+        }
+      },
+      {
+        "cls": "latin-token-initial",
+        "q": "sqlite",
+        "oracle": 1612,
+        "prod": "sqlite*",
+        "raw": "sqlite",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.00620347394540943
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.031017369727047148
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.00620347394540943
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.031017369727047148
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.00620347394540943
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.031017369727047148
+          }
+        }
+      },
+      {
+        "cls": "latin-token-initial",
+        "q": "search",
+        "oracle": 1726,
+        "prod": "search*",
+        "raw": "search",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.005793742757821553
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.028968713789107765
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.005793742757821553
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.028968713789107765
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.005793742757821553
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.028968713789107765
+          }
+        }
+      },
+      {
+        "cls": "latin-token-initial",
+        "q": "fts5",
+        "oracle": 1515,
+        "prod": "fts5*",
+        "raw": "fts5",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.006600660066006601
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.033003300330033
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.006600660066006601
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.033003300330033
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.006600660066006601
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.033003300330033
+          }
+        }
+      },
+      {
+        "cls": "latin-token-initial",
+        "q": "memo",
+        "oracle": 8000,
+        "prod": "memo*",
+        "raw": "memo",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.00125
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.00625
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.00125
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.00625
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.00125
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.00625
+          }
+        }
+      },
+      {
+        "cls": "latin-token-initial",
+        "q": "vect",
+        "oracle": 2823,
+        "prod": "vect*",
+        "raw": "vect",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.003542330853701736
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.017711654268508677
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.003542330853701736
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.017711654268508677
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.003542330853701736
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.017711654268508677
+          }
+        }
+      },
+      {
+        "cls": "latin-token-initial",
+        "q": "tokeniz",
+        "oracle": 1165,
+        "prod": "tokeniz*",
+        "raw": "tokeniz",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.008583690987124463
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.04291845493562232
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.008583690987124463
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.04291845493562232
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.008583690987124463
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.04291845493562232
+          }
+        }
+      },
+      {
+        "cls": "latin-midword",
+        "q": "orkspace",
+        "oracle": 876,
+        "prod": "orkspace*",
+        "raw": "orkspace",
+        "unicode": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.01141552511415525
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.05707762557077625
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.01141552511415525
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.05707762557077625
+          }
+        }
+      },
+      {
+        "cls": "latin-midword",
+        "q": "ntent",
+        "oracle": 256,
+        "prod": "ntent*",
+        "raw": "ntent",
+        "unicode": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.0390625
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.1953125
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.0390625
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.1953125
+          }
+        }
+      },
+      {
+        "cls": "latin-midword",
+        "q": "emories",
+        "oracle": 559,
+        "prod": "emories*",
+        "raw": "emories",
+        "unicode": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.017889087656529516
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.08944543828264759
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.017889087656529516
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.08944543828264759
+          }
+        }
+      },
+      {
+        "cls": "latin-midword",
+        "q": "obust",
+        "oracle": 127,
+        "prod": "obust*",
+        "raw": "obust",
+        "unicode": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.07874015748031496
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.3937007874015748
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.07874015748031496
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.3937007874015748
+          }
+        }
+      },
+      {
+        "cls": "latin-midword",
+        "q": "ential",
+        "oracle": 282,
+        "prod": "ential*",
+        "raw": "ential",
+        "unicode": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.03546099290780142
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.1773049645390071
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.03546099290780142
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.1773049645390071
+          }
+        }
+      },
+      {
+        "cls": "latin-midword",
+        "q": "sisting",
+        "oracle": 0,
+        "prod": "sisting*",
+        "raw": "sisting",
+        "unicode": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": null
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": null
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": null
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": null
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": null
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": null
+          }
+        }
+      },
+      {
+        "cls": "tech-ident",
+        "q": "libsql",
+        "oracle": 145,
+        "prod": "libsql*",
+        "raw": "libsql",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.06896551724137931
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.3448275862068966
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.06896551724137931
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.3448275862068966
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.06896551724137931
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.3448275862068966
+          }
+        }
+      },
+      {
+        "cls": "tech-ident",
+        "q": "better-sqlite3",
+        "oracle": 121,
+        "prod": "better* AND sqlite3*",
+        "raw": "better AND sqlite3",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.08264462809917356
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.4132231404958678
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.08264462809917356
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.4132231404958678
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.08264462809917356
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.4132231404958678
+          }
+        }
+      },
+      {
+        "cls": "tech-ident",
+        "q": "tree-sitter",
+        "oracle": 151,
+        "prod": "tree* AND sitter*",
+        "raw": "tree AND sitter",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.06622516556291391
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.33112582781456956
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.06622516556291391
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.33112582781456956
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.06622516556291391
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.33112582781456956
+          }
+        }
+      },
+      {
+        "cls": "tech-ident",
+        "q": "supabase",
+        "oracle": 132,
+        "prod": "supabase*",
+        "raw": "supabase",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.07575757575757576
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.3787878787878788
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.07575757575757576
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.3787878787878788
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.07575757575757576
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.3787878787878788
+          }
+        }
+      },
+      {
+        "cls": "tech-ident",
+        "q": "zod",
+        "oracle": 302,
+        "prod": "zod*",
+        "raw": "zod",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.033112582781456956
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.16556291390728478
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.033112582781456956
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.16556291390728478
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.033112582781456956
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.16556291390728478
+          }
+        }
+      },
+      {
+        "cls": "tech-ident",
+        "q": "esbuild",
+        "oracle": 165,
+        "prod": "esbuild*",
+        "raw": "esbuild",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.06060606060606061
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.30303030303030304
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.06060606060606061
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.30303030303030304
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.06060606060606061
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.30303030303030304
+          }
+        }
+      },
+      {
+        "cls": "hyphen",
+        "q": "data-pipeline",
+        "oracle": 164,
+        "prod": "data* AND pipeline*",
+        "raw": "data AND pipeline",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 7,
+            "err": null,
+            "recall": 0.042682926829268296
+          },
+          "r50": {
+            "found": 50,
+            "hit": 31,
+            "err": null,
+            "recall": 0.18902439024390244
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 8,
+            "err": null,
+            "recall": 0.04878048780487805
+          },
+          "r50": {
+            "found": 50,
+            "hit": 42,
+            "err": null,
+            "recall": 0.25609756097560976
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 8,
+            "err": null,
+            "recall": 0.04878048780487805
+          },
+          "r50": {
+            "found": 50,
+            "hit": 42,
+            "err": null,
+            "recall": 0.25609756097560976
+          }
+        }
+      },
+      {
+        "cls": "hyphen",
+        "q": "multi-tenant",
+        "oracle": 142,
+        "prod": "multi* AND tenant*",
+        "raw": "multi AND tenant",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.07042253521126761
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.352112676056338
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.07042253521126761
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.352112676056338
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.07042253521126761
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.352112676056338
+          }
+        }
+      },
+      {
+        "cls": "cjk",
+        "q": "记忆",
+        "oracle": 266,
+        "prod": "记忆*",
+        "raw": "记忆",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.03759398496240601
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.18796992481203006
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        }
+      },
+      {
+        "cls": "cjk",
+        "q": "向量",
+        "oracle": 463,
+        "prod": "向量*",
+        "raw": "向量",
+        "unicode": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        }
+      },
+      {
+        "cls": "cjk",
+        "q": "语义",
+        "oracle": 162,
+        "prod": "语义*",
+        "raw": "语义",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.06172839506172839
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.30864197530864196
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        }
+      },
+      {
+        "cls": "cjk",
+        "q": "索引",
+        "oracle": 426,
+        "prod": "索引*",
+        "raw": "索引",
+        "unicode": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        }
+      },
+      {
+        "cls": "cjk-midrun",
+        "q": "理系",
+        "oracle": 132,
+        "prod": "理系*",
+        "raw": "理系",
+        "unicode": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        }
+      },
+      {
+        "cls": "cjk-midrun",
+        "q": "存层",
+        "oracle": 0,
+        "prod": "存层*",
+        "raw": "存层",
+        "unicode": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": null
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": null
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": null
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": null
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": null
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": null
+          }
+        }
+      },
+      {
+        "cls": "cjk-run3",
+        "q": "管理系统",
+        "oracle": 132,
+        "prod": "管理系统*",
+        "raw": "管理系统",
+        "unicode": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.07575757575757576
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.3787878787878788
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.07575757575757576
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.3787878787878788
+          }
+        }
+      },
+      {
+        "cls": "cjk-run3",
+        "q": "数据库",
+        "oracle": 280,
+        "prod": "数据库*",
+        "raw": "数据库",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.03571428571428571
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.17857142857142858
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.03571428571428571
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.17857142857142858
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.03571428571428571
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.17857142857142858
+          }
+        }
+      },
+      {
+        "cls": "cjk-3char",
+        "q": "理系统",
+        "oracle": 132,
+        "prod": "理系统*",
+        "raw": "理系统",
+        "unicode": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.07575757575757576
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.3787878787878788
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.07575757575757576
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.3787878787878788
+          }
+        }
+      },
+      {
+        "cls": "cjk-3char",
+        "q": "量搜索",
+        "oracle": 162,
+        "prod": "量搜索*",
+        "raw": "量搜索",
+        "unicode": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.06172839506172839
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.30864197530864196
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.06172839506172839
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.30864197530864196
+          }
+        }
+      },
+      {
+        "cls": "cjk-3char",
+        "q": "卷词",
+        "oracle": 0,
+        "prod": "卷词*",
+        "raw": "卷词",
+        "unicode": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": null
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": null
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": null
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": null
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": null
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": null
+          }
+        }
+      },
+      {
+        "cls": "short",
+        "q": "ui",
+        "oracle": 1947,
+        "prod": "ui*",
+        "raw": "ui",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.005136106831022085
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.025680534155110426
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        }
+      },
+      {
+        "cls": "short",
+        "q": "go",
+        "oracle": 1230,
+        "prod": "go*",
+        "raw": "go",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.008130081300813009
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.04065040650406504
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        }
+      },
+      {
+        "cls": "short",
+        "q": "ts",
+        "oracle": 3140,
+        "prod": "ts*",
+        "raw": "ts",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.0031847133757961785
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.01592356687898089
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        }
+      },
+      {
+        "cls": "short",
+        "q": "id",
+        "oracle": 2018,
+        "prod": "id*",
+        "raw": "id",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.004955401387512388
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.024777006937561942
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        }
+      },
+      {
+        "cls": "short",
+        "q": "e",
+        "oracle": 8000,
+        "prod": "e*",
+        "raw": "e",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.00125
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.00625
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        }
+      },
+      {
+        "cls": "short",
+        "q": "AI",
+        "oracle": 558,
+        "prod": "AI*",
+        "raw": "AI",
+        "unicode": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": 0
+          }
+        }
+      },
+      {
+        "cls": "case",
+        "q": "VECTOR",
+        "oracle": 2823,
+        "prod": "VECTOR*",
+        "raw": "VECTOR",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.003542330853701736
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.017711654268508677
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.003542330853701736
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.017711654268508677
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.003542330853701736
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.017711654268508677
+          }
+        }
+      },
+      {
+        "cls": "case",
+        "q": "SQLite",
+        "oracle": 1612,
+        "prod": "SQLite*",
+        "raw": "SQLite",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.00620347394540943
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.031017369727047148
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.00620347394540943
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.031017369727047148
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.00620347394540943
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.031017369727047148
+          }
+        }
+      },
+      {
+        "cls": "diacritic",
+        "q": "cafe",
+        "oracle": 0,
+        "prod": "cafe*",
+        "raw": "cafe",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 0,
+            "err": null,
+            "recall": null
+          },
+          "r50": {
+            "found": 50,
+            "hit": 0,
+            "err": null,
+            "recall": null
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": null
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": null
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": null
+          },
+          "r50": {
+            "found": 0,
+            "hit": 0,
+            "err": null,
+            "recall": null
+          }
+        }
+      },
+      {
+        "cls": "id",
+        "q": "manajemen",
+        "oracle": 146,
+        "prod": "manajemen*",
+        "raw": "manajemen",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.0684931506849315
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.3424657534246575
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.0684931506849315
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.3424657534246575
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.0684931506849315
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.3424657534246575
+          }
+        }
+      },
+      {
+        "cls": "id",
+        "q": "pengindeksan",
+        "oracle": 294,
+        "prod": "pengindeksan*",
+        "raw": "pengindeksan",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.034013605442176874
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.17006802721088435
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.034013605442176874
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.17006802721088435
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.034013605442176874
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.17006802721088435
+          }
+        }
+      },
+      {
+        "cls": "id",
+        "q": "kueri",
+        "oracle": 404,
+        "prod": "kueri*",
+        "raw": "kueri",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.024752475247524754
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.12376237623762376
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.024752475247524754
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.12376237623762376
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.024752475247524754
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.12376237623762376
+          }
+        }
+      },
+      {
+        "cls": "id",
+        "q": "memori",
+        "oracle": 1258,
+        "prod": "memori*",
+        "raw": "memori",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.00794912559618442
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.0397456279809221
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.00794912559618442
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.0397456279809221
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.00794912559618442
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.0397456279809221
+          }
+        }
+      },
+      {
+        "cls": "id",
+        "q": "memakai",
+        "oracle": 139,
+        "prod": "memakai*",
+        "raw": "memakai",
+        "unicode": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.07194244604316546
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.3597122302158273
+          }
+        },
+        "trigram": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.07194244604316546
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.3597122302158273
+          }
+        },
+        "trigramRaw": {
+          "r10": {
+            "found": 10,
+            "hit": 10,
+            "err": null,
+            "recall": 0.07194244604316546
+          },
+          "r50": {
+            "found": 50,
+            "hit": 50,
+            "err": null,
+            "recall": 0.3597122302158273
+          }
+        }
+      }
+    ]
+  },
+  "size": {
+    "unicode": {
+      "bytes": 888832,
+      "baseTotal": null,
+      "vocab": {
+        "tokens": 142333,
+        "distinct_terms": 16333
+      }
+    },
+    "trigram": {
+      "bytes": 6176768,
+      "baseTotal": null,
+      "vocab": {
+        "tokens": 931299,
+        "distinct_terms": 2984
+      }
+    },
+    "repetitiveCorpus": {
+      "unicodeBytes": 888832,
+      "trigramBytes": 6176768,
+      "deltaBytes": 5287936,
+      "ratio": 6.949308755760368
+    },
+    "uniqueCorpus": {
+      "unicodeBytes": 1892352,
+      "trigramBytes": 10567680,
+      "deltaBytes": 8675328,
+      "ratio": 5.584415584415584
+    }
+  },
+  "shortCorner": [
+    {
+      "q": "ui",
+      "len": 2,
+      "oracle": 1947,
+      "unicode_found": 50,
+      "trigram_found": 0,
+      "trigram_err": null
+    },
+    {
+      "q": "go",
+      "len": 2,
+      "oracle": 1230,
+      "unicode_found": 50,
+      "trigram_found": 0,
+      "trigram_err": null
+    },
+    {
+      "q": "ts",
+      "len": 2,
+      "oracle": 3140,
+      "unicode_found": 50,
+      "trigram_found": 0,
+      "trigram_err": null
+    },
+    {
+      "q": "id",
+      "len": 2,
+      "oracle": 2018,
+      "unicode_found": 50,
+      "trigram_found": 0,
+      "trigram_err": null
+    },
+    {
+      "q": "e",
+      "len": 1,
+      "oracle": 8000,
+      "unicode_found": 50,
+      "trigram_found": 0,
+      "trigram_err": null
+    },
+    {
+      "q": "AI",
+      "len": 2,
+      "oracle": 558,
+      "unicode_found": 0,
+      "trigram_found": 0,
+      "trigram_err": null
+    }
+  ],
+  "cjk": [
+    {
+      "q": "记忆",
+      "len": 2,
+      "oracle": 266,
+      "uni_found": 50,
+      "uni_recall50": 0.18796992481203006,
+      "tri_found": 0,
+      "tri_recall50": 0,
+      "triRaw_found": 0,
+      "triRaw_recall50": 0,
+      "prod": "记忆*",
+      "raw": "记忆"
+    },
+    {
+      "q": "向量",
+      "len": 2,
+      "oracle": 463,
+      "uni_found": 0,
+      "uni_recall50": 0,
+      "tri_found": 0,
+      "tri_recall50": 0,
+      "triRaw_found": 0,
+      "triRaw_recall50": 0,
+      "prod": "向量*",
+      "raw": "向量"
+    },
+    {
+      "q": "语义",
+      "len": 2,
+      "oracle": 162,
+      "uni_found": 50,
+      "uni_recall50": 0.30864197530864196,
+      "tri_found": 0,
+      "tri_recall50": 0,
+      "triRaw_found": 0,
+      "triRaw_recall50": 0,
+      "prod": "语义*",
+      "raw": "语义"
+    },
+    {
+      "q": "索引",
+      "len": 2,
+      "oracle": 426,
+      "uni_found": 0,
+      "uni_recall50": 0,
+      "tri_found": 0,
+      "tri_recall50": 0,
+      "triRaw_found": 0,
+      "triRaw_recall50": 0,
+      "prod": "索引*",
+      "raw": "索引"
+    },
+    {
+      "q": "理系",
+      "len": 2,
+      "oracle": 132,
+      "uni_found": 0,
+      "uni_recall50": 0,
+      "tri_found": 0,
+      "tri_recall50": 0,
+      "triRaw_found": 0,
+      "triRaw_recall50": 0,
+      "prod": "理系*",
+      "raw": "理系"
+    },
+    {
+      "q": "存层",
+      "len": 2,
+      "oracle": 0,
+      "uni_found": 0,
+      "uni_recall50": null,
+      "tri_found": 0,
+      "tri_recall50": null,
+      "triRaw_found": 0,
+      "triRaw_recall50": null,
+      "prod": "存层*",
+      "raw": "存层"
+    },
+    {
+      "q": "管理系统",
+      "len": 4,
+      "oracle": 132,
+      "uni_found": 0,
+      "uni_recall50": 0,
+      "tri_found": 50,
+      "tri_recall50": 0.3787878787878788,
+      "triRaw_found": 50,
+      "triRaw_recall50": 0.3787878787878788,
+      "prod": "管理系统*",
+      "raw": "管理系统"
+    },
+    {
+      "q": "数据库",
+      "len": 3,
+      "oracle": 280,
+      "uni_found": 50,
+      "uni_recall50": 0.17857142857142858,
+      "tri_found": 50,
+      "tri_recall50": 0.17857142857142858,
+      "triRaw_found": 50,
+      "triRaw_recall50": 0.17857142857142858,
+      "prod": "数据库*",
+      "raw": "数据库"
+    },
+    {
+      "q": "理系统",
+      "len": 3,
+      "oracle": 132,
+      "uni_found": 0,
+      "uni_recall50": 0,
+      "tri_found": 50,
+      "tri_recall50": 0.3787878787878788,
+      "triRaw_found": 50,
+      "triRaw_recall50": 0.3787878787878788,
+      "prod": "理系统*",
+      "raw": "理系统"
+    },
+    {
+      "q": "量搜索",
+      "len": 3,
+      "oracle": 162,
+      "uni_found": 0,
+      "uni_recall50": 0,
+      "tri_found": 50,
+      "tri_recall50": 0.30864197530864196,
+      "triRaw_found": 50,
+      "triRaw_recall50": 0.30864197530864196,
+      "prod": "量搜索*",
+      "raw": "量搜索"
+    },
+    {
+      "q": "卷词",
+      "len": 2,
+      "oracle": 0,
+      "uni_found": 0,
+      "uni_recall50": null,
+      "tri_found": 0,
+      "tri_recall50": null,
+      "triRaw_found": 0,
+      "triRaw_recall50": null,
+      "prod": "卷词*",
+      "raw": "卷词"
+    }
+  ],
+  "probes": [
+    {
+      "label": "case-sensitivity",
+      "q": "VECTOR",
+      "oracle": 2823,
+      "unicode_found": 50,
+      "trigram_found": 50,
+      "note": "both fold ASCII case in SQLite 3.53 (trigram is case-insensitive for ASCII; unicode61 also folds + strips diacritics)"
+    },
+    {
+      "label": "case-sensitivity",
+      "q": "SQLite",
+      "oracle": 1612,
+      "unicode_found": 50,
+      "trigram_found": 50,
+      "note": "both fold ASCII case in SQLite 3.53 (trigram is case-insensitive for ASCII; unicode61 also folds + strips diacritics)"
+    },
+    {
+      "label": "diacritic",
+      "q": "cafe",
+      "oracle": 0,
+      "unicode_found": 50,
+      "trigram_found": 0,
+      "note": "unicode61 folds diacritics (café→cafe); trigram is byte-sensitive, LIKE is byte-sensitive"
+    }
+  ],
+  "latency": [
+    {
+      "name": "single-broad",
+      "q": "sqlite",
+      "prod": "sqlite*",
+      "unicode_ms": {
+        "p50": 2.230333,
+        "p95": 2.83431,
+        "p99": 4.764023,
+        "n": 300
+      },
+      "trigram_ms": {
+        "p50": 3.353389,
+        "p95": 4.401066,
+        "p99": 6.977323,
+        "n": 300
+      },
+      "trigramRaw_ms": {
+        "p50": 3.13893,
+        "p95": 3.88938,
+        "p99": 6.347177,
+        "n": 300
+      },
+      "like_ms": {
+        "p50": 0.344524,
+        "p95": 0.524209,
+        "p99": 1.355981,
+        "n": 300
+      },
+      "oracle": 1612
+    },
+    {
+      "name": "single-cjk",
+      "q": "记忆",
+      "prod": "记忆*",
+      "unicode_ms": {
+        "p50": 0.347669,
+        "p95": 0.451472,
+        "p99": 0.548654,
+        "n": 300
+      },
+      "trigram_ms": {
+        "p50": 0.018153,
+        "p95": 0.02649,
+        "p99": 0.068107,
+        "n": 300
+      },
+      "trigramRaw_ms": {
+        "p50": 0.009697,
+        "p95": 0.018143,
+        "p99": 0.025889,
+        "n": 300
+      },
+      "like_ms": {
+        "p50": 0.71812,
+        "p95": 0.834167,
+        "p99": 0.956886,
+        "n": 300
+      },
+      "oracle": 266
+    },
+    {
+      "name": "multi-and",
+      "q": "vector embedding semantic search",
+      "prod": "vector* AND embedding* AND semantic* AND search*",
+      "unicode_ms": {
+        "p50": 1.987199,
+        "p95": 2.391233,
+        "p99": 4.930093,
+        "n": 300
+      },
+      "trigram_ms": {
+        "p50": 5.73793,
+        "p95": 6.786237,
+        "p99": 11.501168,
+        "n": 300
+      },
+      "trigramRaw_ms": {
+        "p50": 4.786606,
+        "p95": 5.860699,
+        "p99": 8.933155,
+        "n": 300
+      },
+      "like_ms": {
+        "p50": 3.221103,
+        "p95": 4.059999,
+        "p99": 5.946149,
+        "n": 300
+      },
+      "oracle": 10
+    },
+    {
+      "name": "phrase",
+      "q": "\"semantic search\"",
+      "prod": "\"semantic search\"",
+      "unicode_ms": {
+        "p50": 0.665922,
+        "p95": 0.976892,
+        "p99": 2.091915,
+        "n": 300
+      },
+      "trigram_ms": {
+        "p50": 2.606545,
+        "p95": 3.742335,
+        "p99": 5.573986,
+        "n": 300
+      },
+      "trigramRaw_ms": {
+        "p50": 2.518641,
+        "p95": 4.043416,
+        "p99": 9.436915,
+        "n": 300
+      },
+      "like_ms": {
+        "p50": 3.711057,
+        "p95": 5.741267,
+        "p99": 10.247499,
+        "n": 300
+      },
+      "oracle": 159
+    },
+    {
+      "name": "short-pathological",
+      "q": "e",
+      "prod": "e*",
+      "unicode_ms": {
+        "p50": 3.198701,
+        "p95": 3.708912,
+        "p99": 5.080594,
+        "n": 300
+      },
+      "trigram_ms": {
+        "p50": 0.050645,
+        "p95": 0.073687,
+        "p99": 0.120313,
+        "n": 300
+      },
+      "trigramRaw_ms": {
+        "p50": 0.01075,
+        "p95": 0.02126,
+        "p99": 0.039424,
+        "n": 300
+      },
+      "like_ms": {
+        "p50": 0.151953,
+        "p95": 0.18763,
+        "p99": 0.267991,
+        "n": 300
+      },
+      "oracle": 8000
+    }
+  ],
+  "explain": [
+    {
+      "name": "single-broad",
+      "q": "sqlite",
+      "unicode_prod": [
+        "SCAN memories_fts_unicode VIRTUAL TABLE INDEX 0:M3"
+      ],
+      "trigram_prod": [
+        "SCAN memories_fts_trigram VIRTUAL TABLE INDEX 0:M3"
+      ],
+      "trigram_raw": [
+        "SCAN memories_fts_trigram VIRTUAL TABLE INDEX 0:M3"
+      ],
+      "like": [
+        "SCAN memories"
+      ]
+    },
+    {
+      "name": "multi-and",
+      "q": "vector embedding semantic search",
+      "unicode_prod": [
+        "SCAN memories_fts_unicode VIRTUAL TABLE INDEX 0:M3"
+      ],
+      "trigram_prod": [
+        "SCAN memories_fts_trigram VIRTUAL TABLE INDEX 0:M3"
+      ],
+      "trigram_raw": [
+        "SCAN memories_fts_trigram VIRTUAL TABLE INDEX 0:M3"
+      ],
+      "like": [
+        "SCAN memories"
+      ]
+    },
+    {
+      "name": "phrase",
+      "q": "\"semantic search\"",
+      "unicode_prod": [
+        "SCAN memories_fts_unicode VIRTUAL TABLE INDEX 0:M3"
+      ],
+      "trigram_prod": [
+        "SCAN memories_fts_trigram VIRTUAL TABLE INDEX 0:M3"
+      ],
+      "trigram_raw": [
+        "SCAN memories_fts_trigram VIRTUAL TABLE INDEX 0:M3"
+      ],
+      "like": [
+        "SCAN memories"
+      ]
+    },
+    {
+      "name": "single-cjk",
+      "q": "记忆",
+      "unicode_prod": [
+        "SCAN memories_fts_unicode VIRTUAL TABLE INDEX 0:M3"
+      ],
+      "trigram_prod": [
+        "SCAN memories_fts_trigram VIRTUAL TABLE INDEX 0:M3"
+      ],
+      "trigram_raw": [
+        "SCAN memories_fts_trigram VIRTUAL TABLE INDEX 0:M3"
+      ],
+      "like": [
+        "SCAN memories"
+      ]
+    }
+  ]
+}

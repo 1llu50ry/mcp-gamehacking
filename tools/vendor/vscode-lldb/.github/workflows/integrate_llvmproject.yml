@@ -1,0 +1,45 @@
+# This workflow updates the repository for recent changes to llvm-project.
+name: Integrate Monorepo Changes
+
+on:
+  # Run the workflow every 4 hours to pull in changes from llvm-project.
+  schedule:
+    - cron:  '0 */4 * * *'
+
+  # Allows for running this workflow manually from the Actions tab.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Timestamp Begin
+        run: date
+
+      - uses: actions/checkout@v2
+
+      - name: Clone llvm-project
+        uses: actions/checkout@v2
+        with:
+          repository: llvm/llvm-project
+          ref: 'main'
+          path: 'llvm_src'
+
+      - name: Update extension source
+        run: |
+          cp -r llvm_src/lldb/tools/lldb-dap/extension/. ./
+          cp llvm_src/lldb/tools/lldb-dap/README.md ./
+
+      - name: Commit updated source
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add -- . ':!llvm_src/'
+          git commit -m "Integrate from LLVM at llvm/llvm-project@$(cd llvm_src/ && (git rev-parse HEAD | head -1) && cd ..)" -a || echo "Extension source is already up-to-date"
+          git push || 0
+
+      - name: Timestamp End
+        run: date

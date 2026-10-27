@@ -1,0 +1,41 @@
+# AI Orchestration Service Dependencies
+# Core web framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# HTTP client for AI APIs
+httpx==0.25.2
+aiohttp==3.9.5
+
+# AI client libraries
+anthropic==0.18.1
+
+# Database and caching
+psycopg2-binary==2.9.7
+asyncpg==0.29.0
+redis==5.0.1
+
+# Configuration and utilities
+pydantic==2.5.0
+pydantic-settings==2.1.0
+python-multipart==0.0.6
+
+# Monitoring and logging
+prometheus-client==0.19.0
+structlog==23.2.0
+python-json-logger==2.0.7
+
+# Rate limiting and circuit breaker
+tenacity==8.2.3
+pybreaker==1.0.1
+
+# Task scheduling and background jobs
+celery==5.3.4
+kombu==5.3.4
+
+# Date and time utilities
+python-dateutil==2.8.2
+
+# Development and testing
+pytest==7.4.3
+pytest-asyncio==0.21.1

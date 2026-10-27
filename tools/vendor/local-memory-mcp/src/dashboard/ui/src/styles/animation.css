@@ -1,0 +1,128 @@
+/* ─── Animations ────────────────────────────────────────────────────────────── */
+@keyframes fade-in-up {
+	from {
+		opacity: 0;
+		transform: translateY(14px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes fade-in-scale {
+	from {
+		opacity: 0;
+		transform: scale(0.96);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+@keyframes slide-in-right {
+	from {
+		opacity: 0;
+		transform: translateX(20px);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
+}
+
+@keyframes spin {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@keyframes pulse-glow {
+	0%,
+	100% {
+		box-shadow: 0 0 6px rgba(14, 165, 233, 0.3);
+	}
+	50% {
+		box-shadow:
+			0 0 18px rgba(14, 165, 233, 0.6),
+			0 0 30px rgba(14, 165, 233, 0.2);
+	}
+}
+
+@keyframes float {
+	0%,
+	100% {
+		transform: translateY(0px);
+	}
+	50% {
+		transform: translateY(-4px);
+	}
+}
+
+@keyframes status-blink {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.4;
+	}
+}
+
+@keyframes orbit-glow {
+	0% {
+		transform: translate(-50%, -50%) rotate(0deg) translateX(12px) rotate(0deg);
+	}
+	100% {
+		transform: translate(-50%, -50%) rotate(360deg) translateX(12px) rotate(-360deg);
+	}
+}
+
+.animate-fade-in {
+	animation: fade-in-up var(--duration-slow) var(--ease-expo);
+}
+
+.animate-fade-in-scale {
+	animation: fade-in-scale var(--duration-slow) var(--ease-expo);
+}
+
+.animate-slide-in {
+	animation: slide-in-right var(--duration-slow) var(--ease-expo);
+}
+
+.animate-spin {
+	animation: spin 0.8s linear infinite;
+}
+.animate-float {
+	animation: float 3s ease-in-out infinite;
+}
+.animate-pulse-glow {
+	animation: pulse-glow 2s ease-in-out infinite;
+}
+.animate-status-blink {
+	animation: status-blink 1.8s ease-in-out infinite;
+}
+
+/* ─── Stagger animation for lists ────────────────────────────────────────── */
+.stagger-item:nth-child(1) {
+	animation-delay: 0ms;
+}
+.stagger-item:nth-child(2) {
+	animation-delay: 50ms;
+}
+.stagger-item:nth-child(3) {
+	animation-delay: 100ms;
+}
+.stagger-item:nth-child(4) {
+	animation-delay: 150ms;
+}
+.stagger-item:nth-child(5) {
+	animation-delay: 200ms;
+}
+.stagger-item:nth-child(n + 6) {
+	animation-delay: 250ms;
+}

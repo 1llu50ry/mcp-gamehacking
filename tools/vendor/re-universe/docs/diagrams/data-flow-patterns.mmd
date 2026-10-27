@@ -1,0 +1,124 @@
+```mermaid
+flowchart TB
+    subgraph "Data Sources"
+        BinFiles[Binary Files<br/>D2 Executables]
+        CommunityData[Community Sources<br/>GitHub, Forums, Wikis]
+        UserInput[User Inputs<br/>Chat, Analysis Requests]
+        LiveHooks[Live Function Hooks<br/>Runtime Behavior Data]
+    end
+
+    subgraph "Ingestion Layer"
+        BSImporter[BSim Importer<br/>Binary Analysis Pipeline]
+        CommunityMiner[Community Miner<br/>Automated Discovery]
+        ChatProcessor[Chat Processor<br/>Natural Language Processing]
+        HookCollector[Hook Data Collector<br/>Runtime Information]
+    end
+
+    subgraph "Processing & Analysis"
+        StaticAnalysis[Static Analysis<br/>Ghidra + BSim]
+        VectorGeneration[Vector Generation<br/>Function Embeddings]
+        AIAnalysis[AI Analysis<br/>Multi-model Processing]
+        QualityValidator[Quality Validator<br/>Trust & Confidence Scoring]
+    end
+
+    subgraph "Storage Layer"
+        PostgresDB[(PostgreSQL<br/>Core Database)]
+        VectorStore[(pgvector<br/>Semantic Search)]
+        CacheLayer[(Redis Cache<br/>Performance Layer)]
+        HierarchyStore[(System Hierarchy<br/>Structured Organization)]
+    end
+
+    subgraph "Intelligence Layer"
+        SemanticSearch[Semantic Search<br/>Context-Aware Retrieval]
+        KnowledgeGraph[Knowledge Graph<br/>Relationship Discovery]
+        ContextEngine[Context Engine<br/>Multi-source Integration]
+        InsightGenerator[Insight Generator<br/>Pattern Recognition]
+    end
+
+    subgraph "User Experience"
+        WebInterface[Web Interface<br/>Three-Panel Navigation]
+        ChatInterface[AI Chat Interface<br/>Context-Aware Assistant]
+        APIEndpoints[REST API<br/>External Integration]
+        ExportTools[Export Tools<br/>Data Distribution]
+    end
+
+    subgraph "Continuous Improvement"
+        FeedbackLoop[User Feedback Loop<br/>Quality Improvement]
+        AutoDiscovery[Auto Discovery<br/>New Knowledge Sources]
+        ModelTraining[Model Fine-tuning<br/>Domain Optimization]
+        SystemLearning[System Learning<br/>Pattern Adaptation]
+    end
+
+    %% Primary Data Flow
+    BinFiles --> BSImporter
+    CommunityData --> CommunityMiner
+    UserInput --> ChatProcessor
+    LiveHooks --> HookCollector
+
+    BSImporter --> StaticAnalysis
+    CommunityMiner --> QualityValidator
+    ChatProcessor --> AIAnalysis
+    HookCollector --> StaticAnalysis
+
+    StaticAnalysis --> VectorGeneration
+    VectorGeneration --> VectorStore
+    AIAnalysis --> PostgresDB
+    QualityValidator --> HierarchyStore
+
+    PostgresDB --> SemanticSearch
+    VectorStore --> SemanticSearch
+    CacheLayer --> SemanticSearch
+    HierarchyStore --> KnowledgeGraph
+
+    SemanticSearch --> ContextEngine
+    KnowledgeGraph --> ContextEngine
+    ContextEngine --> InsightGenerator
+
+    InsightGenerator --> WebInterface
+    ContextEngine --> ChatInterface
+    PostgresDB --> APIEndpoints
+    VectorStore --> ExportTools
+
+    %% Feedback and Learning Flows
+    WebInterface --> FeedbackLoop
+    ChatInterface --> FeedbackLoop
+    FeedbackLoop --> ModelTraining
+
+    CommunityMiner --> AutoDiscovery
+    AutoDiscovery --> CommunityData
+
+    InsightGenerator --> SystemLearning
+    SystemLearning --> ContextEngine
+
+    %% Cache and Performance Optimization
+    SemanticSearch -.->|Cache Results| CacheLayer
+    AIAnalysis -.->|Cache Responses| CacheLayer
+    ContextEngine -.->|Cache Context| CacheLayer
+
+    %% Cross-layer Intelligence
+    KnowledgeGraph -.->|Enrich| StaticAnalysis
+    ContextEngine -.->|Guide| VectorGeneration
+    InsightGenerator -.->|Validate| QualityValidator
+
+    %% Real-time Updates
+    HookCollector -.->|Live Updates| ContextEngine
+    AutoDiscovery -.->|New Sources| CommunityMiner
+    FeedbackLoop -.->|Corrections| QualityValidator
+
+    %% Styling
+    classDef sources fill:#e3f2fd
+    classDef ingestion fill:#f3e5f5
+    classDef processing fill:#fff3e0
+    classDef storage fill:#e8f5e8
+    classDef intelligence fill:#fce4ec
+    classDef experience fill:#fff8e1
+    classDef improvement fill:#f1f8e9
+
+    class BinFiles,CommunityData,UserInput,LiveHooks sources
+    class BSImporter,CommunityMiner,ChatProcessor,HookCollector ingestion
+    class StaticAnalysis,VectorGeneration,AIAnalysis,QualityValidator processing
+    class PostgresDB,VectorStore,CacheLayer,HierarchyStore storage
+    class SemanticSearch,KnowledgeGraph,ContextEngine,InsightGenerator intelligence
+    class WebInterface,ChatInterface,APIEndpoints,ExportTools experience
+    class FeedbackLoop,AutoDiscovery,ModelTraining,SystemLearning improvement
+```

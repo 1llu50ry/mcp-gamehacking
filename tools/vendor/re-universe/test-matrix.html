@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Cross-Version Matrix - Blue Color</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        th { background-color: #f2f2f2; }
+        .addr-cell.exact-match { color: #6969ff !important; font-weight: 600; }
+        .addr-cell { color: #333; }
+        .version-selector { margin: 20px 0; }
+        .selected-version { background-color: #e6f2ff; }
+    </style>
+</head>
+<body>
+    <h1>Cross-Version Matrix Test - Blue Color for Exact Matches</h1>
+
+    <div class="version-selector">
+        <label for="versionSelect">Select Version:</label>
+        <select id="versionSelect" onchange="selectVersion(this.value)">
+            <option value="">-- Select Version --</option>
+        </select>
+    </div>
+
+    <div id="status">Loading...</div>
+
+    <table id="functionTable">
+        <thead>
+            <tr>
+                <th>Function</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+
+    <script>
+        let functionData = null;
+        let selectedVersion = null;
+
+        async function loadData() {
+            try {
+                document.getElementById('status').innerHTML = 'Loading D2Client.dll functions...';
+
+                const response = await fetch('http://localhost:8081/api/functions/cross-version/D2Client.dll');
+                const data = await response.json();
+
+                functionData = data;
+                console.log('Loaded function data:', data);
+
+                // Populate version selector
+                const versionSelect = document.getElementById('versionSelect');
+                data.versions.forEach(version => {
+                    const option = document.createElement('option');
+                    option.value = version;
+                    option.textContent = version;
+                    versionSelect.appendChild(option);
+                });
+
+                document.getElementById('status').innerHTML = `Loaded ${Object.keys(data.functions).length} functions across ${data.versions.length} versions`;
+
+                // Build initial table
+                buildTable();
+
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('status').innerHTML = 'Error loading data: ' + error.message;
+            }
+        }
+
+        function selectVersion(version) {
+            selectedVersion = version;
+            console.log('Selected version:', version);
+            buildTable();
+        }
+
+        function buildTable() {
+            if (!functionData) return;
+
+            const table = document.getElementById('functionTable');
+            const thead = table.querySelector('thead tr');
+            const tbody = table.querySelector('tbody');
+
+            // Clear existing content
+            thead.innerHTML = '<th>Function</th>';
+            tbody.innerHTML = '';
+
+            // Add version headers
+            functionData.versions.forEach(version => {
+                const th = document.createElement('th');
+                th.textContent = version;
+                if (selectedVersion === version) {
+                    th.classList.add('selected-version');
+                }
+                thead.appendChild(th);
+            });
+
+            // Get functions that exist in selected version (if one is selected)
+            let functionsToShow = Object.keys(functionData.functions);
+            if (selectedVersion) {
+                functionsToShow = functionsToShow.filter(funcName => {
+                    return functionData.functions[funcName].addresses &&
+                           functionData.functions[funcName].addresses[selectedVersion];
+                });
+            }
+
+            // Sort functions alphabetically
+            functionsToShow.sort();
+
+            // Build rows
+            functionsToShow.slice(0, 20).forEach(funcName => {  // Show only first 20 for testing
+                const func = functionData.functions[funcName];
+                const row = document.createElement('tr');
+
+                // Function name cell
+                const nameCell = document.createElement('td');
+                nameCell.textContent = func.name || funcName;
+                row.appendChild(nameCell);
+
+                // Address cells for each version
+                functionData.versions.forEach(version => {
+                    const cell = document.createElement('td');
+                    const addr = func.addresses ? func.addresses[version] : null;
+
+                    if (addr) {
+                        cell.textContent = addr;
+                        cell.className = 'addr-cell';
+
+                        // Add exact-match class if this version matches the selected version
+                        if (selectedVersion && version === selectedVersion) {
+                            cell.classList.add('exact-match');
+                        }
+                    } else {
+                        cell.textContent = '—';
+                        cell.className = 'addr-cell missing';
+                    }
+
+                    row.appendChild(cell);
+                });
+
+                tbody.appendChild(row);
+            });
+        }
+
+        // Load data when page loads
+        loadData();
+    </script>
+</body>
+</html>

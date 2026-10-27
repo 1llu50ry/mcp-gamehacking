@@ -1,0 +1,288 @@
+/* Tea + Tailwind 兼容覆盖 */
+/* Tea 的默认 box-sizing 是 content-box，覆盖为 border-box 以兼容 Tailwind */
+.tea-layout,
+.tea-layout *,
+.tea-layout *::before,
+.tea-layout *::after {
+  box-sizing: border-box;
+}
+
+/* ===== Button: icon + 文字水平排列 =====
+ * 外部版 tea-component@2.8.0 的 .tea-btn 默认 display: inline-block，
+ * 当内部放 SVG 图标（如 <AddIcon /> 新建 Task）时，SVG 默认 display: block
+ * 会导致图标和文字各占一行。改为 inline-flex 让两者水平居中排列。
+ * 内部版 @tencent/tea-component 默认就是 inline-flex，这里补齐差异。 */
+.tea-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+/* icon-only 按钮不需要 gap */
+.tea-btn--icon {
+  gap: 0;
+}
+
+/* 全局最外层壳子：GlobalHeader（48px 固定）+ Layout（占满剩余空间） */
+._memory-app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* 单产品应用的品牌已统一收敛到 GlobalHeader；Menu 无 title/icon 时隐藏空 header，
+   避免侧边栏额外留出一段没有内容的顶部空间。 */
+.tea-menu__header:empty {
+  display: none;
+}
+
+/* Tea Menu 默认 title 区与下方菜单项间距偏大，收紧到 16px 底部间距，
+   与 pill 菜单项的左右 8px 留白保持一致 */
+.tea-menu__title {
+  padding-bottom: 16px;
+}
+
+/* 内容区卡片去圆角。Tea 默认 Card 会带 margin: 20px auto 0，
+ * 让单卡片页面在宽屏下收缩/居中并和布局 gap 叠加；公共页面壳统一接管外间距。 */
+.tea-card {
+  margin: 0;
+  border-radius: 0 !important;
+}
+
+/* Tea 的 Content.Body 内层默认 max-width 为 1360px，超过该宽度后会居中留白，
+ * 因此右侧业务页的 Card 看起来比 Memory项目窄。公共壳与参照项目一致改为全宽，
+ * 由各业务页在确有阅读宽度需求时自行设置局部 max-width。 */
+.tea-layout__content-body-inner {
+  max-width: 100%;
+}
+
+/* ===== 整页高度锁定到视口，滚动条只在内容区内部出现 =====
+ * 之前 html/body/#root 没有固定高度，Content.Body 所在的 flex 链路上
+ * 每一层也没有 min-height:0，导致 flex 子元素默认按内容撑高（min-height:auto
+ * 的经典陷阱），一旦某个页面内容变高就会撑破视口高度的容器，
+ * 从而在浏览器窗口级别出现一条贯穿全页（包含侧边栏/顶栏）的滚动条。
+ * 这里把 html/body/#root 锁死为视口高度 + overflow:hidden，只保留
+ * Content.Body（.tea-layout__content-body）作为唯一的滚动容器。 */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+/* Layout 现在是 _memory-app-shell 里 GlobalHeader 的兄弟节点，
+   用 flex:1（flex-basis:0）占满 GlobalHeader 让出的剩余高度，
+   而不是自己写死 100vh（会连同顶栏一起超出视口） */
+.tea-layout {
+  flex: 1;
+  min-height: 0;
+}
+
+.tea-layout__body {
+  height: 100%;
+  overflow: hidden;
+}
+
+.tea-layout__content {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tea-layout__content-inner {
+  min-height: 0;
+}
+
+.tea-layout__content-body {
+  min-height: 0;
+  overflow-y: auto;
+  /* 始终预留纵向滚动条的位置（哪怕当前内容不够高、滚动条不出现）。
+   * 没有这行时：像 ChatMemoryPanel 在「团队资产/固定资产」tab（内容高、出滚动条）
+   * 和「我的资产分配」tab（内容矮、无滚动条）之间切换，会导致内容区可用宽度
+   * 随滚动条的出现/消失而跳变，视觉上就是整块内容"闪一下"跳向右边（滚动条消失时）
+   * 或跳向左边（滚动条出现时）。加 scrollbar-gutter: stable 后宽度始终一致，
+   * 不再跟内容高度联动跳动。 */
+  scrollbar-gutter: stable;
+}
+
+/* ===== 公共页面内容壳 =====
+ * 对齐 Memory项目的 Content.Body：页面背景、16px 内容留白和全宽承载在布局层统一，
+ * 业务页面无需自行处理视口高度与外层间距。 */
+._memory-content-body {
+  max-width: 100%;
+  min-height: calc(100% - 34px);
+  padding: 16px;
+  background: var(--tea-color-bg-page-default);
+}
+
+._memory-page-frame {
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  /* 路由切换连续性：快速淡入 + 轻微上移，仅 transform/opacity，不做加载编排 */
+  animation: _page-enter 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes _page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 视图切换（卡片/列表）快速淡入，使布局状态变化可感知 */
+._view-swap {
+  animation: _view-swap-in 0.15s ease-out;
+}
+
+@keyframes _view-swap-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 资源详情头的元数据行（次级信息：Branch / commit / 时间 / 页数 等），两页通用 */
+._detail-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding-left: 28px; /* 与 icon(20px) + gap(8px) 对齐，让元信息从标题下方开始 */
+  font-size: 12px;
+  color: var(--tea-color-text-tertiary);
+}
+
+._detail-meta-sep {
+  color: var(--tea-color-text-disabled);
+}
+
+/* 尊重系统「减少动态效果」偏好：全局关闭动画/过渡 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* 防止 Tea 默认 margin 与 Tailwind 布局冲突 */
+.tea-card + .tea-card {
+  margin-top: 0 !important;
+}
+
+/* 链接颜色 */
+a,
+.tea-link-external {
+  color: var(--tea-color-text-link-default);
+}
+
+/* Tea Alert 在 flex 容器中拉满宽度 */
+.tea-alert {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* Console list body 标准包装器 */
+.console-list-body {
+  display: block;
+}
+
+/* Justify right 区域 flex 居右 */
+.tea-table__action-panel .tea-justify-grid__col--right {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ===== 侧边栏导航 pill 风格（最小覆盖） =====
+ * Tea Menu（light 主题）默认选中态是纯文字变蓝、无背景块，
+ * 默认 icon 有 margin-top 偏移、text 有额外 padding，对齐不佳。
+ * 这里在组件结构不变的前提下，仅覆盖视觉呈现。 */
+.tea-menu--light .tea-menu__list > li:not(.tea-menu__label) {
+  margin: 2px 8px;
+}
+
+/* 锚点元素：图标与文字水平排布 + 居中对齐，pill 圆角，统一 padding */
+.tea-menu--light .tea-menu__list > li:not(.tea-menu__label) > .tea-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 6px;
+}
+
+/* 去掉 Tea 默认 icon 上偏移，清除 text 多余 padding，保持与锚点居中对齐 */
+.tea-menu--light .tea-menu__list > li:not(.tea-menu__label) > .tea-menu__item .tea-menu__list-icon {
+  margin-top: 0;
+  flex-shrink: 0;
+}
+
+.tea-menu--light .tea-menu__list > li:not(.tea-menu__label) > .tea-menu__item .tea-menu__text {
+  padding: 0;
+  line-height: 1.4;
+}
+
+/* 选中态：品牌色底 + 白字 */
+.tea-menu--light .tea-menu__list > li:not(.tea-menu__label).is-selected > .tea-menu__item,
+.tea-menu--light .tea-menu__list > li:not(.tea-menu__label).is-selected > .tea-menu__item:hover {
+  background-color: var(--tea-color-bg-brand-default) !important;
+  color: var(--tea-color-text-on-bg-brand-default);
+}
+
+.tea-menu--light
+  .tea-menu__list
+  > li:not(.tea-menu__label).is-selected
+  > .tea-menu__item
+  .tea-menu__text {
+  color: var(--tea-color-text-on-bg-brand-default) !important;
+}
+
+/* 分组标题与 pill 间距对齐 */
+.tea-menu--light .tea-menu__list > li.tea-menu__label {
+  padding-left: 8px;
+}
+
+/* ===== Onboarding Guide 气泡自适应（避免窄视口/边缘元素时气泡溢出视口） =====
+ * Tea Guide 内部 overlay modifiers 关闭了 flip / preventOverflow / hide，
+ * 气泡固定宽 356px（.tea-guide{min-width:356px;max-width:356px}）会硬溢出。
+ * 覆盖为「按视口宽度自适应，且贴 16px 视口安全边」，让按钮与正文始终可点。 */
+.tea-guide {
+  min-width: 280px;
+  max-width: min(360px, calc(100vw - 32px));
+}
+
+/* ===== Onboarding Guide footer 平铺布局 =====
+ * Tea Guide 默认 footer 用 flex 横排：圆点（dot）在左、按钮组（btn-group）在右。
+ * 8 步引导时 dot 占 ~120px，3 个按钮（跳过/上一步/下一步）总宽超 200px，
+ * 总宽 320+ 不够，圆点会挤掉按钮，按钮被迫换行堆成大块。
+ * 改为「圆点独占一行（居中），按钮组在第二行水平平铺不换行」，保证 3 个按钮始终同行。 */
+.tea-guide__footer {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+.tea-guide__footer .tea-guide__dot {
+  justify-content: center;
+}
+.tea-guide__footer .tea-guide__btn-group {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}

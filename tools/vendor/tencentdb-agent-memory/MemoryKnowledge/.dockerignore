@@ -1,0 +1,11 @@
+node_modules
+.git
+.env
+.env.*
+dist
+coverage
+*.test.ts
+__tests__
+.data-dir
+*.md
+docs

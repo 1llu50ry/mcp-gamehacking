@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block title %}Search Functions - Ghidra RE Platform{% endblock %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        <h2>Search Functions</h2>
+    </div>
+    <div class="panel-content">
+        <form method="get">
+            <div class="flex gap-1">
+                <input type="text" name="q" class="form-control" placeholder="Search by function name (min 3 characters)..." value="{{ query }}" style="flex: 1;">
+                <button type="submit" class="btn btn-primary">🔍 Search</button>
+            </div>
+        </form>
+
+        {% if query %}
+            {% if query|length < 3 %}
+                <p class="text-center mt-2" style="color: var(--color-rare);">
+                    Please enter at least 3 characters to search.
+                </p>
+            {% elif functions %}
+                <table class="data-table mt-2">
+                    <thead>
+                        <tr>
+                            <th>Function Name</th>
+                            <th>Executable</th>
+                            <th>Address</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for func in functions %}
+                        <tr>
+                            <td class="mono text-magic">{{ func.name_func }}</td>
+                            <td>
+                                <a href="{% url 'bsim:executable_detail' func.id_exe.id %}" class="text-unique">
+                                    {{ func.id_exe.name_exec }}
+                                </a>
+                            </td>
+                            <td class="mono text-muted">{{ func.address_hex }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% if functions|length >= 100 %}
+                    <p class="text-center mt-1" style="color: var(--text-muted); font-size: 0.85rem;">
+                        Showing first 100 results. Refine your search for more specific results.
+                    </p>
+                {% endif %}
+            {% else %}
+                <p class="text-center mt-2" style="color: var(--text-muted);">
+                    No functions found matching "{{ query }}"
+                </p>
+            {% endif %}
+        {% else %}
+            <p class="text-center mt-2" style="color: var(--text-muted);">
+                Enter a function name to search across all executables in the BSim database.
+            </p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

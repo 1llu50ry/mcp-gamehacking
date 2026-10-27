@@ -1,0 +1,36 @@
+{
+  "name": "team-memory-control",
+  "version": "0.1.0",
+  "description": "团队记忆管控平台 - 管理 team/user/agent/task 与四类资产",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "generate:meta-openapi": "tsx scripts/generate-meta-openapi.ts",
+    "test:panel:e2e": "tests/panel/e2e-panel-meta.sh",
+    "test:knowledge:e2e": "tsx tests/knowledge/e2e-knowledge-chain.ts",
+    "test:knowledge:e2e:full": "E2E_MODE=full tsx tests/knowledge/e2e-knowledge-chain.ts",
+    "mock-kernel": "tsx scripts/mock-memory-server.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.0",
+    "dotenv": "^16.4.0",
+    "hono": "^4.6.0",
+    "jose": "^6.2.10",
+    "ulid": "^2.3.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}

@@ -1,0 +1,48 @@
+/* 页面内容区通用样式 - 作为 Content.Body 直接子节点 */
+._memory-page-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/*
+ * 圆角对齐 Tea Design 圆角阶梯（2/4/6/8/12/16/20/30/9999px），
+ * 已在 tailwind.config.js 的 borderRadius 中统一定义（rounded-md=4px、
+ * rounded-lg=6px、rounded-xl=8px、rounded-2xl=12px），此处不再重复覆盖。
+ */
+
+/* 继承 Tea 字体和颜色 */
+._memory-page-body {
+  font-family: inherit;
+  color: var(--tea-color-text-primary);
+}
+
+/* 将 Tailwind border colors 映射到 Tea token */
+._memory-page-body .border-border {
+  border-color: var(--tea-color-border-primary-default);
+}
+
+._memory-page-body .bg-card {
+  background: var(--tea-color-bg-primary-default);
+}
+
+/* 使 Tailwind 按钮在视觉上接近 Tea Button */
+._memory-page-body button:not(.tea-btn) {
+  font-family: inherit;
+  font-size: 12px;
+  border-radius: 2px;
+}
+
+/* 主题色按钮近似 */
+._memory-page-body .bg-primary {
+  background-color: var(--tea-color-bg-brand-default);
+}
+
+._memory-page-body .text-primary-foreground {
+  color: var(--tea-color-text-on-bg-brand-default);
+}
+
+/* Toast/Sonner 适配 Tea 风格 */
+[data-sonner-toaster] {
+  font-family: inherit;
+}

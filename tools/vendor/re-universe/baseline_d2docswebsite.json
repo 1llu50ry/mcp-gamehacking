@@ -1,0 +1,12 @@
+{
+    "service_name": "D2DocsWebsite",
+    "metric_name": "response_time_ms",
+    "baseline_value": 13,
+    "min_value": 12,
+    "max_value": 15,
+    "success_rate": 100,
+    "warning_threshold": 19,
+    "critical_threshold": 39,
+    "measurement_date": "2026-02-20T09:45:35-07:00",
+    "iterations": 5
+}

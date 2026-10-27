@@ -1,0 +1,30 @@
+name: Test
+
+on:
+  # Triggers on push to any branch.
+  push:
+    branches: ['**']
+
+  # Triggers after Integrate Monorepo Changes completes.
+  workflow_run:
+    workflows: ["Integrate Monorepo Changes"]
+    types:
+      - completed
+
+  # Allows for running this workflow manually from the Actions tab.
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        id: install
+        run: npm install
+
+      - name: Run Unit Tests
+        id: unittest
+        run: npm run unittest

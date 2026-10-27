@@ -1,0 +1,492 @@
+/* ###
+ * IP: GHIDRA
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package reva.headless;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.EnumSet;
+import java.util.Set;
+
+import ghidra.base.project.GhidraProject;
+import ghidra.framework.Application;
+import ghidra.framework.ApplicationConfiguration;
+import ghidra.framework.HeadlessGhidraApplicationConfiguration;
+import ghidra.framework.model.ProjectLocator;
+import utility.application.ApplicationLayout;
+import ghidra.util.Msg;
+import ghidra.GhidraApplicationLayout;
+
+import reva.plugin.ConfigManager;
+import reva.plugin.ToolGroup;
+import reva.server.McpServerManager;
+
+/**
+ * Headless launcher for ReVa MCP server.
+ * <p>
+ * This class enables ReVa to run in headless Ghidra mode without the GUI plugin system.
+ * It can be invoked from pyghidra or other headless contexts.
+ * <p>
+ * Projects are ephemeral in stdio mode - created in temp directories and cleaned up on exit.
+ * <p>
+ * Usage from pyghidra:
+ * <pre>
+ * from reva.headless import RevaHeadlessLauncher
+ *
+ * launcher = RevaHeadlessLauncher()
+ * launcher.start()
+ *
+ * # Server is now running
+ * if launcher.waitForServer(30000):
+ *     print(f"Server ready on port {launcher.getPort()}")
+ *
+ * # Do work...
+ *
+ * launcher.stop()
+ * </pre>
+ */
+public class RevaHeadlessLauncher {
+
+    private McpServerManager serverManager;
+    private ConfigManager configManager;
+    private File configFile;
+    private boolean autoInitializeGhidra;
+    private boolean useRandomPort;
+    private File projectLocation;
+    private String projectName;
+    private String apiKey;
+    private String enabledToolGroupsCsv;
+    private String disabledToolGroupsCsv;
+    private GhidraProject ghidraProject;
+
+    /**
+     * Constructor with default settings (in-memory configuration)
+     */
+    public RevaHeadlessLauncher() {
+        this(null, true, false);
+    }
+
+    /**
+     * Constructor with configuration file
+     * @param configFile The configuration file to load, or null for defaults
+     */
+    public RevaHeadlessLauncher(File configFile) {
+        this(configFile, true, false);
+    }
+
+    /**
+     * Constructor with configuration file path
+     * Convenience constructor for PyGhidra scripts that use string paths
+     * @param configFilePath Path to the configuration file
+     */
+    public RevaHeadlessLauncher(String configFilePath) {
+        this(new File(configFilePath), true, false);
+    }
+
+    /**
+     * Constructor with random port option
+     * @param configFile The configuration file to load, or null for defaults
+     * @param useRandomPort Whether to use a random available port instead of configured port
+     */
+    public RevaHeadlessLauncher(File configFile, boolean useRandomPort) {
+        this(configFile, true, useRandomPort);
+    }
+
+    /**
+     * Constructor with full control
+     * @param configFile The configuration file to load, or null for defaults
+     * @param autoInitializeGhidra Whether to automatically initialize Ghidra if not already initialized
+     * @param useRandomPort Whether to use a random available port instead of configured port
+     */
+    public RevaHeadlessLauncher(File configFile, boolean autoInitializeGhidra, boolean useRandomPort) {
+        this(configFile, autoInitializeGhidra, useRandomPort, null, null);
+    }
+
+    /**
+     * Constructor with project parameters
+     * @param configFile The configuration file to load, or null for defaults
+     * @param useRandomPort Whether to use a random available port instead of configured port
+     * @param projectLocation The directory where projects are stored (e.g., .reva/projects)
+     * @param projectName The name of the project to create/open
+     */
+    public RevaHeadlessLauncher(File configFile, boolean useRandomPort, File projectLocation, String projectName) {
+        this(configFile, true, useRandomPort, projectLocation, projectName);
+    }
+
+    /**
+     * Constructor with full control and project parameters
+     * @param configFile The configuration file to load, or null for defaults
+     * @param autoInitializeGhidra Whether to automatically initialize Ghidra if not already initialized
+     * @param useRandomPort Whether to use a random available port instead of configured port
+     * @param projectLocation The directory where projects are stored (e.g., .reva/projects), or null for no project
+     * @param projectName The name of the project to create/open, or null for no project
+     */
+    public RevaHeadlessLauncher(File configFile, boolean autoInitializeGhidra, boolean useRandomPort,
+                               File projectLocation, String projectName) {
+        this.configFile = configFile;
+        this.autoInitializeGhidra = autoInitializeGhidra;
+        this.useRandomPort = useRandomPort;
+        this.projectLocation = projectLocation;
+        this.projectName = projectName;
+    }
+
+    /**
+     * Constructor with full control, project parameters, and an API key.
+     * When apiKey is non-null and non-empty, API key authentication is enabled
+     * with that key before the server starts.
+     *
+     * @param configFile The configuration file to load, or null for defaults
+     * @param autoInitializeGhidra Whether to auto-initialize Ghidra if needed
+     * @param useRandomPort Whether to use a random available port
+     * @param projectLocation The directory where projects are stored, or null
+     * @param projectName The project name to create/open, or null
+     * @param apiKey The API key to require, or null to leave auth unchanged
+     */
+    public RevaHeadlessLauncher(File configFile, boolean autoInitializeGhidra, boolean useRandomPort,
+                               File projectLocation, String projectName, String apiKey) {
+        this(configFile, autoInitializeGhidra, useRandomPort, projectLocation, projectName);
+        this.apiKey = apiKey;
+    }
+
+    /**
+     * Allowlist: comma-separated tool-group ids; only these groups stay enabled,
+     * all others are disabled. Mutually exclusive with {@link #setDisabledToolGroups}.
+     * Applied at {@link #start()} time. Ids are parsed via {@link ToolGroup#fromId}.
+     * @param csv comma-separated group ids, or null/blank to leave all groups as-is
+     */
+    public void setEnabledToolGroups(String csv) {
+        this.enabledToolGroupsCsv = csv;
+    }
+
+    /**
+     * Disable-list: comma-separated tool-group ids to turn off; all others stay enabled.
+     * Mutually exclusive with {@link #setEnabledToolGroups}. Applied at {@link #start()} time.
+     * @param csv comma-separated group ids, or null/blank to leave all groups enabled
+     */
+    public void setDisabledToolGroups(String csv) {
+        this.disabledToolGroupsCsv = csv;
+    }
+
+    /**
+     * Start the MCP server in headless mode
+     * @throws IOException if configuration file cannot be read
+     * @throws IllegalStateException if Ghidra is not initialized and autoInitializeGhidra is false
+     */
+    public void start() throws IOException {
+        Msg.info(this, "Starting ReVa MCP server in headless mode...");
+
+        // Initialize Ghidra application if needed
+        if (!Application.isInitialized()) {
+            if (autoInitializeGhidra) {
+                Msg.info(this, "Initializing Ghidra application in headless mode...");
+                try {
+                    ApplicationLayout layout = new GhidraApplicationLayout();
+                    ApplicationConfiguration config = new HeadlessGhidraApplicationConfiguration();
+                    Application.initializeApplication(layout, config);
+                    Msg.info(this, "Ghidra application initialized");
+                } catch (IOException e) {
+                    throw new IOException("Failed to initialize Ghidra application layout", e);
+                }
+            } else {
+                throw new IllegalStateException(
+                    "Ghidra application is not initialized. " +
+                    "Call Application.initializeApplication() first or set autoInitializeGhidra=true");
+            }
+        }
+
+        // Create config manager based on mode
+        if (configFile != null) {
+            Msg.info(this, "Loading configuration from: " + configFile.getAbsolutePath());
+            configManager = new ConfigManager(configFile);
+        } else {
+            Msg.info(this, "Using default configuration (in-memory)");
+            configManager = new ConfigManager();
+        }
+
+        // Use random port if requested
+        if (useRandomPort) {
+            int randomPort = configManager.setRandomAvailablePort();
+            Msg.info(this, "Using random port: " + randomPort);
+        }
+
+        // Apply a launcher-supplied API key before the server starts so the auth
+        // filter is installed. Used by mcp-reva to authenticate its private bridge.
+        if (apiKey != null && !apiKey.isEmpty()) {
+            configManager.setApiKey(apiKey);
+            configManager.setApiKeyEnabled(true);
+            Msg.info(this, "API key authentication enabled (key supplied by launcher)");
+        }
+
+        // Apply tool-group enable/disable lists before the server registers tools.
+        applyToolGroupConfiguration();
+
+        // Create/open persistent project if location and name specified
+        if (projectLocation != null && projectName != null) {
+            try {
+                ghidraProject = createOrOpenProject(projectLocation, projectName);
+                Msg.info(this, "Opened project: " + projectName);
+            } catch (Exception e) {
+                throw new IOException("Failed to create/open project: " + projectName, e);
+            }
+        }
+
+        // Create and start server manager
+        serverManager = new McpServerManager(configManager);
+        serverManager.startServer();
+
+        // startServer() can return without binding (server disabled, or public-binding
+        // guard refused), so report the actual outcome rather than always claiming success.
+        if (serverManager.isServerRunning()) {
+            Msg.info(this, "ReVa MCP server started in headless mode");
+        } else {
+            Msg.warn(this, "ReVa MCP server did not start (disabled in config, or public " +
+                "binding without API key was not approved)");
+        }
+    }
+
+    /**
+     * Apply launcher-supplied tool-group enable/disable lists to the config before
+     * the server registers tools. Throws if both lists are given or an id is unknown.
+     */
+    private void applyToolGroupConfiguration() throws IOException {
+        boolean hasEnabled = enabledToolGroupsCsv != null && !enabledToolGroupsCsv.isBlank();
+        boolean hasDisabled = disabledToolGroupsCsv != null && !disabledToolGroupsCsv.isBlank();
+        if (hasEnabled && hasDisabled) {
+            throw new IOException("Specify only one of enabled/disabled tool groups, not both.");
+        }
+        if (hasEnabled) {
+            Set<ToolGroup> keep = parseToolGroups(enabledToolGroupsCsv);
+            for (ToolGroup group : ToolGroup.values()) {
+                configManager.setToolGroupEnabled(group, keep.contains(group));
+            }
+            Msg.info(this, "Tool groups restricted to: " + enabledToolGroupsCsv);
+        } else if (hasDisabled) {
+            Set<ToolGroup> off = parseToolGroups(disabledToolGroupsCsv);
+            for (ToolGroup group : off) {
+                configManager.setToolGroupEnabled(group, false);
+            }
+            Msg.info(this, "Tool groups disabled: " + disabledToolGroupsCsv);
+        }
+    }
+
+    /**
+     * Parse a comma-separated list of tool-group ids into a set, failing loudly on
+     * any unknown id (listing the valid ids).
+     */
+    private Set<ToolGroup> parseToolGroups(String csv) throws IOException {
+        Set<ToolGroup> result = EnumSet.noneOf(ToolGroup.class);
+        for (String token : csv.split(",")) {
+            String trimmed = token.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            ToolGroup group = ToolGroup.fromId(trimmed);
+            if (group == null) {
+                StringBuilder valid = new StringBuilder();
+                for (ToolGroup g : ToolGroup.values()) {
+                    if (valid.length() > 0) {
+                        valid.append(", ");
+                    }
+                    valid.append(g.canonicalId());
+                }
+                throw new IOException("Unknown tool group id '" + trimmed + "'. Valid ids: " + valid);
+            }
+            result.add(group);
+        }
+        return result;
+    }
+
+    /**
+     * Create or open a persistent Ghidra project
+     * @param location The directory where projects are stored
+     * @param name The project name
+     * @return The opened GhidraProject
+     * @throws IOException if project creation/opening fails
+     */
+    private GhidraProject createOrOpenProject(File location, String name) throws IOException {
+        try {
+            // Ensure project directory exists
+            if (!location.exists()) {
+                if (!location.mkdirs()) {
+                    throw new IOException("Failed to create project directory: " + location.getAbsolutePath());
+                }
+            }
+
+            String projectLocationPath = location.getAbsolutePath();
+            ProjectLocator locator = new ProjectLocator(projectLocationPath, name);
+
+            // Check if project already exists
+            if (locator.getMarkerFile().exists() && locator.getProjectDir().exists()) {
+                Msg.info(this, "Opening existing project: " + name + " at " + projectLocationPath);
+                return GhidraProject.openProject(projectLocationPath, name, true);
+            } else {
+                Msg.info(this, "Creating new project: " + name + " at " + projectLocationPath);
+                return GhidraProject.createProject(projectLocationPath, name, false);
+            }
+        } catch (Exception e) {
+            throw new IOException("Failed to create/open project: " + name, e);
+        }
+    }
+
+    /**
+     * Stop the server and cleanup
+     */
+    public void stop() {
+        Msg.info(this, "Stopping ReVa MCP server...");
+
+        if (serverManager != null) {
+            serverManager.shutdown();
+            serverManager = null;
+        }
+
+        if (configManager != null) {
+            configManager.dispose();
+            configManager = null;
+        }
+
+        // Close Ghidra project (but don't delete it - it's persistent)
+        if (ghidraProject != null) {
+            try {
+                Msg.info(this, "Closing project: " + projectName);
+                ghidraProject.close();
+            } catch (Exception e) {
+                Msg.error(this, "Error closing project: " + e.getMessage(), e);
+            } finally {
+                ghidraProject = null;
+            }
+        }
+
+        Msg.info(this, "ReVa MCP server stopped");
+    }
+
+    /**
+     * Get the server port
+     * @return The server port, or -1 if server is not running
+     */
+    public int getPort() {
+        if (serverManager != null) {
+            return serverManager.getServerPort();
+        }
+        return -1;
+    }
+
+    /**
+     * Check if server is running
+     * @return True if the server is running
+     */
+    public boolean isRunning() {
+        return serverManager != null && serverManager.isServerRunning();
+    }
+
+    /**
+     * Check if server is ready to accept connections
+     * @return True if the server is ready
+     */
+    public boolean isServerReady() {
+        return serverManager != null && serverManager.isServerReady();
+    }
+
+    /**
+     * Wait for server to be ready
+     * @param timeoutMs Maximum time to wait in milliseconds
+     * @return True if server became ready within timeout, false otherwise
+     */
+    public boolean waitForServer(long timeoutMs) {
+        long start = System.currentTimeMillis();
+        while (System.currentTimeMillis() - start < timeoutMs) {
+            if (isRunning() && isServerReady()) {
+                return true;
+            }
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Get the configuration manager
+     * @return The configuration manager, or null if not started
+     */
+    public ConfigManager getConfigManager() {
+        return configManager;
+    }
+
+    /**
+     * Get the server manager
+     * @return The server manager, or null if not started
+     */
+    public McpServerManager getServerManager() {
+        return serverManager;
+    }
+
+    /**
+     * Main method for standalone execution
+     * <p>
+     * Example usage:
+     * <pre>
+     * java -cp ... reva.headless.RevaHeadlessLauncher [configFile]
+     * </pre>
+     *
+     * @param args Optional configuration file path as first argument
+     */
+    public static void main(String[] args) {
+        // Parse arguments
+        File configFile = null;
+        if (args.length > 0) {
+            configFile = new File(args[0]);
+            if (!configFile.exists()) {
+                System.err.println("Configuration file not found: " + configFile.getAbsolutePath());
+                System.exit(1);
+            }
+        }
+
+        // Create and start launcher
+        RevaHeadlessLauncher launcher = new RevaHeadlessLauncher(configFile);
+
+        try {
+            launcher.start();
+
+            // Wait for server to be ready
+            if (launcher.waitForServer(30000)) {
+                System.out.println("ReVa MCP server ready on port " + launcher.getPort());
+                System.out.println("Press Ctrl+C to stop");
+
+                // Add shutdown hook for clean exit
+                Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                    System.out.println("\nShutting down...");
+                    launcher.stop();
+                }));
+
+                // Keep running until interrupted
+                try {
+                    Thread.currentThread().join();
+                } catch (InterruptedException e) {
+                    // Normal exit
+                }
+            } else {
+                System.err.println("Failed to start server within timeout");
+                System.exit(1);
+            }
+        } catch (Exception e) {
+            System.err.println("Error starting server: " + e.getMessage());
+            e.printStackTrace();
+            System.exit(1);
+        }
+    }
+}

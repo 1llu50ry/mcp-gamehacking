@@ -1,0 +1,119 @@
+{
+  "$schema": "https://fundingjson.org/schema/v1.1.0.json",
+  "version": "v1.1.0",
+  "entity": {
+    "type": "individual",
+    "role": "owner",
+    "name": "Alok Kumar Mishra",
+    "email": "alok16022006@gmail.com",
+    "description": "I'm a security-focused open source developer from India and a core maintainer of the Rizin reverse engineering framework. I built rz-frida during Google Summer of Code 2026 and founded RzWeb, which brings Rizin to the browser through WebAssembly. I'm a student at IIIT Jabalpur, and funding lets me keep maintaining these projects instead of dropping them for paid work.",
+    "webpageUrl": {
+      "url": "https://indalok.github.io"
+    }
+  },
+  "projects": [
+    {
+      "guid": "rzweb",
+      "name": "RzWeb",
+      "description": "RzWeb is a browser-based reverse engineering platform that runs the Rizin framework entirely client-side via WebAssembly. Drop in a binary and get disassembly, a decompiler view, control flow graphs, cross-references, hex view and a Rizin terminal, with nothing to install and no data leaving the machine. Analysis contexts persist in IndexedDB, and an MCP server exposes the same WASM engine to AI tools. It's used by students, CTF players and security researchers who can't install or pay for desktop RE tools. 762 GitHub stars and 73 forks since January 2026, live at rizin.pages.dev.",
+      "webpageUrl": {
+        "url": "https://rizin.pages.dev",
+        "wellKnown": "https://rizin.pages.dev/.well-known/funding-manifest-urls"
+      },
+      "repositoryUrl": {
+        "url": "https://github.com/IndAlok/rzweb"
+      },
+      "licenses": [
+        "spdx:LGPL-3.0-only"
+      ],
+      "tags": [
+        "reverse-engineering",
+        "security",
+        "webassembly",
+        "binary-analysis",
+        "developer-tools",
+        "malware-analysis",
+        "mcp",
+        "rizin"
+      ]
+    }
+  ],
+  "funding": {
+    "channels": [
+      {
+        "guid": "github-sponsors",
+        "type": "payment-provider",
+        "address": "https://github.com/sponsors/IndAlok",
+        "description": "GitHub Sponsors."
+      },
+      {
+        "guid": "bank-in",
+        "type": "bank",
+        "address": "",
+        "description": "Direct bank transfer to my Indian bank account (INR). Details on request by email."
+      }
+    ],
+    "plans": [
+      {
+        "guid": "maintenance-2027",
+        "status": "active",
+        "name": "RzWeb maintenance for 2027",
+        "description": "One year of part-time maintenance: keeping the WebAssembly build in sync with upstream Rizin releases, fixing browser-specific bugs, hardening the MCP server, adding decompiler support to the WASM build, and covering hosting and CI.",
+        "amount": 10000,
+        "currency": "USD",
+        "frequency": "one-time",
+        "channels": [
+          "github-sponsors"
+        ]
+      },
+      {
+        "guid": "fu-m1-upstream-sync",
+        "status": "active",
+        "name": "FOSS United milestone 1 (Jan to Mar 2027): upstream sync and versioned WASM releases",
+        "description": "rzwasi CI rebuilds rizin.js and rizin.wasm for every Rizin release tag and publishes versioned builds, so RzWeb can pin and roll back a Rizin version. Fix the licence detection on the rzwasi repo. Done when rizin.pages.dev runs the latest Rizin release from a versioned build and the steps are documented. If another grant ends up paying for the same work, I will lower this ask and say so.",
+        "amount": 125000,
+        "currency": "INR",
+        "frequency": "one-time",
+        "channels": [
+          "bank-in"
+        ]
+      },
+      {
+        "guid": "fu-m2-browser-tests",
+        "status": "active",
+        "name": "FOSS United milestone 2 (Apr to Jun 2027): automated browser tests",
+        "description": "Today Vitest cannot load rizin.wasm, so releases depend on a manual click-through list in the README. Turn that list (two tabs, cold RZWEBPRJ open, history restore, cancel between aa and aaa, missing apply-project notice) into headless browser tests in CI against the real wasm, plus open-and-analyse smoke tests for ELF, PE and Mach-O samples. If another grant ends up paying for the same work, I will lower this ask and say so.",
+        "amount": 125000,
+        "currency": "INR",
+        "frequency": "one-time",
+        "channels": [
+          "bank-in"
+        ]
+      },
+      {
+        "guid": "fu-m3-decompiler",
+        "status": "active",
+        "name": "FOSS United milestone 3 (Jul to Sep 2027): decompiler in the default build",
+        "description": "The jsdec decompiler build in rzwasi is opt-in and experimental, so the public site falls back to pdf with asm.pseudo. Make the jsdec build stable, keep wasm size and load time in check, and ship pdd on rizin.pages.dev. Test whether rz-ghidra can be built for the browser and publish the result. If another grant ends up paying for the same work, I will lower this ask and say so.",
+        "amount": 125000,
+        "currency": "INR",
+        "frequency": "one-time",
+        "channels": [
+          "bank-in"
+        ]
+      },
+      {
+        "guid": "fu-m4-mcp-release",
+        "status": "active",
+        "name": "FOSS United milestone 4 (Oct to Dec 2027): MCP server release and hardening",
+        "description": "Publish the RzWeb MCP server (mcp/) to npm with versioned releases. Add input checks for context ids and paths, keep the HTTP mode on loopback with an optional token, add tests and setup docs. Run one workshop or talk for student security clubs on browser-based reverse engineering. If another grant ends up paying for the same work, I will lower this ask and say so.",
+        "amount": 125000,
+        "currency": "INR",
+        "frequency": "one-time",
+        "channels": [
+          "bank-in"
+        ]
+      }
+    ]
+  }
+}

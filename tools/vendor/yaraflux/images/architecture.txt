@@ -1,0 +1,34 @@
++------------------------------------------+
+|              AI Assistant                |
++--------------------+---------------------+
+                    |
+                    | Model Context Protocol
+                    |
++--------------------v---------------------+
+|              YaraFlux MCP Server         |
+|                                          |
+|  +----------------+    +---------------+ |
+|  | MCP Server     |    | Tool Registry | |
+|  +-------+--------+    +-------+-------+ |
+|          |                     |         |
+|  +-------v--------+    +-------v-------+ |
+|  | YARA Service   |    | Storage Layer | |
+|  +----------------+    +---------------+ |
+|                                          |
++------------------------------------------+
+          |                   |
+ +-----------------+  +---------------+
+ | YARA Engine     |  | Storage       |
+ | - Rule Compiling|  | - Local FS    |
+ | - File Scanning |  | - MinIO/S3    |
+ +-----------------+  +---------------+
+
+MCP TOOLS:
+- Rule Management (7)
+- Scanning (3)
+- File Management (7)
+- Storage Management (2)
+
+RESOURCE TEMPLATES:
+- rules://{source}
+- rule://{name}/{source}

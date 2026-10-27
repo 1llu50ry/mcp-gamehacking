@@ -1,0 +1,192 @@
+import type { AnalysisJob, DecompilerEngine, FunctionBriefing, FunctionSummary, Paginated } from '../context/types';
+
+export interface RizinFile {
+  name: string;
+  data: Uint8Array;
+}
+
+export interface RizinInstanceConfig {
+  ioCache?: boolean;
+  analysisDepth?: number;
+  extraArgs?: string[];
+  noAnalysis?: boolean;
+  maxOutputBytes?: number;
+  enableCache?: boolean;
+  contextId?: string;
+  deferAnalysis?: boolean;
+}
+
+export interface FunctionDetailCacheEntry {
+  disasm?: unknown;
+  graph?: unknown;
+  updatedAt: number;
+}
+
+export interface AnalysisData {
+  functions: unknown[];
+  strings: unknown[];
+  imports: unknown[];
+  exports: unknown[];
+  sections: unknown[];
+  info: unknown;
+  functionDetails: Record<string, FunctionDetailCacheEntry>;
+}
+
+export interface RizinNotice {
+  id: string;
+  severity: 'info' | 'warning' | 'error';
+  code: string;
+  message: string;
+  detail?: string;
+}
+
+export interface RizinAutocompleteResult {
+  start: number;
+  end: number;
+  endString: string;
+  options: string[];
+}
+
+export interface RizinCommandHelpEntry {
+  name: string;
+  summary?: string;
+  description?: string;
+  args?: string;
+}
+
+export type XrefSource = 'aflj' | 'afx' | 'instruction' | 'empty';
+export type CallGraphMode = 'neighborhood' | 'global';
+
+export interface XrefEntry {
+  addr: number;
+  from?: number;
+  to?: number;
+  type: string;
+  name?: string;
+  opcode?: string;
+}
+
+export interface XrefsResult {
+  to: XrefEntry[];
+  from: XrefEntry[];
+  source: XrefSource;
+  error?: string;
+}
+
+export interface CallGraphNode {
+  id: string;
+  label: string;
+  offset?: number;
+}
+
+export interface CallGraphEdge {
+  source: string;
+  target: string;
+  type?: 'jump' | 'fail' | 'call';
+}
+
+export interface CallGraphResult {
+  nodes: CallGraphNode[];
+  edges: CallGraphEdge[];
+  truncated: boolean;
+  source: 'aflj' | 'agc' | 'agC' | 'agf' | 'empty';
+}
+
+export type RizinLoadPhase =
+  | 'initializing'
+  | 'downloading'
+  | 'processing'
+  | 'ready'
+  | 'error';
+
+export interface RizinStateSnapshot {
+  currentAddress: string;
+  isOpen: boolean;
+  isAnalysisComplete: boolean;
+  fileHash: string;
+  cacheHit: boolean;
+  notices: RizinNotice[];
+  lastStderr: string;
+  fileName: string | null;
+  writeMode: boolean;
+  isDirty: boolean;
+  job: AnalysisJob | null;
+  hasApplyProject: boolean;
+}
+
+export type RizinRequest =
+  | { id: number; method: 'open'; file: RizinFile; config?: RizinInstanceConfig; restoreProjectData?: Uint8Array }
+  | { id: number; method: 'executeCommand'; command: string }
+  | { id: number; method: 'getFunctionDetails'; address: number }
+  | { id: number; method: 'getAutocomplete'; input: string; cursorPos: number; maxResults: number }
+  | { id: number; method: 'readMemory'; address: number; size: number }
+  | { id: number; method: 'getXrefs'; address: number }
+  | { id: number; method: 'getCallGraph'; address: number; mode: CallGraphMode }
+  | { id: number; method: 'getDecompilation'; address: number }
+  | { id: number; method: 'exportProject' }
+  | { id: number; method: 'importProject'; data: Uint8Array }
+  | { id: number; method: 'setWriteMode'; enable: boolean }
+  | { id: number; method: 'readFileSlice'; offset: number; length: number }
+  | { id: number; method: 'searchFileBytes'; needle: Uint8Array; caseInsensitive: boolean }
+  | { id: number; method: 'patchFile'; offset: number; hex: string }
+  | { id: number; method: 'exportBinary' }
+  | { id: number; method: 'runScript'; source: string; language: 'rz' | 'js' }
+  | { id: number; method: 'startAnalysis' }
+  | { id: number; method: 'cancelAnalysis' }
+  | { id: number; method: 'listFunctions'; offset?: number; limit?: number; query?: string }
+  | { id: number; method: 'listStrings'; offset?: number; limit?: number; contains?: string }
+  | { id: number; method: 'functionBriefing'; address: number }
+  | { id: number; method: 'checkpoint' }
+  | { id: number; method: 'close' };
+
+export type RizinMethod = RizinRequest['method'];
+
+export interface RizinResultMap {
+  open: {
+    analysis: AnalysisData | null;
+    commandCatalog: Record<string, RizinCommandHelpEntry>;
+  };
+  executeCommand: { output: string };
+  getFunctionDetails: { detail: FunctionDetailCacheEntry };
+  getAutocomplete: { result: RizinAutocompleteResult | null };
+  readMemory: { bytes: Uint8Array };
+  getXrefs: { xrefs: XrefsResult };
+  getCallGraph: { graph: CallGraphResult };
+  getDecompilation: { code: string; pseudo: boolean; engine: DecompilerEngine };
+  exportProject: { data: Uint8Array };
+  importProject: {
+    analysis: AnalysisData | null;
+    commandCatalog: Record<string, RizinCommandHelpEntry>;
+  };
+  setWriteMode: { writeMode: boolean };
+  readFileSlice: { bytes: Uint8Array };
+  searchFileBytes: { matches: number[] };
+  patchFile: { ok: boolean; error?: string };
+  exportBinary: { data: Uint8Array; name: string };
+  runScript: { output: string; error?: string };
+  startAnalysis: { job: AnalysisJob | null };
+  cancelAnalysis: { job: AnalysisJob | null };
+  listFunctions: Paginated<FunctionSummary>;
+  listStrings: Paginated<{ addr: number; string: string; length?: number }>;
+  functionBriefing: { briefing: FunctionBriefing };
+  checkpoint: { ok: boolean };
+  close: Record<string, never>;
+}
+
+export type RizinResult = RizinResultMap[RizinMethod];
+
+export type RizinResponse =
+  | { id: number; ok: true; result: RizinResult; state: RizinStateSnapshot }
+  | { id: number; ok: false; error: string; errorInfo?: { code: string; message: string; detail?: string } };
+
+export type RizinWorkerEvent =
+  | { event: 'ready' }
+  | { event: 'progress'; phase: RizinLoadPhase; progress: number; message: string }
+  | { event: 'notice'; notice: RizinNotice }
+  | { event: 'analysisChanged'; analysis: AnalysisData | null; state: RizinStateSnapshot }
+  | { event: 'job'; job: AnalysisJob };
+
+export type RizinControl = { control: 'init' };
+
+export type RizinInbound = RizinRequest | RizinControl;
+export type RizinOutbound = RizinResponse | RizinWorkerEvent;

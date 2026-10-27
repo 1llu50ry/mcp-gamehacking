@@ -1,0 +1,69 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: ghidra-analysis-api
+  datasource:
+    url: jdbc:postgresql://${BSIM_DB_HOST:bsim-postgres}:${BSIM_DB_PORT:5432}/${BSIM_DB_NAME:bsim}
+    username: ${BSIM_DB_USER:bsim_user}
+    password: ${BSIM_DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+      jedis:
+        pool:
+          max-active: 20
+          max-idle: 10
+          min-idle: 5
+  cache:
+    type: none
+
+# Ghidra Integration Settings
+ghidra:
+  server:
+    host: ${GHIDRA_SERVER_HOST:ghidra-server}
+    port: ${GHIDRA_SERVER_PORT:13100}
+    ip: ${GHIDRA_IP:}
+    username: ${GHIDRA_USERS:}
+    password: ${GHIDRA_PASSWORD:}
+  projects:
+    path: ${GHIDRA_PROJECTS_PATH:/repos}
+  temp:
+    path: ${GHIDRA_TEMP_PATH:/tmp/ghidra-uploads}
+
+# BSim Database Settings
+bsim:
+  db:
+    host: ${BSIM_DB_HOST:bsim-postgres}
+    port: ${BSIM_DB_PORT:5432}
+    name: ${BSIM_DB_NAME:bsim}
+    user: ${BSIM_DB_USER:bsim_user}
+    password: ${BSIM_DB_PASSWORD:}
+
+# Logging
+logging:
+  level:
+    com.ghidra: INFO
+    org.springframework.web: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+
+# Management endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always

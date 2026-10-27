@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Blue Color Test - Cross-Version Matrix</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a1a; color: #fff; }
+        table { border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #444; padding: 8px; text-align: center; min-width: 80px; }
+        th { background-color: #333; color: #fff; }
+        .addr-cell { color: #ccc; }
+        .addr-cell.exact-match { color: #6969ff !important; font-weight: 600; }
+        .addr-cell.missing { color: #666; }
+        .version-selector { margin: 20px 0; padding: 10px; background: #333; border-radius: 5px; }
+        .selected-version { background-color: #0066cc !important; color: white; }
+        select { padding: 5px; }
+        .status { margin: 10px 0; padding: 10px; background: #444; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Cross-Version Matrix Test - Blue Color (#6969ff) for Exact Matches</h1>
+
+    <div class="version-selector">
+        <label for="versionSelect">Select Version to highlight in blue:</label>
+        <select id="versionSelect" onchange="selectVersion(this.value)">
+            <option value="">-- Select Version --</option>
+            <option value="1.00">1.00</option>
+            <option value="1.01">1.01</option>
+            <option value="1.07">1.07</option>
+            <option value="1.10">1.10</option>
+            <option value="1.13d">1.13d</option>
+        </select>
+    </div>
+
+    <div class="status" id="status">
+        Select a version above to see exact matches highlighted in blue (#6969ff)
+    </div>
+
+    <table id="functionTable">
+        <thead>
+            <tr>
+                <th>Function</th>
+                <th id="v1.00">1.00</th>
+                <th id="v1.01">1.01</th>
+                <th id="v1.07">1.07</th>
+                <th id="v1.10">1.10</th>
+                <th id="v1.13d">1.13d</th>
+            </tr>
+        </thead>
+        <tbody id="functionTableBody">
+        </tbody>
+    </table>
+
+    <script>
+        // Sample function data (from actual API response)
+        const testFunctionData = {
+            "AccumulateElementalDamageStats": {
+                "addresses": {
+                    "1.00": null,
+                    "1.01": null,
+                    "1.07": null,
+                    "1.10": null,
+                    "1.13d": "0x6FAE26C0"
+                }
+            },
+            "AcquireCriticalSectionByIndex": {
+                "addresses": {
+                    "1.00": "0x100DA5DD",
+                    "1.01": "0x100DA9AD",
+                    "1.07": "0x6FB9B69C",
+                    "1.10": "0x6FB61D82",
+                    "1.13d": "0x6FAB5134"
+                }
+            },
+            "AddDialogLine": {
+                "addresses": {
+                    "1.00": "0x10001870",
+                    "1.01": "0x1000187F",
+                    "1.07": "0x6FB00990",
+                    "1.10": "0x6FAD7180",
+                    "1.13d": null
+                }
+            },
+            "AddIntegers": {
+                "addresses": {
+                    "1.00": "0x10001064",
+                    "1.01": "0x100142B0",
+                    "1.07": "0x6FADC900",
+                    "1.10": "0x6FAAD050",
+                    "1.13d": null
+                }
+            },
+            "ActivatePlayerSkill": {
+                "addresses": {
+                    "1.00": null,
+                    "1.01": null,
+                    "1.07": null,
+                    "1.10": null,
+                    "1.13d": null
+                }
+            }
+        };
+
+        const versions = ["1.00", "1.01", "1.07", "1.10", "1.13d"];
+        let selectedVersion = null;
+
+        function selectVersion(version) {
+            selectedVersion = version;
+            console.log('Selected version:', version);
+
+            // Update status
+            const statusEl = document.getElementById('status');
+            if (version) {
+                statusEl.innerHTML = `Selected version: <strong>${version}</strong> - Functions with addresses in this version are highlighted in <span style="color: #6969ff; font-weight: 600;">#6969ff blue</span>`;
+            } else {
+                statusEl.innerHTML = 'Select a version above to see exact matches highlighted in blue (#6969ff)';
+            }
+
+            // Update column headers
+            versions.forEach(v => {
+                const headerEl = document.getElementById(`v${v}`);
+                if (v === version) {
+                    headerEl.classList.add('selected-version');
+                } else {
+                    headerEl.classList.remove('selected-version');
+                }
+            });
+
+            buildTable();
+        }
+
+        function buildTable() {
+            const tbody = document.getElementById('functionTableBody');
+            tbody.innerHTML = '';
+
+            Object.keys(testFunctionData).forEach(funcName => {
+                const func = testFunctionData[funcName];
+                const row = document.createElement('tr');
+
+                // Function name cell
+                const nameCell = document.createElement('td');
+                nameCell.textContent = funcName;
+                nameCell.style.textAlign = 'left';
+                nameCell.style.fontWeight = '600';
+                row.appendChild(nameCell);
+
+                // Address cells for each version
+                versions.forEach(version => {
+                    const cell = document.createElement('td');
+                    const addr = func.addresses[version];
+
+                    if (addr) {
+                        cell.textContent = addr;
+                        cell.className = 'addr-cell';
+
+                        // Add exact-match class if this version matches the selected version
+                        if (selectedVersion && version === selectedVersion) {
+                            cell.classList.add('exact-match');
+                        }
+                    } else {
+                        cell.textContent = '—';
+                        cell.className = 'addr-cell missing';
+                    }
+
+                    row.appendChild(cell);
+                });
+
+                tbody.appendChild(row);
+            });
+        }
+
+        // Build initial table
+        buildTable();
+
+        // Add some explanatory text
+        document.body.insertAdjacentHTML('beforeend', `
+            <div style="margin: 20px 0; padding: 15px; background: #333; border-radius: 5px;">
+                <h3>Test Instructions:</h3>
+                <ol>
+                    <li>Select a version from the dropdown above</li>
+                    <li>Functions that exist in the selected version will have their addresses highlighted in <span style="color: #6969ff; font-weight: 600;">#6969ff blue</span></li>
+                    <li>This demonstrates the exact match highlighting feature for the cross-version matrix</li>
+                </ol>
+                <p><strong>Expected behavior:</strong> When you select version 1.00, the addresses 0x100DA5DD, 0x10001870, and 0x10001064 should turn blue.</p>
+            </div>
+        `);
+    </script>
+</body>
+</html>

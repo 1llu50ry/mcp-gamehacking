@@ -1,0 +1,834 @@
+# DecompNet toolchain registry.
+#
+# Every part is downloaded from its upstream release and verified against the pinned sha256
+# before anything is extracted. Toolchains are installed under $DECOMPNET_TOOLCHAINS
+# (default ~/.local/share/decompnet/toolchains) and mounted read-only into the compile sandbox.
+#
+# license = "proprietary" entries are supported but never installed without
+# `decompnet toolchain install <id> --accept-license`: running them is the operator's decision.
+# An empty sha256 means "pin on first install" (trust on first use); the installer records it.
+#
+# Each part lists the platforms it is for (linux-x86_64, linux-aarch64, macos-x86_64, macos-arm64,
+# windows-x86_64). Apple Silicon Macs run the x86_64 builds through Rosetta 2.
+# On Windows, a toolchain with only a linux-x86_64 build is installed from that build and runs inside
+# WSL 2 (wsl.py); a part for wsl-x86_64 replaces the Linux one there.
+
+[runtime-i386]
+name = "32-bit x86 C runtime (glibc 2.44)"
+kind = "runtime"
+license = "LGPL-2.1-or-later"
+source = "Arch Linux archive, lib32-glibc 2.44+r50"
+description = "Lets old 32-bit compiler binaries run inside the sandbox without installing multilib on the host."
+[[runtime-i386.parts]]
+url = "https://archive.archlinux.org/packages/l/lib32-glibc/lib32-glibc-2.44%2Br50%2Bg1848099f063e-1-x86_64.pkg.tar.zst"
+sha256 = "a977f9a6a405ab85e594aa9f1230a0b7dddfc33e3de5f2cb66931c92a48931d8"
+subdir = "usr/lib32"
+platforms = ["linux-x86_64"]
+[[runtime-i386.parts]]
+# for WSL on Windows: the same runtime from Debian 13 (xz inside, which Windows unpacks; zstd it can't)
+url = "https://snapshot.debian.org/archive/debian/20250805T202250Z/pool/main/g/glibc/libc6-i386_2.41-12_amd64.deb"
+sha256 = "d3b984867db9cac65d89b75c75f64347964e2837eb53e7782b4349a6c2a5eaaa"
+subdir = "usr/lib32"
+platforms = ["wsl-x86_64"]
+
+["gcc-2.7.2-kmc"]
+name = "GCC 2.7.2 (KMC-compatible) + binutils 2.6"
+platform = "N64"
+arch = "mips"
+license = "GPL-2.0"
+source = "decompals/mips-gcc-2.7.2 v0.1, decompals/mips-binutils-2.6 v0.3"
+description = "GCC 2.7.2 built to reproduce the KMC compiler used by many N64 games, with the matching assembler."
+cc = ["{tc}/gcc", "-B{tc}/", "-c"]
+flags = ["-G0", "-mips3", "-mgp32", "-mfp32", "-O2"]
+[["gcc-2.7.2-kmc".parts]]
+url = "https://github.com/decompals/mips-gcc-2.7.2/releases/download/v0.1/gcc-2.7.2-linux.tar.gz"
+sha256 = "e09e7b53d4e47d1b7bab1f854c4498c0bffbea2553b1d7201dc3e0e983923874"
+platforms = ["linux-x86_64"]
+[["gcc-2.7.2-kmc".parts]]
+url = "https://github.com/decompals/mips-binutils-2.6/releases/download/v0.3/binutils-2.6-linux.tar.gz"
+sha256 = "5a612cd28344e5b410c3344ec5dcfb92d9d03947756f190cd12404055b4a624d"
+platforms = ["linux-x86_64"]
+[["gcc-2.7.2-kmc".parts]]
+url = "https://github.com/decompals/mips-gcc-2.7.2/releases/download/v0.1/gcc-2.7.2-mac.tar.gz"
+sha256 = "5923ea59b97d39d65d684a3ef2f25cd1cbcaf2fd0b5cf6a7f1a4804500a770e0"
+platforms = ["macos-x86_64", "macos-arm64"]
+[["gcc-2.7.2-kmc".parts]]
+url = "https://github.com/decompals/mips-binutils-2.6/releases/download/v0.3/binutils-2.6-mac.tar.gz"
+sha256 = "ab21ad5908fb7776a4b0c596cc82f216876e3b5d108c7c7c1f33543b3f3fce4c"
+platforms = ["macos-x86_64", "macos-arm64"]
+
+["gcc-2.7.2-psx"]
+name = "GCC 2.7.2 for PlayStation + binutils 2.6"
+platform = "PS1"
+arch = "mipsel"
+license = "GPL-2.0"
+source = "decompals/old-gcc 0.17 (gcc-2.7.2-psx), decompals/mips-binutils-2.6 v0.3"
+description = "GCC 2.7.2 with the PlayStation patches, the C compiler family behind PSY-Q, with the GNU assembler."
+cc = ["{tc}/gcc", "-B{tc}/", "-c", "-Wa,-EL"]
+flags = ["-O2", "-G8"]
+[["gcc-2.7.2-psx".parts]]
+url = "https://github.com/decompals/old-gcc/releases/download/0.17/gcc-2.7.2-psx.tar.gz"
+sha256 = "500a459b3485e885a8d302cac23c2a4632f3900e03a09153f6190699fd723571"
+platforms = ["linux-x86_64"]
+[["gcc-2.7.2-psx".parts]]
+url = "https://github.com/decompals/mips-binutils-2.6/releases/download/v0.3/binutils-2.6-linux.tar.gz"
+sha256 = "5a612cd28344e5b410c3344ec5dcfb92d9d03947756f190cd12404055b4a624d"
+platforms = ["linux-x86_64"]
+[["gcc-2.7.2-psx".parts]]
+url = "https://github.com/decompals/old-gcc/releases/download/0.17/gcc-2.7.2-psx-macos.tar.gz"
+sha256 = "4280894661c9792bc19f5c970c283d35381937fb44e479a91d0c044c95fcd208"
+platforms = ["macos-x86_64", "macos-arm64"]
+[["gcc-2.7.2-psx".parts]]
+url = "https://github.com/decompals/mips-binutils-2.6/releases/download/v0.3/binutils-2.6-mac.tar.gz"
+sha256 = "ab21ad5908fb7776a4b0c596cc82f216876e3b5d108c7c7c1f33543b3f3fce4c"
+platforms = ["macos-x86_64", "macos-arm64"]
+
+["gcc-2.8.1-psx"]
+name = "GCC 2.8.1 for PlayStation + binutils 2.6"
+platform = "PS1"
+arch = "mipsel"
+license = "GPL-2.0"
+source = "decompals/old-gcc 0.17 (gcc-2.8.1-psx), decompals/mips-binutils-2.6 v0.3"
+description = "GCC 2.8.1 with the PlayStation patches (later PSY-Q versions), with the GNU assembler."
+cc = ["{tc}/gcc", "-B{tc}/", "-c", "-Wa,-EL"]
+flags = ["-O2", "-G8"]
+[["gcc-2.8.1-psx".parts]]
+url = "https://github.com/decompals/old-gcc/releases/download/0.17/gcc-2.8.1-psx.tar.gz"
+sha256 = "f6f6e883942d4d3289d048236c672e71ed410e546aaae8ff655952f1567e1be0"
+platforms = ["linux-x86_64"]
+[["gcc-2.8.1-psx".parts]]
+url = "https://github.com/decompals/mips-binutils-2.6/releases/download/v0.3/binutils-2.6-linux.tar.gz"
+sha256 = "5a612cd28344e5b410c3344ec5dcfb92d9d03947756f190cd12404055b4a624d"
+platforms = ["linux-x86_64"]
+[["gcc-2.8.1-psx".parts]]
+url = "https://github.com/decompals/old-gcc/releases/download/0.17/gcc-2.8.1-psx-macos.tar.gz"
+sha256 = "bab0c6ea1f394573d5aabbdd7b37e36aceeb83c522141d946a87a9f58c199ea0"
+platforms = ["macos-x86_64", "macos-arm64"]
+[["gcc-2.8.1-psx".parts]]
+url = "https://github.com/decompals/mips-binutils-2.6/releases/download/v0.3/binutils-2.6-mac.tar.gz"
+sha256 = "ab21ad5908fb7776a4b0c596cc82f216876e3b5d108c7c7c1f33543b3f3fce4c"
+platforms = ["macos-x86_64", "macos-arm64"]
+
+["ee-gcc-2.96"]
+name = "EE-GCC 2.96"
+platform = "PS2"
+arch = "mipsel"
+license = "GPL-2.0"
+source = "decompme/compilers release 'compilers'"
+description = "The GCC 2.96 Emotion Engine compiler from the PS2 SDK era."
+requires = ["runtime-i386"]
+cc = ["{tc}/bin/ee-gcc", "-c"]
+flags = ["-O2", "-G0"]
+[["ee-gcc-2.96".parts]]
+url = "https://github.com/decompme/compilers/releases/download/compilers/ee-gcc2.96.tar.xz"
+sha256 = "0590d2ca9da8f5903889d66761220d14b47a8d14ba987ca53db84a1650a1fd0a"
+platforms = ["linux-x86_64"]
+
+["ido-7.1"]
+name = "IDO 7.1 (static recompilation)"
+platform = "N64"
+arch = "mips"
+license = "proprietary"
+source = "decompals/ido-static-recomp v1.2 (SGI IRIX Development Option, recompiled for Linux, macOS and Windows)"
+description = "SGI's compiler used by most first-party N64 games. Proprietary: install only if you accept the licensing risk."
+cc = ["{tc}/cc", "-c"]
+flags = ["-O2", "-mips2", "-G", "0", "-non_shared", "-Xcpluscomm", "-Wab,-r4300_mul", "-woff", "649,838,712"]
+[["ido-7.1".parts]]
+url = "https://github.com/decompals/ido-static-recomp/releases/download/v1.2/ido-7.1-recomp-linux.tar.gz"
+sha256 = "0d411696e178fcca34c31c3bf02011b928d7fd9c1fa7f8bf45070e0781b58e15"
+platforms = ["linux-x86_64"]
+[["ido-7.1".parts]]
+url = "https://github.com/decompals/ido-static-recomp/releases/download/v1.2/ido-7.1-recomp-macos.tar.gz"
+sha256 = "7f75570ed1ca14e6161b84b10743d440c685f27291bfbfaf87c6a82236553bc6"
+platforms = ["macos-x86_64", "macos-arm64"]
+[["ido-7.1".parts]]
+url = "https://github.com/decompals/ido-static-recomp/releases/download/v1.2/ido-7.1-recomp-windows.tar.gz"
+sha256 = "28487a90a47d2565d8c38235750500f6fbd3479b758e966b529166825804c926"
+platforms = ["windows-x86_64"]
+
+["ido-5.3"]
+name = "IDO 5.3 (static recompilation)"
+platform = "N64"
+arch = "mips"
+license = "proprietary"
+source = "decompals/ido-static-recomp v1.2 (SGI IRIX Development Option, recompiled for Linux, macOS and Windows)"
+description = "The earlier SGI compiler used by early N64 titles. Proprietary: install only if you accept the licensing risk."
+cc = ["{tc}/cc", "-c"]
+flags = ["-O2", "-mips2", "-G", "0", "-non_shared", "-Xcpluscomm", "-Wab,-r4300_mul"]
+[["ido-5.3".parts]]
+url = "https://github.com/decompals/ido-static-recomp/releases/download/v1.2/ido-5.3-recomp-linux.tar.gz"
+sha256 = "ab5c741561f80913d58c8b074771f23941a3edd312505a8ebed6d1dfeb65e506"
+platforms = ["linux-x86_64"]
+[["ido-5.3".parts]]
+url = "https://github.com/decompals/ido-static-recomp/releases/download/v1.2/ido-5.3-recomp-macos.tar.gz"
+sha256 = "5b1ca006ee4b158ffba0422fc3f00b9b330f9036f279bae2ea1b4703317ad9c0"
+platforms = ["macos-x86_64", "macos-arm64"]
+[["ido-5.3".parts]]
+url = "https://github.com/decompals/ido-static-recomp/releases/download/v1.2/ido-5.3-recomp-windows.tar.gz"
+sha256 = "2268f64cab973750e78bdf7aa2ff3cccf78ad1d181507da6faeb61f3d22c2e1e"
+platforms = ["windows-x86_64"]
+
+[m2c]
+name = "m2c decompiler"
+kind = "tool"
+license = "GPL-3.0"
+source = "matt-kempster/m2c @ 708d2d2c (2026-09-16)"
+description = "Machine decompiler for MIPS and PowerPC. Produces the starting point agents see for a new function."
+git = "https://github.com/matt-kempster/m2c"
+commit = "708d2d2cb2698f091a92492b328f73b24209f72d"
+
+[cloudflared]
+name = "cloudflared"
+kind = "tool"
+license = "Apache-2.0"
+source = "cloudflare/cloudflared 2026.10.2"
+description = "Cloudflare's tunnel client. decomp.anything uses a free quick tunnel (no account) when you invite friends to a project."
+[[cloudflared.parts]]
+url = "https://github.com/cloudflare/cloudflared/releases/download/2026.10.2/cloudflared-linux-amd64"
+sha256 = "35fbdd2beb378436c7da377d7358cea8e33f9c94a6705d1d8036bf9b0d6d8005"
+binary = "cloudflared"
+platforms = ["linux-x86_64"]
+[[cloudflared.parts]]
+url = "https://github.com/cloudflare/cloudflared/releases/download/2026.10.2/cloudflared-linux-arm64"
+sha256 = "b7e55b4d9702c2ab5f8348f780bb1db044527fc555367714c78e0595750a4665"
+binary = "cloudflared"
+platforms = ["linux-aarch64"]
+[[cloudflared.parts]]
+url = "https://github.com/cloudflare/cloudflared/releases/download/2026.10.2/cloudflared-darwin-amd64.tgz"
+sha256 = "b64efd5a2772fc124b855f60eb3d33ba1a4f2ba67b19ddc58d32b705d42b82c9"
+platforms = ["macos-x86_64"]
+[[cloudflared.parts]]
+url = "https://github.com/cloudflare/cloudflared/releases/download/2026.10.2/cloudflared-darwin-arm64.tgz"
+sha256 = "529a07089ac2d46762578389230fa148e5cb6ce2689200fc006956864042d17a"
+platforms = ["macos-arm64"]
+[[cloudflared.parts]]
+url = "https://github.com/cloudflare/cloudflared/releases/download/2026.10.2/cloudflared-windows-amd64.exe"
+sha256 = "12c7c887f8aaab779aef1dfa9b60673530a5adb88ecc55dd6df8f56e0b70f199"
+binary = "cloudflared.exe"
+platforms = ["windows-x86_64"]
+
+
+# ------------------------------------------------------------------------------------------------
+# The decomp community's toolbelt. Downloaded on demand; every part is pinned to its release digest.
+
+[objdiff-cli]
+name = "objdiff-cli"
+kind = "tool"
+license = "MIT OR Apache-2.0"
+source = "encounter/objdiff v3.8.3"
+description = "The diff tool almost every modern decomp uses: per-function match percentages and instruction diffs for MIPS, PowerPC, ARM, ARM64, SuperH and x86."
+binary_name = "objdiff-cli"
+[[objdiff-cli.parts]]
+url = "https://github.com/encounter/objdiff/releases/download/v3.8.3/objdiff-cli-linux-x86_64"
+sha256 = "e823ae932a56c68dcd86b68d12f2268c953e0c027402162c8a6dfa6a00d65008"
+binary = "objdiff-cli"
+platforms = ["linux-x86_64"]
+[[objdiff-cli.parts]]
+url = "https://github.com/encounter/objdiff/releases/download/v3.8.3/objdiff-cli-linux-aarch64"
+sha256 = "0e630457e2f33a43da3723e195ecd0b39b683a6a83122955fdc68c5b17183cbc"
+binary = "objdiff-cli"
+platforms = ["linux-aarch64"]
+[[objdiff-cli.parts]]
+url = "https://github.com/encounter/objdiff/releases/download/v3.8.3/objdiff-cli-macos-arm64"
+sha256 = "27dbd79196394c246dde77ef0a6ac855ff6c568069171dd7db0093f39c03ee8d"
+binary = "objdiff-cli"
+platforms = ["macos-arm64"]
+[[objdiff-cli.parts]]
+url = "https://github.com/encounter/objdiff/releases/download/v3.8.3/objdiff-cli-macos-x86_64"
+sha256 = "4a0f5079600cb9ddf2369414e712f96838bc0ae05cd1a98c92f6131078ec4b0e"
+binary = "objdiff-cli"
+platforms = ["macos-x86_64"]
+[[objdiff-cli.parts]]
+url = "https://github.com/encounter/objdiff/releases/download/v3.8.3/objdiff-cli-windows-x86_64.exe"
+sha256 = "dd12dfb5e9e94a7f6c949a37e1815963cf2cffe4c87b4999b7ebc8c15b398a1f"
+binary = "objdiff-cli.exe"
+platforms = ["windows-x86_64"]
+
+[dtk]
+name = "decomp-toolkit"
+kind = "tool"
+license = "MIT OR Apache-2.0"
+source = "encounter/decomp-toolkit v1.8.4"
+description = "GameCube and Wii toolkit: reads discs, analyses and splits DOL/REL files, generates linker scripts."
+binary_name = "dtk"
+[[dtk.parts]]
+url = "https://github.com/encounter/decomp-toolkit/releases/download/v1.8.4/dtk-linux-x86_64"
+sha256 = "7c86b1994401bde0cad1d308e6c04cccb65e85453ccc5062ac12baab3b03d320"
+binary = "dtk"
+platforms = ["linux-x86_64"]
+[[dtk.parts]]
+url = "https://github.com/encounter/decomp-toolkit/releases/download/v1.8.4/dtk-linux-aarch64"
+sha256 = "889a551d57916772f21a29c997579e0508f268c96bcbc946a0a66bff029cf97c"
+binary = "dtk"
+platforms = ["linux-aarch64"]
+[[dtk.parts]]
+url = "https://github.com/encounter/decomp-toolkit/releases/download/v1.8.4/dtk-macos-arm64"
+sha256 = "5ba1fd76adf937847277a1ebe2238b698df0020c3dbbde23ecb126f00fb10353"
+binary = "dtk"
+platforms = ["macos-arm64"]
+[[dtk.parts]]
+url = "https://github.com/encounter/decomp-toolkit/releases/download/v1.8.4/dtk-macos-x86_64"
+sha256 = "84bcab745a070bb970cf4bc0d69ddce9f6a58d5de257999ccc8adfa1567d17c9"
+binary = "dtk"
+platforms = ["macos-x86_64"]
+[[dtk.parts]]
+url = "https://github.com/encounter/decomp-toolkit/releases/download/v1.8.4/dtk-windows-x86_64.exe"
+sha256 = "6a693e95aa4d30acccc673343302a4abdfa3146bd0fb15cb1a2bce924cbc782a"
+binary = "dtk.exe"
+platforms = ["windows-x86_64"]
+
+[wibo]
+name = "wibo"
+kind = "tool"
+license = "MIT"
+source = "decompals/wibo 1.2.0"
+description = "Runs the old Windows compilers many decomps need (Metrowerks, MSVC) on Linux and macOS."
+binary_name = "wibo"
+[[wibo.parts]]
+url = "https://github.com/decompals/wibo/releases/download/1.2.0/wibo-x86_64"
+sha256 = "13f86a2d618f0dbe67179d349625345eabf9b46450295cb4c904e49f6aff85af"
+binary = "wibo"
+platforms = ["linux-x86_64"]
+[[wibo.parts]]
+url = "https://github.com/decompals/wibo/releases/download/1.2.0/wibo-macos"
+sha256 = "2b3000ef6a7a490c24ccd71967735ae0005e218922e51806cca1b8d77fd3cf7c"
+binary = "wibo"
+platforms = ["macos-x86_64", "macos-arm64"]
+
+[coddog]
+name = "coddog"
+kind = "tool"
+license = "MIT OR Apache-2.0"
+source = "ethteck/coddog 0.6.3"
+description = "Finds functions that look alike, inside one game or across games, so agents can learn from code that already matches."
+binary_name = "coddog"
+[[coddog.parts]]
+url = "https://github.com/ethteck/coddog/releases/download/0.6.3/coddog-cli-x86_64-unknown-linux-gnu.tar.xz"
+sha256 = "c8e1dd6228d4363378598b71c57095fc8d5b02c3d0cffb1c71b051a257e75bc7"
+subdir = "coddog-cli-x86_64-unknown-linux-gnu"
+platforms = ["linux-x86_64"]
+[[coddog.parts]]
+url = "https://github.com/ethteck/coddog/releases/download/0.6.3/coddog-cli-aarch64-apple-darwin.tar.xz"
+sha256 = "b040cf68cd673795ae95336dbadb045255b7d4d100f98cba32360ce1a64a0d0b"
+subdir = "coddog-cli-aarch64-apple-darwin"
+platforms = ["macos-arm64"]
+[[coddog.parts]]
+url = "https://github.com/ethteck/coddog/releases/download/0.6.3/coddog-cli-x86_64-apple-darwin.tar.xz"
+sha256 = "40d8f12c67a852e5716c1c2c1181673fc81bcd505e656111775c1d3b38094ed3"
+subdir = "coddog-cli-x86_64-apple-darwin"
+platforms = ["macos-x86_64"]
+[[coddog.parts]]
+url = "https://github.com/ethteck/coddog/releases/download/0.6.3/coddog-cli-x86_64-pc-windows-msvc.zip"
+sha256 = "ce49cda2f01acbfcb1fea165ef3cbe4db06d7b5ea3738676069149a74d8e9ea3"
+platforms = ["windows-x86_64"]
+
+[gc-wii-binutils]
+name = "GNU binutils for GameCube and Wii"
+kind = "tool"
+license = "GPL-3.0"
+source = "encounter/gc-wii-binutils 2.42-2"
+description = "powerpc-eabi assembler, linker and objdump, as used by GameCube and Wii decomps."
+[["gc-wii-binutils".parts]]
+url = "https://github.com/encounter/gc-wii-binutils/releases/download/2.42-2/linux-x86_64.zip"
+sha256 = "64e4bf7aee5c06075d8fa818ebd2a0a3a72e0eeef3896bdec2f198b0e950fe63"
+executable = true
+platforms = ["linux-x86_64"]
+[["gc-wii-binutils".parts]]
+url = "https://github.com/encounter/gc-wii-binutils/releases/download/2.42-2/macos-universal.zip"
+sha256 = "c40bad23fd7d9eb22d4533875922fc19785ed067978b605804e345bc6e62449d"
+executable = true
+platforms = ["macos-x86_64", "macos-arm64"]
+[["gc-wii-binutils".parts]]
+url = "https://github.com/encounter/gc-wii-binutils/releases/download/2.42-2/windows-x86_64.zip"
+sha256 = "bd95bd57607efb45c437e97b77ec199073e242869027eb72196b0720611bb1c1"
+platforms = ["windows-x86_64"]
+
+[agbcc]
+name = "agbcc"
+platform = "GBA"
+arch = "arm"
+license = "GPL-2.0"
+source = "pret/agbcc release"
+description = "The GCC 2.95-based compiler behind most Game Boy Advance games, as rebuilt by the pret community."
+cc = ["{tc}/bin/agbcc"]
+flags = ["-mthumb-interwork", "-O2"]
+requires = ["arm-gnu"]
+# agbcc only compiles preprocessed C to assembly: preprocess, compile, assemble, like pret's builds
+cmd = ["/bin/sh", "-c", "src=\"$1\"; obj=\"$2\"; inc=\"$3\"; shift 3; \"{tc:arm-gnu}/bin/arm-none-eabi-cpp\" -nostdinc -undef -I \"{tc}/include\" -I \"$inc\" \"$src\" -o \"$obj.i\" && \"{tc}/bin/agbcc\" \"$@\" \"$obj.i\" -o \"$obj.s\" && \"{tc:arm-gnu}/bin/arm-none-eabi-as\" -mcpu=arm7tdmi -o \"$obj\" \"$obj.s\"", "agbcc", "{src}", "{obj}", "{include}", "{flags}"]
+[[agbcc.parts]]
+url = "https://github.com/pret/agbcc/releases/download/release/agbcc.tar.gz"
+sha256 = "bcf0197e3e27d8e08506a142e25fa68ea7f6679a98347a6406804eb3f9ff4d29"
+platforms = ["linux-x86_64"]
+
+[maspsx]
+name = "maspsx"
+kind = "tool"
+license = "MIT"
+source = "mkst/maspsx @ e85ecb3 (2026-10-02)"
+description = "Makes GCC output assemble like Sony's PSY-Q assembler (ASPSX), which matching PlayStation code needs."
+[[maspsx.parts]]
+url = "https://github.com/mkst/maspsx/archive/e85ecb373828aabea96d7e6400974d4f91ce8c74.tar.gz"
+sha256 = "9f8ea9827b785ae41437befa8ebdceb8c00f3b1e8f3a90c506948e2df1079bde"
+subdir = "maspsx-e85ecb373828aabea96d7e6400974d4f91ce8c74"
+
+[upx]
+name = "UPX"
+kind = "tool"
+license = "GPL-2.0-or-later"
+source = "upx/upx 5.2.1"
+description = "Unpacks UPX-compressed PC programs before splitting; packed code otherwise looks like one function. Optional."
+binary_name = "upx"
+[[upx.parts]]
+url = "https://github.com/upx/upx/releases/download/v5.2.1/upx-5.2.1-amd64_linux.tar.xz"
+sha256 = "402162aad30af47e60dbd767fb2e64ca394ace9727ba1f40283641f1d1b91657"
+subdir = "upx-5.2.1-amd64_linux"
+platforms = ["linux-x86_64"]
+
+[rizin]
+name = "Rizin"
+kind = "tool"
+license = "LGPL-3.0-or-later"
+source = "system rizin"
+description = "A lightweight native analysis provider REA can use when Ghidra, Hopper or IDA aren't installed. Install it with your package manager; optional."
+system = true
+download = "https://github.com/rizinorg/rizin/releases/latest"
+cmd = ["rizin"]
+binary_name = "rizin"
+
+[detect-it-easy]
+name = "Detect It Easy"
+kind = "tool"
+license = "MIT"
+source = "system diec (Detect It Easy)"
+description = "Compiler and packer fingerprints from Detect It Easy's command-line tool; useful before choosing a toolchain. Install diec with your package manager; optional."
+system = true
+download = "https://github.com/horsicq/Detect-It-Easy/releases/latest"
+cmd = ["diec"]
+binary_name = "diec"
+
+[llvm-tools]
+name = "LLVM tools (PDB reader)"
+kind = "tool"
+license = "Apache-2.0 WITH LLVM-exception"
+source = "system LLVM (llvm-pdbutil)"
+description = "Reads PDB debug symbols for Windows programs. Optional: install LLVM with your package manager or the LLVM installer; MAP, DWARF and symbol_addrs.txt need nothing extra."
+system = true
+download = "https://github.com/llvm/llvm-project/releases/latest"
+cmd = ["llvm-pdbutil"]
+binary_name = "llvm-pdbutil"
+
+[ghidra]
+name = "Ghidra"
+kind = "tool"
+license = "Apache-2.0"
+source = "NationalSecurityAgency/ghidra 12.1.4"
+description = "The NSA's reverse-engineering suite: analyses and decompiles code for almost any CPU. Large (540 MB) and needs Java 21+; optional."
+requires_java = 21
+[[ghidra.parts]]
+url = "https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_12.1.4_build/ghidra_12.1.4_PUBLIC_20260921.zip"
+sha256 = "ddac49f903da9d5bac833e5cc79395098b9c33cfd3279be5f31bd00387d2d4db"
+subdir = "ghidra_12.1.4_PUBLIC"
+
+[rea]
+name = "REA"
+kind = "tool"
+license = "MIT"
+source = "morluto/rea 6.7.0"
+description = "Reverse Engineer Anything: the analysis server behind the RE console and the agents' inspect_binary. Needs Node.js; native code also needs Ghidra, Hopper or IDA."
+npm = "rea-agents@6.7.0"
+
+[binutils-mips]
+name = "GNU binutils for MIPS (decompals)"
+kind = "tool"
+license = "GPL-2.0"
+source = "decompals/binutils-mips-ps2-decompals v0.10"
+description = "A modern MIPS assembler and linker (PS1, PS2, N64), as used with maspsx and by PS2 decomps."
+binary_name = "mips-ps2-decompals-ld"
+[[binutils-mips.parts]]
+url = "https://github.com/decompals/binutils-mips-ps2-decompals/releases/download/v0.10/binutils-mips-ps2-decompals-linux-x86-64.tar.gz"
+sha256 = "9fe31ea3ee1a37536f9f0e2e12c668e7c3cb99e59f5154bd2f1fc4762473094c"
+platforms = ["linux-x86_64"]
+[[binutils-mips.parts]]
+url = "https://github.com/decompals/binutils-mips-ps2-decompals/releases/download/v0.10/binutils-mips-ps2-decompals-macos-arm64.tar.gz"
+sha256 = "948cc736e01b2c135168caabfb616f6ed8efe89f1dad1ed8ef1ca74acb1b742c"
+platforms = ["macos-arm64"]
+[[binutils-mips.parts]]
+url = "https://github.com/decompals/binutils-mips-ps2-decompals/releases/download/v0.10/binutils-mips-ps2-decompals-windows-x86-64.zip"
+sha256 = "2bb5904ee174e04f1600cc70ffdb3dc36b0efa4d1892ea446be588ba8dc6198c"
+platforms = ["windows-x86_64"]
+
+[mwcc]
+name = "Metrowerks CodeWarrior (GameCube, Wii) + ProDG + Xbox 360 MSVC"
+kind = "compiler-pack"
+platform = "GameCube/Wii"
+license = "proprietary"
+source = "files.decomp.dev compilers_20251118.zip (the decomp community's archive)"
+description = "Every CodeWarrior version GameCube and Wii games were built with (GC 1.0-3.0a5, Wii 0x4201-1.7), SN ProDG and the Xbox 360 compilers. Windows programs, run through wibo on Linux and macOS."
+[[mwcc.parts]]
+url = "https://files.decomp.dev/compilers_20251118.zip"
+sha256 = "69b0d4980a2eccea4ae6e70b486714b5190cb6c75e3bc7b8fb5878a8854d0d1c"
+
+[mwccarm]
+name = "Metrowerks CodeWarrior for Nintendo DS (mwccarm)"
+kind = "compiler-pack"
+platform = "DS"
+license = "proprietary"
+source = "decompme/compilers release 'compilers' mwccarm.zip (the decomp community's archive)"
+description = "Every CodeWarrior version DS games were built with (1.2, 2.0, DSi 1.1-1.6), compiler and linker. Windows programs, run through wibo on Linux and macOS."
+[[mwccarm.parts]]
+url = "https://github.com/decompme/compilers/releases/download/compilers/mwccarm.zip"
+sha256 = "dc386e37b2176e960954a733de928337d9b7e7620b9e94228008c31774339ace"
+
+[dsd]
+name = "ds-decomp (dsd)"
+kind = "tool"
+license = "MIT"
+source = "AetiasHax/ds-decomp v0.12.1"
+description = "Nintendo DS toolkit: extracts and rebuilds ROMs, analyses the ARM9 and overlays, delinks them into objects."
+binary_name = "dsd"
+[[dsd.parts]]
+url = "https://github.com/AetiasHax/ds-decomp/releases/download/v0.12.1/dsd-linux-x86_64"
+sha256 = "256edde804dd8e5d7bc4c0e4187f85244ee4cd1f42bb427502e01fda6af43ceb"
+binary = "dsd"
+platforms = ["linux-x86_64"]
+[[dsd.parts]]
+url = "https://github.com/AetiasHax/ds-decomp/releases/download/v0.12.1/dsd-macos-arm64"
+sha256 = "1bbb57fe66a37123a7e9a64459b174956ea69ea103ad3dfd2766f18ca63057c7"
+binary = "dsd"
+platforms = ["macos-arm64"]
+[[dsd.parts]]
+url = "https://github.com/AetiasHax/ds-decomp/releases/download/v0.12.1/dsd-macos-x86_64"
+sha256 = "21adcef119d6e9b6bb853b0e5cc626bc4c086d28d45abc9a91b715c78631a044"
+binary = "dsd"
+platforms = ["macos-x86_64"]
+[[dsd.parts]]
+url = "https://github.com/AetiasHax/ds-decomp/releases/download/v0.12.1/dsd-windows-x86_64.exe"
+sha256 = "5917df26bffc05d4752276a2e0b1edd21bd6e920aabe1992be8a50efc9d10932"
+binary = "dsd.exe"
+platforms = ["windows-x86_64"]
+
+[sjiswrap]
+name = "sjiswrap"
+kind = "tool"
+license = "Apache-2.0"
+source = "encounter/sjiswrap v1.2.2"
+description = "Lets CodeWarrior compile Shift-JIS (Japanese) source files; used by dtk-template projects."
+binary_name = "sjiswrap"
+[[sjiswrap.parts]]
+url = "https://github.com/encounter/sjiswrap/releases/download/v1.2.2/sjiswrap-windows-x86.exe"
+sha256 = "01d50fa1148cfc3c3b16658c6c9b1c0d9f5324cde79ed6c09ef8353af9d63adf"
+binary = "sjiswrap.exe"
+
+[dtk-template]
+name = "dtk-template"
+kind = "template"
+license = "CC0-1.0"
+source = "encounter/dtk-template @ 95a941f"
+description = "The community's project template for GameCube and Wii decomps, used to start a new one from scratch."
+[[dtk-template.parts]]
+url = "https://github.com/encounter/dtk-template/archive/95a941f755919ebe50c1725a4ce73524470e7a02.tar.gz"
+sha256 = "c49f889a4e092388beef4867340887ec6f0410bd1055d79a8f8850bea89ada61"
+subdir = "dtk-template-95a941f755919ebe50c1725a4ce73524470e7a02"
+
+[arm-gnu]
+name = "Arm GNU Toolchain (arm-none-eabi)"
+kind = "tool"
+license = "GPL-3.0"
+source = "Arm GNU Toolchain 14.3.Rel1 (developer.arm.com)"
+description = "Arm's official assembler, linker and preprocessor for ARM and Thumb code (GBA, DS); about 150 MB."
+binary_name = "bin/arm-none-eabi-as"
+[[arm-gnu.parts]]
+url = "https://developer.arm.com/-/media/Files/downloads/gnu/14.3.rel1/binrel/arm-gnu-toolchain-14.3.rel1-x86_64-arm-none-eabi.tar.xz"
+sha256 = "8f6903f8ceb084d9227b9ef991490413014d991874a1e34074443c2a72b14dbd"
+subdir = "arm-gnu-toolchain-14.3.rel1-x86_64-arm-none-eabi"
+platforms = ["linux-x86_64"]
+[[arm-gnu.parts]]
+url = "https://developer.arm.com/-/media/Files/downloads/gnu/14.3.rel1/binrel/arm-gnu-toolchain-14.3.rel1-darwin-arm64-arm-none-eabi.tar.xz"
+sha256 = "30f4d08b219190a37cded6aa796f4549504902c53cfc3c7e044a8490b6eba1f7"
+subdir = "arm-gnu-toolchain-14.3.rel1-darwin-arm64-arm-none-eabi"
+platforms = ["macos-arm64"]
+[[arm-gnu.parts]]
+url = "https://developer.arm.com/-/media/Files/downloads/gnu/14.3.rel1/binrel/arm-gnu-toolchain-14.3.rel1-mingw-w64-x86_64-arm-none-eabi.zip"
+sha256 = "864c0c8815857d68a1bbba2e5e2782255bb922845c71c97636004a3d74f60986"
+platforms = ["windows-x86_64"]  # the Windows zip has bin/, lib/, ... at its top, no folder around them
+
+[luvdis]
+name = "Luvdis"
+kind = "tool"
+license = "MIT"
+source = "aarant/luvdis @ ec3a4e3e"
+description = "Game Boy Advance disassembler: finds the functions in a ROM and writes assembly that rebuilds it."
+git = "https://github.com/aarant/luvdis"
+commit = "ec3a4e3ee3afe3e9b4a9c7ae8fffc65e1ea2096c"
+pip_extra = ["setuptools<70"]
+
+# ---------------------------------------------------------------- Windows (PC) games
+# These are compilers already on the machine: no archive is downloaded, so `system = true` skips the
+# toolchain store. MinGW-w64 is in every Linux distribution (and in MSYS2 / WSL); real games need the
+# compiler that built them (MSVC) for an exact match, which can be supplied with a project's own
+# [compiler] cmd as usual.
+
+[mingw-x86_64]
+name = "MinGW-w64 GCC (x86-64 Windows target)"
+kind = "compiler"
+license = "GPL-2.0-or-later"
+source = "system x86_64-w64-mingw32-gcc"
+description = "GCC for 64-bit Windows, used to match x86-64 PC games. Finds the compiler on PATH."
+system = true
+download = "https://winlibs.com/"
+platform = "Windows"
+arch = "x86_64"
+flags = ["-O2", "-ffreestanding", "-ffunction-sections", "-fdata-sections", "-fno-asynchronous-unwind-tables",
+         "-fno-unwind-tables", "-fno-stack-protector", "-fno-ident", "-fno-pic", "-fno-pie", "-mno-stack-arg-probe"]
+cmd = ["x86_64-w64-mingw32-gcc", "-c", "{flags}", "-I{include}", "{src}", "-o", "{obj}"]
+
+[mingw-x86]
+name = "MinGW-w64 GCC (32-bit Windows target)"
+kind = "compiler"
+license = "GPL-2.0-or-later"
+source = "system i686-w64-mingw32-gcc"
+description = "GCC for 32-bit Windows, used to match x86 PC games. Finds the compiler on PATH."
+system = true
+download = "https://winlibs.com/"
+platform = "Windows"
+arch = "x86"
+flags = ["-O2", "-ffreestanding", "-ffunction-sections", "-fdata-sections", "-fno-asynchronous-unwind-tables",
+         "-fno-unwind-tables", "-fno-stack-protector", "-fno-ident", "-fno-pic", "-fno-pie", "-mno-stack-arg-probe"]
+cmd = ["i686-w64-mingw32-gcc", "-c", "{flags}", "-I{include}", "{src}", "-o", "{obj}"]
+
+[mingwxx-x86_64]
+name = "MinGW-w64 G++ (x86-64 Windows target)"
+kind = "compiler"
+license = "GPL-2.0-or-later"
+source = "system x86_64-w64-mingw32-g++"
+description = "GCC's C++ driver for 64-bit Windows, used to match x86-64 PC programs built as C++."
+system = true
+download = "https://winlibs.com/"
+platform = "Windows"
+arch = "x86_64"
+flags = ["-O2", "-ffreestanding", "-ffunction-sections", "-fdata-sections", "-fno-asynchronous-unwind-tables",
+         "-fno-unwind-tables", "-fno-stack-protector", "-fno-ident", "-fno-pic", "-fno-pie", "-mno-stack-arg-probe"]
+cmd = ["x86_64-w64-mingw32-g++", "-c", "-x", "c++", "{flags}", "-I{include}", "{src}", "-o", "{obj}"]
+
+[mingwxx-x86]
+name = "MinGW-w64 G++ (32-bit Windows target)"
+kind = "compiler"
+license = "GPL-2.0-or-later"
+source = "system i686-w64-mingw32-g++"
+description = "GCC's C++ driver for 32-bit Windows, used to match x86 PC programs built as C++."
+system = true
+download = "https://winlibs.com/"
+platform = "Windows"
+arch = "x86"
+flags = ["-O2", "-ffreestanding", "-ffunction-sections", "-fdata-sections", "-fno-asynchronous-unwind-tables",
+         "-fno-unwind-tables", "-fno-stack-protector", "-fno-ident", "-fno-pic", "-fno-pie", "-mno-stack-arg-probe"]
+cmd = ["i686-w64-mingw32-g++", "-c", "-x", "c++", "{flags}", "-I{include}", "{src}", "-o", "{obj}"]
+
+[clang-cl-x86_64]
+name = "Clang (clang-cl, x86-64 Windows target)"
+kind = "compiler"
+license = "Apache-2.0 WITH LLVM-exception"
+source = "system clang-cl"
+description = "LLVM's MSVC-compatible driver, often a closer match for code built with MSVC. Finds clang-cl on PATH."
+system = true
+download = "https://github.com/llvm/llvm-project/releases/latest"
+platform = "Windows"
+arch = "x86_64"
+flags = ["/O2", "/GS-"]
+cmd = ["clang-cl", "/c", "{flags}", "/TC", "/I{include}", "/Fo{obj}", "--", "{src}"]
+
+[clang-cl-x86]
+name = "Clang (clang-cl, 32-bit Windows target)"
+kind = "compiler"
+license = "Apache-2.0 WITH LLVM-exception"
+source = "system clang-cl (i686)"
+description = "LLVM's 32-bit MSVC-compatible driver for x86 PC games. Finds clang-cl on PATH."
+system = true
+download = "https://github.com/llvm/llvm-project/releases/latest"
+platform = "Windows"
+arch = "x86"
+flags = ["/O2", "/GS-"]
+cmd = ["clang-cl", "--target=i686-pc-windows-msvc", "/c", "{flags}", "/TC", "/I{include}", "/Fo{obj}", "--", "{src}"]
+
+[clang-clxx-x86_64]
+name = "Clang (clang-cl, x86-64 Windows target, C++)"
+kind = "compiler"
+license = "Apache-2.0 WITH LLVM-exception"
+source = "system clang-cl"
+description = "LLVM's MSVC-compatible C++ driver, used to match x86-64 programs built with MSVC as C++."
+system = true
+download = "https://github.com/llvm/llvm-project/releases/latest"
+platform = "Windows"
+arch = "x86_64"
+flags = ["/O2", "/GS-"]
+cmd = ["clang-cl", "/c", "{flags}", "/TP", "/I{include}", "/Fo{obj}", "--", "{src}"]
+
+[clang-clxx-x86]
+name = "Clang (clang-cl, 32-bit Windows target, C++)"
+kind = "compiler"
+license = "Apache-2.0 WITH LLVM-exception"
+source = "system clang-cl (i686)"
+description = "LLVM's 32-bit MSVC-compatible C++ driver, used to match x86 programs built with MSVC as C++."
+system = true
+download = "https://github.com/llvm/llvm-project/releases/latest"
+platform = "Windows"
+arch = "x86"
+flags = ["/O2", "/GS-"]
+cmd = ["clang-cl", "--target=i686-pc-windows-msvc", "/c", "{flags}", "/TP", "/I{include}", "/Fo{obj}", "--", "{src}"]
+
+# Microsoft's own compiler, when it is installed. A game built with VC6/VC8/... matches byte for byte only
+# with the same cl.exe; clang-cl is the free near-relative (see clang-cl-*). Put the cl.exe that targets
+# the game's architecture on PATH (the x86 one for a 32-bit game) or point the project's [compiler] cmd at it.
+
+[msvc-x86]
+name = "Microsoft Visual C++ (cl.exe, 32-bit target)"
+kind = "compiler"
+license = "proprietary"
+source = "system cl.exe (Visual Studio)"
+description = "The compiler many Windows games were built with. Finds the x86-targeting cl.exe on PATH."
+system = true
+download = "https://visualstudio.microsoft.com/vs/older-downloads/"
+platform = "Windows"
+arch = "x86"
+flags = ["/O2", "/GS-", "/Gy"]
+cmd = ["cl", "/nologo", "/c", "{flags}", "/I{include}", "/Fo{obj}", "/TC", "{src}"]
+
+[msvcxx-x86]
+name = "Microsoft Visual C++ (cl.exe, 32-bit target, C++)"
+kind = "compiler"
+license = "proprietary"
+source = "system cl.exe (Visual Studio)"
+description = "The C++ compiler many Windows games were built with. Finds the x86-targeting cl.exe on PATH."
+system = true
+download = "https://visualstudio.microsoft.com/vs/older-downloads/"
+platform = "Windows"
+arch = "x86"
+flags = ["/O2", "/GS-", "/Gy"]
+cmd = ["cl", "/nologo", "/c", "{flags}", "/I{include}", "/Fo{obj}", "/TP", "{src}"]
+
+[msvc-x86_64]
+name = "Microsoft Visual C++ (cl.exe, 64-bit target)"
+kind = "compiler"
+license = "proprietary"
+source = "system cl.exe (Visual Studio)"
+description = "The compiler many 64-bit Windows games were built with. Finds cl.exe on PATH."
+system = true
+download = "https://visualstudio.microsoft.com/"
+platform = "Windows"
+arch = "x86_64"
+flags = ["/O2", "/GS-", "/Gy"]
+cmd = ["cl", "/nologo", "/c", "{flags}", "/I{include}", "/Fo{obj}", "/TC", "{src}"]
+
+[msvcxx-x86_64]
+name = "Microsoft Visual C++ (cl.exe, 64-bit target, C++)"
+kind = "compiler"
+license = "proprietary"
+source = "system cl.exe (Visual Studio)"
+description = "The C++ compiler many 64-bit Windows games were built with. Finds cl.exe on PATH."
+system = true
+download = "https://visualstudio.microsoft.com/"
+platform = "Windows"
+arch = "x86_64"
+flags = ["/O2", "/GS-", "/Gy"]
+cmd = ["cl", "/nologo", "/c", "{flags}", "/I{include}", "/Fo{obj}", "/TP", "{src}"]
+
+# ---------------------------------------------------------------- Linux programs
+# The GCC and Clang already on the machine. A program matches byte for byte only with the compiler version
+# and flags that built it (.comment usually says which: the import shows it); a project can point its
+# [compiler] cmd at another version. Position-independent programs are imported with -fPIE instead of -fno-pie.
+
+[gcc-linux-x86_64]
+name = "GCC (x86-64 Linux)"
+kind = "compiler"
+license = "GPL-3.0-or-later"
+source = "system gcc"
+description = "The GCC on this machine, for 64-bit Linux programs."
+system = true
+platform = "Linux"
+arch = "x86_64"
+flags = ["-O2", "-fno-pic", "-fno-pie", "-fno-stack-protector", "-fcf-protection=none", "-fno-asynchronous-unwind-tables", "-fno-ident", "-ffunction-sections", "-fdata-sections"]
+cmd = ["gcc", "-c", "{flags}", "-I{include}", "{src}", "-o", "{obj}"]
+
+[gxx-linux-x86_64]
+name = "G++ (x86-64 Linux, C++)"
+kind = "compiler"
+license = "GPL-3.0-or-later"
+source = "system g++"
+description = "The GCC on this machine compiling C++, for 64-bit Linux programs."
+system = true
+platform = "Linux"
+arch = "x86_64"
+flags = ["-O2", "-fno-pic", "-fno-pie", "-fno-stack-protector", "-fcf-protection=none", "-fno-asynchronous-unwind-tables", "-fno-ident", "-ffunction-sections", "-fdata-sections"]
+cmd = ["g++", "-c", "-x", "c++", "{flags}", "-I{include}", "{src}", "-o", "{obj}"]
+
+[clang-linux-x86_64]
+name = "Clang (x86-64 Linux)"
+kind = "compiler"
+license = "Apache-2.0 WITH LLVM-exception"
+source = "system clang"
+description = "The Clang on this machine, for 64-bit Linux programs."
+system = true
+platform = "Linux"
+arch = "x86_64"
+flags = ["-O2", "-fno-pic", "-fno-pie", "-fno-stack-protector", "-fcf-protection=none", "-fno-asynchronous-unwind-tables", "-fno-ident", "-ffunction-sections", "-fdata-sections"]
+cmd = ["clang", "-c", "{flags}", "-I{include}", "{src}", "-o", "{obj}"]
+
+[clangxx-linux-x86_64]
+name = "Clang++ (x86-64 Linux, C++)"
+kind = "compiler"
+license = "Apache-2.0 WITH LLVM-exception"
+source = "system clang++"
+description = "The Clang on this machine compiling C++, for 64-bit Linux programs."
+system = true
+platform = "Linux"
+arch = "x86_64"
+flags = ["-O2", "-fno-pic", "-fno-pie", "-fno-stack-protector", "-fcf-protection=none", "-fno-asynchronous-unwind-tables", "-fno-ident", "-ffunction-sections", "-fdata-sections"]
+cmd = ["clang++", "-c", "-x", "c++", "{flags}", "-I{include}", "{src}", "-o", "{obj}"]
+
+[gcc-linux-x86]
+name = "GCC (32-bit x86 Linux)"
+kind = "compiler"
+license = "GPL-3.0-or-later"
+source = "system gcc -m32"
+description = "The GCC on this machine, for 32-bit Linux programs (needs gcc-multilib)."
+system = true
+platform = "Linux"
+arch = "x86"
+flags = ["-O2", "-fno-pic", "-fno-pie", "-fno-stack-protector", "-fcf-protection=none", "-fno-asynchronous-unwind-tables", "-fno-ident", "-ffunction-sections", "-fdata-sections"]
+cmd = ["gcc", "-m32", "-c", "{flags}", "-I{include}", "{src}", "-o", "{obj}"]
+
+[gxx-linux-x86]
+name = "G++ (32-bit x86 Linux, C++)"
+kind = "compiler"
+license = "GPL-3.0-or-later"
+source = "system g++ -m32"
+description = "The GCC on this machine compiling C++, for 32-bit Linux programs (needs g++-multilib)."
+system = true
+platform = "Linux"
+arch = "x86"
+flags = ["-O2", "-fno-pic", "-fno-pie", "-fno-stack-protector", "-fcf-protection=none", "-fno-asynchronous-unwind-tables", "-fno-ident", "-ffunction-sections", "-fdata-sections"]
+cmd = ["g++", "-m32", "-c", "-x", "c++", "{flags}", "-I{include}", "{src}", "-o", "{obj}"]
+
+[clang-linux-x86]
+name = "Clang (32-bit x86 Linux)"
+kind = "compiler"
+license = "Apache-2.0 WITH LLVM-exception"
+source = "system clang -m32"
+description = "The Clang on this machine, for 32-bit Linux programs."
+system = true
+platform = "Linux"
+arch = "x86"
+flags = ["-O2", "-fno-pic", "-fno-pie", "-fno-stack-protector", "-fcf-protection=none", "-fno-asynchronous-unwind-tables", "-fno-ident", "-ffunction-sections", "-fdata-sections"]
+cmd = ["clang", "-m32", "-c", "{flags}", "-I{include}", "{src}", "-o", "{obj}"]
+
+[clangxx-linux-x86]
+name = "Clang++ (32-bit x86 Linux, C++)"
+kind = "compiler"
+license = "Apache-2.0 WITH LLVM-exception"
+source = "system clang++ -m32"
+description = "The Clang on this machine compiling C++, for 32-bit Linux programs."
+system = true
+platform = "Linux"
+arch = "x86"
+flags = ["-O2", "-fno-pic", "-fno-pie", "-fno-stack-protector", "-fcf-protection=none", "-fno-asynchronous-unwind-tables", "-fno-ident", "-ffunction-sections", "-fdata-sections"]
+cmd = ["clang++", "-m32", "-c", "-x", "c++", "{flags}", "-I{include}", "{src}", "-o", "{obj}"]

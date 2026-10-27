@@ -1,0 +1,315 @@
+"""
+End-to-end tests for mcp-reva CLI with stdio transport.
+
+Tests the complete CLI workflow using the official MCP Python SDK's stdio_client.
+These tests verify that the CLI can:
+- Start successfully via stdio
+- Initialize an MCP session
+- List and call MCP tools
+- Handle multiple requests
+- Shut down cleanly
+
+All tests use real PyGhidra and Ghidra integration.
+"""
+
+import json
+import re
+from pathlib import Path
+
+import pytest
+
+# Mark all tests in this file
+# E2E tests need longer timeout due to PyGhidra initialization (10-30s) + server startup
+pytestmark = [
+    pytest.mark.cli,
+    pytest.mark.e2e,
+    pytest.mark.slow,
+    pytest.mark.asyncio(loop_scope="session"),
+    pytest.mark.timeout(180)  # 3 minutes for full subprocess + PyGhidra + server startup
+]
+
+
+def _require_fixture_binary(name: str) -> Path:
+    """Resolve a fixture binary under tests/fixtures/, guarding against LFS pointers.
+
+    Skips the test if the fixture is absent. Fails (rather than skips) if the
+    file is a Git LFS pointer instead of the real binary: a real fixture is
+    tens of KB, while a pointer is ~140 bytes of text starting with
+    "version https://git-lfs.github.com". Without this guard, import-file
+    fails inside the JVM with a confusing error.
+    """
+    fixture = Path(__file__).parent / "fixtures" / name
+    if not fixture.exists():
+        pytest.skip(f"Test fixture not found: {fixture}")
+    if fixture.stat().st_size < 200:
+        try:
+            head = fixture.read_text()
+        except UnicodeDecodeError:
+            return fixture  # actually a small binary; treat as real
+        if head.startswith("version https://git-lfs.github.com"):
+            pytest.fail(
+                f"Test fixture {fixture.name} is a Git LFS pointer, not the "
+                "actual file. Run 'git lfs pull' locally or enable LFS in "
+                "CI checkout."
+            )
+    return fixture
+
+
+class TestCLIStartup:
+    """Test CLI startup and initialization via stdio."""
+
+    async def test_cli_initializes_successfully(self, mcp_stdio_client):
+        """CLI starts and initializes MCP session successfully"""
+        # The fixture stores the InitializeResult it received during session setup.
+        assert mcp_stdio_client.reva_init_result is not None
+
+    async def test_server_info_is_correct(self, mcp_stdio_client):
+        """Server reports correct name and version"""
+        # The fixture already initialized the session (one initialize per MCP
+        # session); assert on the stored InitializeResult.
+        info = mcp_stdio_client.reva_init_result
+
+        assert info.server_info.name == "ReVa"
+        # The bridge reports its own CLI version under MCP SDK v2 (v1 defaulted to
+        # the SDK's version); require a sane semver-ish shape rather than pinning.
+        assert re.match(r"\d+\.\d+", info.server_info.version), (
+            f"Unexpected server version format: {info.server_info.version!r}"
+        )
+
+    async def test_server_capabilities(self, mcp_stdio_client):
+        """Server reports expected capabilities"""
+        info = mcp_stdio_client.reva_init_result
+
+        # ReVa supports tools, resources, and prompts
+        assert info.capabilities.tools is not None
+        assert info.capabilities.resources is not None
+        assert info.capabilities.prompts is not None
+
+
+class TestMCPToolCalls:
+    """Test MCP tool calls via stdio."""
+
+    async def test_list_tools(self, mcp_stdio_client):
+        """Can list all available MCP tools"""
+        result = await mcp_stdio_client.list_tools()
+
+        # ReVa has 40+ tools
+        assert len(result.tools) > 40
+
+        # Check for some essential tools
+        tool_names = [tool.name for tool in result.tools]
+        assert "list-project-files" in tool_names
+        # Note: Tool names may vary, just ensure we have a substantial list
+        assert len([name for name in tool_names if "function" in name.lower()]) > 0
+
+    async def test_call_list_programs_tool(self, mcp_stdio_client):
+        """list-project-files returns a well-formed listing payload"""
+        result = await mcp_stdio_client.call_tool(
+            "list-project-files",
+            arguments={"folderPath": "/"}
+        )
+
+        assert result is not None
+        assert not result.is_error, (
+            f"list-project-files failed: "
+            f"{result.content[0].text if result.content else 'no content'}"
+        )
+        data = json.loads(result.content[0].text)
+        assert "itemCount" in data and "items" in data, f"unexpected payload: {data}"
+        assert isinstance(data["items"], list)
+
+    async def test_list_resources(self, mcp_stdio_client):
+        """Can list MCP resources"""
+        result = await mcp_stdio_client.list_resources()
+
+        # ReVa registers the program-list resource (ProgramListResource).
+        # Resource uri may be an AnyUrl object, so compare as strings.
+        assert result.resources is not None
+        resource_uris = [str(r.uri) for r in result.resources]
+        assert "ghidra://programs" in resource_uris, (
+            f"program-list resource missing; got {resource_uris}"
+        )
+
+    async def test_sequential_tool_calls(self, mcp_stdio_client):
+        """Can make multiple sequential tool calls"""
+        # Call list_tools twice
+        result1 = await mcp_stdio_client.list_tools()
+        result2 = await mcp_stdio_client.list_tools()
+
+        # Should get same results
+        assert len(result1.tools) == len(result2.tools)
+
+
+class TestProjectCreation:
+    """Test that mcp-reva creates Ghidra project in .reva/."""
+
+    async def test_does_not_create_reva_directory(self, mcp_stdio_client_isolated, isolated_workspace):
+        """CLI does NOT create .reva directory in stdio mode (lazy initialization prevents unnecessary creation)"""
+        reva_dir = isolated_workspace / ".reva"
+
+        # After CLI starts, .reva should NOT exist (lazy initialization)
+        assert not reva_dir.exists(), ".reva directory should not exist at startup"
+
+        # Even after using MCP tools, .reva should NOT be created
+        # (MCP tools use Java-side project management, not Python ProjectManager)
+        fixture = _require_fixture_binary("test_arm64")
+        import_result = await mcp_stdio_client_isolated.call_tool(
+            "import-file",
+            arguments={
+                "path": str(fixture),
+                "enableVersionControl": False,
+                "analyzeAfterImport": False,
+            }
+        )
+
+        # A real fixture binary must import cleanly; an error here would make
+        # the .reva assertion below meaningless.
+        assert not getattr(import_result, "is_error", False), (
+            f"Import failed: {import_result.content[0].text if import_result.content else 'no content'}"
+        )
+
+        # .reva still should NOT exist (ProjectManager.import_binary() was never called)
+        assert not reva_dir.exists(), ".reva directory should not be created by MCP tools in stdio mode"
+
+    async def test_lazy_initialization_prevents_directory_creation(self, mcp_stdio_client_isolated, isolated_workspace):
+        """ProjectManager lazy initialization prevents .reva directory creation at startup"""
+        reva_dir = isolated_workspace / ".reva"
+
+        # The mcp_stdio_client_isolated fixture starts the CLI which creates a ProjectManager
+        # With lazy initialization, .reva should NOT be created
+        assert not reva_dir.exists(), ".reva directory should not be created by CLI startup"
+
+        # Verify this remains true after a short delay
+        import asyncio
+        await asyncio.sleep(0.5)
+        assert not reva_dir.exists(), ".reva directory should still not exist after CLI is running"
+
+
+class TestBinaryImportRoundTrip:
+    """Verify a CLI-initiated import round-trips through list-project-files.
+
+    The 'auto-import from cwd' behavior the previous test asserted does not exist
+    in stdio mode (see test_does_not_create_reva_directory, which proves
+    ProjectManager.import_binary() is never called). Instead we exercise the
+    real CLI path: explicit import-file then list-project-files.
+    """
+
+    async def test_explicit_import_appears_in_listing(
+        self, mcp_stdio_client, isolated_workspace, ghidra_initialized
+    ):
+        """import-file followed by list-project-files reflects the imported program."""
+        fixture = _require_fixture_binary("test_arm64")
+
+        import_result = await mcp_stdio_client.call_tool(
+            "import-file",
+            arguments={
+                "path": str(fixture),
+                "enableVersionControl": False,
+                "analyzeAfterImport": False,
+            },
+        )
+
+        assert import_result is not None
+        assert not getattr(import_result, "is_error", False), (
+            f"Import failed: {import_result.content[0].text if import_result.content else 'no content'}"
+        )
+
+        import_data = json.loads(import_result.content[0].text)
+        assert import_data.get("success") is True
+        imported = import_data.get("importedPrograms", [])
+        assert len(imported) == 1, f"Expected 1 imported program, got {imported}"
+        program_path = imported[0]
+
+        list_result = await mcp_stdio_client.call_tool(
+            "list-project-files",
+            arguments={"folderPath": "/", "recursive": True},
+        )
+
+        assert list_result is not None
+        assert not getattr(list_result, "is_error", False)
+        assert len(list_result.content) > 0
+
+        metadata = json.loads(list_result.content[0].text)
+        entries = metadata.get("items", [])
+
+        # Locate the imported program by programPath in the listing.
+        # Filter out None paths before the endswith fallback -- otherwise
+        # `endswith("")` is always True and the assertion is vacuous.
+        listed_paths = [e.get("programPath") or e.get("path") for e in entries]
+        non_null_paths = [p for p in listed_paths if p]
+        assert program_path in listed_paths or any(
+            program_path.endswith(p) for p in non_null_paths
+        ), (
+            f"Imported program {program_path!r} not found in listing. "
+            f"itemCount={metadata.get('itemCount')}, entries={entries}"
+        )
+
+
+def _result_error_text(result) -> str:
+    """Concatenate text content from a CallToolResult, or empty string."""
+    if not getattr(result, "content", None):
+        return ""
+    parts = []
+    for item in result.content:
+        text = getattr(item, "text", None)
+        if text:
+            parts.append(text)
+    return "\n".join(parts)
+
+
+class TestErrorHandling:
+    """Test error handling in CLI.
+
+    Server must signal failure either by raising an MCP exception (e.g., MCPError)
+    or by returning a CallToolResult with isError=True. A silent success on a
+    nonexistent tool or missing required args would be a regression.
+    """
+
+    async def test_handles_unknown_tool(self, mcp_stdio_client):
+        """Unknown tool name surfaces as is_error or MCPError, never silent success."""
+        from mcp import MCPError  # canonical import path used elsewhere in repo
+
+        try:
+            result = await mcp_stdio_client.call_tool(
+                "nonexistent-tool",
+                arguments={}
+            )
+        except MCPError as exc:
+            # Acceptable: SDK surfaced server-side method/tool-not-found
+            assert "nonexistent-tool" in str(exc) or "tool" in str(exc).lower(), (
+                f"MCPError did not mention the unknown tool: {exc}"
+            )
+            return
+
+        assert result is not None, "Server must respond, even for unknown tools"
+        assert getattr(result, "is_error", False) is True, (
+            f"Unknown tool must return isError=True, got result={result}"
+        )
+        error_text = _result_error_text(result)
+        assert error_text, "Error result must include human-readable error text"
+
+    async def test_handles_invalid_tool_arguments(self, mcp_stdio_client):
+        """Calling get-functions without required programPath surfaces a clear error."""
+        from mcp import MCPError  # canonical import path used elsewhere in repo
+
+        try:
+            result = await mcp_stdio_client.call_tool(
+                "get-functions",
+                arguments={}  # missing required programPath
+            )
+        except MCPError as exc:
+            # Acceptable: SDK surfaced schema-validation rejection
+            assert "programPath" in str(exc) or "required" in str(exc).lower(), (
+                f"MCPError must mention the missing argument: {exc}"
+            )
+            return
+
+        assert result is not None
+        assert getattr(result, "is_error", False) is True, (
+            f"Missing required programPath must return isError=True, got result={result}"
+        )
+        error_text = _result_error_text(result)
+        assert error_text, "Validation error must include text content"
+        assert "programPath" in error_text or "required" in error_text.lower(), (
+            f"Validation error should mention programPath or 'required': {error_text}"
+        )

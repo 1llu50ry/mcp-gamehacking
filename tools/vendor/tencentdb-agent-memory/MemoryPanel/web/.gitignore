@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.DS_Store
+
+# src 下源码统一用 .ts/.tsx，禁止提交 tsc 误生成的同名编译产物
+src/**/*.js

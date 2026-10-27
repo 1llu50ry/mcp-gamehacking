@@ -1,0 +1,1 @@
+export { StandardEntity } from "./entity";

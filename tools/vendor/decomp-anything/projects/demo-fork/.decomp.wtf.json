@@ -1,0 +1,4 @@
+{
+  "game": {"what": "Demo Quest 64, the demo ROM that ships with decomp.wtf", "path": "baserom.z64", "sha1": "6de89e655ac8625dad6e7041cca50b6d8ebd1d36"},
+  "setup": [["python", "configure.py"], ["ninja"]]
+}

@@ -1,0 +1,21 @@
+{
+    "recommendations": [
+        "ms-vscode.powershell",
+        "ms-vscode-remote.remote-containers",
+        "redhat.vscode-yaml",
+        "github.vscode-github-actions",
+        "github.copilot",
+        "github.copilot-chat",
+        "ms-python.python",
+        "ms-vscode.hexeditor",
+        "ms-vscode.cmake-tools",
+        "ms-vscode.cpptools",
+        "timonwong.shellcheck",
+        "foxundermoon.shell-format",
+        "ms-vscode.vscode-json",
+        "yzhang.markdown-all-in-one",
+        "davidanson.vscode-markdownlint",
+        "formulahendry.docker-explorer",
+        "ms-azuretools.vscode-docker"
+    ]
+}

@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Ghidra RE Platform{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ recent_analyses|length }}</div>
+        <div class="stat-label">Recent Analyses</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ recent_comments|length }}</div>
+        <div class="stat-label">Recent Comments</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">--</div>
+        <div class="stat-label">Executables</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">--</div>
+        <div class="stat-label">Functions</div>
+    </div>
+</div>
+
+<div class="flex gap-2">
+    <div style="flex: 1;">
+        <div class="panel">
+            <div class="panel-header flex flex-between flex-center">
+                <h2>Recent Analyses</h2>
+                <a href="{% url 'core:analysis_list' %}" class="btn">View All</a>
+            </div>
+            <div class="panel-content">
+                {% if recent_analyses %}
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Binary</th>
+                                <th>Status</th>
+                                <th>Functions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for analysis in recent_analyses %}
+                            <tr>
+                                <td><a href="{% url 'core:analysis_detail' analysis.id %}" class="text-magic">{{ analysis.name }}</a></td>
+                                <td class="mono">{{ analysis.binary_name }}</td>
+                                <td>
+                                    {% if analysis.status == 'completed' %}
+                                        <span class="text-set">✓ {{ analysis.status }}</span>
+                                    {% elif analysis.status == 'running' %}
+                                        <span class="text-rare">⟳ {{ analysis.status }}</span>
+                                    {% elif analysis.status == 'failed' %}
+                                        <span style="color: var(--accent-red-light);">✗ {{ analysis.status }}</span>
+                                    {% else %}
+                                        <span class="text-muted">{{ analysis.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="mono text-unique">{{ analysis.function_count }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="text-center" style="color: var(--text-muted); padding: 2rem;">
+                        No analyses yet. Start analyzing binaries to see them here.
+                    </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div style="flex: 1;">
+        <div class="panel">
+            <div class="panel-header flex flex-between flex-center">
+                <h2>Recent Discussion</h2>
+                <a href="{% url 'core:discussion' %}" class="btn">View All</a>
+            </div>
+            <div class="panel-content">
+                {% if recent_comments %}
+                    {% for comment in recent_comments %}
+                        <div class="comment">
+                            <div class="comment-header">
+                                <div class="comment-avatar">{{ comment.user.username.0|upper }}</div>
+                                <span class="comment-author">{{ comment.user.username }}</span>
+                                <span class="comment-time">{{ comment.created_at|timesince }} ago</span>
+                            </div>
+                            <div class="comment-content">
+                                {{ comment.content|truncatewords:30 }}
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-center" style="color: var(--text-muted); padding: 2rem;">
+                        No comments yet. 
+                        {% if user.is_authenticated %}
+                            <a href="{% url 'core:discussion' %}" style="color: var(--accent-gold);">Start a discussion!</a>
+                        {% else %}
+                            <a href="{% url 'account_login' %}" style="color: var(--accent-gold);">Log in to start a discussion!</a>
+                        {% endif %}
+                    </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="panel mt-2">
+    <div class="panel-header">
+        <h2>Quick Links</h2>
+    </div>
+    <div class="panel-content">
+        <div class="flex gap-2">
+            <a href="{% url 'bsim:executables' %}" class="btn btn-primary">📁 Browse Executables</a>
+            <a href="{% url 'bsim:search_functions' %}" class="btn">🔍 Search Functions</a>
+            <a href="{% url 'bsim:database_info' %}" class="btn">📊 Database Info</a>
+            {% if user.is_authenticated %}
+                <a href="{% url 'core:discussion' %}" class="btn">💬 Join Discussion</a>
+            {% else %}
+                <a href="{% url 'account_signup' %}" class="btn btn-primary">✨ Sign Up to Contribute</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

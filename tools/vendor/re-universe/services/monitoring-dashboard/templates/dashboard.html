@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RE-Universe Monitoring Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #0f172a;
+            color: #e2e8f0;
+            line-height: 1.6;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1e293b, #334155);
+            padding: 1rem;
+            border-bottom: 1px solid #334155;
+        }
+
+        .header h1 {
+            color: #60a5fa;
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            font-size: 0.9rem;
+            margin-top: 0.25rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: #1e293b;
+            border-radius: 8px;
+            padding: 1.5rem;
+            border: 1px solid #334155;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h3 {
+            color: #f1f5f9;
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-healthy { background-color: #10b981; }
+        .status-degraded { background-color: #f59e0b; }
+        .status-unhealthy { background-color: #ef4444; }
+        .status-unknown { background-color: #6b7280; }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #334155;
+        }
+
+        .metric:last-child {
+            border-bottom: none;
+        }
+
+        .metric-label {
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+
+        .metric-value {
+            color: #f1f5f9;
+            font-weight: 600;
+        }
+
+        .service-list {
+            display: grid;
+            gap: 0.75rem;
+        }
+
+        .service-item {
+            background: #0f172a;
+            padding: 1rem;
+            border-radius: 6px;
+            border: 1px solid #334155;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .service-name {
+            font-weight: 500;
+        }
+
+        .service-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .response-time {
+            color: #94a3b8;
+            font-size: 0.8rem;
+        }
+
+        .chart-container {
+            height: 300px;
+            background: #0f172a;
+            border-radius: 6px;
+            padding: 1rem;
+            border: 1px solid #334155;
+            margin-top: 1rem;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            color: #94a3b8;
+        }
+
+        .error {
+            color: #ef4444;
+            text-align: center;
+            padding: 1rem;
+        }
+
+        .last-updated {
+            color: #64748b;
+            font-size: 0.8rem;
+            text-align: center;
+            margin-top: 1rem;
+        }
+
+        .alert {
+            background: #7f1d1d;
+            border: 1px solid #dc2626;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .alert-title {
+            color: #fca5a5;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .refresh-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .refresh-btn:hover {
+            background: #2563eb;
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>RE-Universe Monitoring Dashboard</h1>
+        <div class="subtitle">Real-time system health and performance monitoring</div>
+    </div>
+
+    <div class="container">
+        <div class="toolbar">
+            <div id="last-updated" class="last-updated">Loading...</div>
+            <button class="refresh-btn" onclick="refreshData()">Refresh</button>
+        </div>
+
+        <div id="alerts-container"></div>
+
+        <div class="grid">
+            <!-- System Overview -->
+            <div class="card">
+                <h3>System Overview</h3>
+                <div id="system-metrics" class="loading">Loading system metrics...</div>
+            </div>
+
+            <!-- Service Health -->
+            <div class="card">
+                <h3>Service Health</h3>
+                <div id="service-health" class="loading">Loading service health...</div>
+            </div>
+
+            <!-- Performance Metrics -->
+            <div class="card">
+                <h3>Performance Metrics</h3>
+                <div id="performance-metrics" class="loading">Loading performance data...</div>
+            </div>
+
+            <!-- Database & Cache -->
+            <div class="card">
+                <h3>Database & Cache</h3>
+                <div id="database-metrics" class="loading">Loading database metrics...</div>
+            </div>
+        </div>
+
+        <!-- Historical Charts -->
+        <div class="card">
+            <h3>Response Time History (24 Hours)</h3>
+            <div class="chart-container">
+                <div class="loading">Historical charts coming soon...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let refreshInterval;
+
+        async function fetchData(endpoint) {
+            try {
+                const response = await fetch(`/api/${endpoint}`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return await response.json();
+            } catch (error) {
+                console.error(`Failed to fetch ${endpoint}:`, error);
+                return null;
+            }
+        }
+
+        function formatResponseTime(ms) {
+            if (ms === null || ms === undefined) return 'N/A';
+            return `${Math.round(ms)}ms`;
+        }
+
+        function getStatusClass(status) {
+            switch (status?.toLowerCase()) {
+                case 'healthy': return 'status-healthy';
+                case 'degraded': return 'status-degraded';
+                case 'unhealthy': return 'status-unhealthy';
+                default: return 'status-unknown';
+            }
+        }
+
+        function renderSystemMetrics(data) {
+            if (!data) {
+                document.getElementById('system-metrics').innerHTML = '<div class="error">Failed to load system metrics</div>';
+                return;
+            }
+
+            const html = `
+                <div class="metric">
+                    <span class="metric-label">Total Services</span>
+                    <span class="metric-value">${data.total_services}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Healthy</span>
+                    <span class="metric-value" style="color: #10b981">${data.healthy_services}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Degraded</span>
+                    <span class="metric-value" style="color: #f59e0b">${data.degraded_services}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Unhealthy</span>
+                    <span class="metric-value" style="color: #ef4444">${data.unhealthy_services}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Avg Response Time</span>
+                    <span class="metric-value">${formatResponseTime(data.average_response_time)}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Error Rate</span>
+                    <span class="metric-value">${data.error_rate_percent.toFixed(1)}%</span>
+                </div>
+            `;
+
+            document.getElementById('system-metrics').innerHTML = html;
+        }
+
+        function renderServiceHealth(data) {
+            if (!data || !Array.isArray(data)) {
+                document.getElementById('service-health').innerHTML = '<div class="error">Failed to load service health</div>';
+                return;
+            }
+
+            const html = data.map(service => `
+                <div class="service-item">
+                    <div>
+                        <div class="service-name">${service.name}</div>
+                        <div class="response-time">${formatResponseTime(service.response_time_ms)}</div>
+                    </div>
+                    <div class="service-status">
+                        <span class="status-indicator ${getStatusClass(service.status)}"></span>
+                        ${service.status}
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('service-health').innerHTML = `<div class="service-list">${html}</div>`;
+        }
+
+        function renderPerformanceMetrics(data) {
+            if (!data || !Array.isArray(data)) {
+                document.getElementById('performance-metrics').innerHTML = '<div class="loading">No performance baselines available</div>';
+                return;
+            }
+
+            if (data.length === 0) {
+                document.getElementById('performance-metrics').innerHTML = '<div class="loading">Building performance baselines...</div>';
+                return;
+            }
+
+            const html = data.map(baseline => `
+                <div class="metric">
+                    <span class="metric-label">${baseline.service_name}</span>
+                    <span class="metric-value ${baseline.status === 'critical' ? 'style="color: #ef4444"' : baseline.status === 'warning' ? 'style="color: #f59e0b"' : ''}">
+                        ${baseline.status}
+                    </span>
+                </div>
+            `).join('');
+
+            document.getElementById('performance-metrics').innerHTML = html;
+        }
+
+        function renderDatabaseMetrics(systemData) {
+            if (!systemData) {
+                document.getElementById('database-metrics').innerHTML = '<div class="error">Failed to load database metrics</div>';
+                return;
+            }
+
+            const html = `
+                <div class="metric">
+                    <span class="metric-label">Database Connections</span>
+                    <span class="metric-value">${systemData.database_connections}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Redis Connections</span>
+                    <span class="metric-value">${systemData.redis_connections}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">API Calls Today</span>
+                    <span class="metric-value">${systemData.total_api_calls_today}</span>
+                </div>
+            `;
+
+            document.getElementById('database-metrics').innerHTML = html;
+        }
+
+        function renderAlerts(healthData, systemData) {
+            const alertsContainer = document.getElementById('alerts-container');
+            const alerts = [];
+
+            // Check for unhealthy services
+            if (healthData) {
+                const unhealthyServices = healthData.filter(s => s.status === 'unhealthy');
+                if (unhealthyServices.length > 0) {
+                    alerts.push(`${unhealthyServices.length} service(s) are unhealthy: ${unhealthyServices.map(s => s.name).join(', ')}`);
+                }
+            }
+
+            // Check for high error rate
+            if (systemData && systemData.error_rate_percent > 10) {
+                alerts.push(`High error rate detected: ${systemData.error_rate_percent.toFixed(1)}%`);
+            }
+
+            if (alerts.length > 0) {
+                const html = `
+                    <div class="alert">
+                        <div class="alert-title">System Alerts</div>
+                        ${alerts.map(alert => `<div>• ${alert}</div>`).join('')}
+                    </div>
+                `;
+                alertsContainer.innerHTML = html;
+            } else {
+                alertsContainer.innerHTML = '';
+            }
+        }
+
+        async function refreshData() {
+            const [healthData, systemData, performanceData] = await Promise.all([
+                fetchData('health/all'),
+                fetchData('metrics/system'),
+                fetchData('baselines/performance')
+            ]);
+
+            renderSystemMetrics(systemData);
+            renderServiceHealth(healthData);
+            renderPerformanceMetrics(performanceData);
+            renderDatabaseMetrics(systemData);
+            renderAlerts(healthData, systemData);
+
+            document.getElementById('last-updated').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+        }
+
+        // Initial load
+        refreshData();
+
+        // Auto-refresh every 30 seconds
+        refreshInterval = setInterval(refreshData, 30000);
+
+        // Refresh on page visibility change
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                refreshData();
+            }
+        });
+    </script>
+</body>
+</html>

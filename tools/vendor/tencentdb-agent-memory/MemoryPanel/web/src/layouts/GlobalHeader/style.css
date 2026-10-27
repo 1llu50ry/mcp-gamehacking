@@ -1,0 +1,223 @@
+._memory-global-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  padding: 0 16px;
+  background: var(--tea-color-bg-primary-default);
+  border-bottom: 1px solid var(--tea-color-border-primary-default);
+  flex-shrink: 0;
+}
+
+._memory-global-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+._memory-global-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+._memory-global-header-logo {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+}
+
+._memory-global-header-brand-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tea-color-text-primary);
+  white-space: nowrap;
+}
+
+._memory-global-header-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--tea-color-border-primary-default);
+  flex-shrink: 0;
+}
+
+._memory-global-header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+._memory-global-header-sync {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--tea-color-text-secondary);
+  white-space: nowrap;
+}
+
+._memory-global-header-sync-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--tea-color-bg-success-default);
+  flex-shrink: 0;
+}
+
+._memory-global-header-user-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 4px 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+._memory-global-header-user-btn:hover {
+  background: var(--tea-color-bg-secondary-hover);
+}
+
+._memory-global-header-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--tea-color-bg-brand-default);
+  color: var(--tea-color-text-on-bg-brand-default);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+._memory-global-header-username {
+  font-size: 12px;
+  color: var(--tea-color-text-primary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+._memory-global-header-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--tea-color-text-secondary);
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+._memory-global-header-icon-btn:hover {
+  background: var(--tea-color-bg-secondary-hover);
+  color: var(--tea-color-text-primary);
+}
+
+/* ===== 使用说明按钮 ===== */
+._memory-global-header-guide-btn {
+  padding: 4px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--tea-color-text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+._memory-global-header-guide-btn:hover {
+  background: var(--tea-color-bg-secondary-hover);
+  color: var(--tea-color-text-primary);
+}
+
+._memory-global-header-guide-btn.is-active {
+  background: var(--tea-color-bg-brand-lighten-default);
+  color: var(--tea-color-text-brand-default);
+  font-weight: 500;
+}
+
+/* ===== Profile Modal：tea Avatar + Justify + 描述型分块 ===== */
+
+._memory-profile-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+._memory-profile-identity-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+._memory-profile-identity-name {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 22px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+._memory-profile-identity-id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+
+._memory-profile-divider {
+  height: 1px;
+  background: var(--tea-color-border-secondary-default);
+  margin: 16px 0;
+}
+
+._memory-profile-section {
+  margin-bottom: 12px;
+}
+
+._memory-profile-section:last-child {
+  margin-bottom: 0;
+}
+
+._memory-profile-section-label {
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+._memory-profile-section-hint {
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+/* 修复 tea InputAdornment 默认 display:inline-block 导致的 Input 撑不开
+   （历史上 InputAdornment + size="full" 的 Input 实际宽度按内容收缩，
+   右侧 Copy 图标被孤立悬空）。改为块级容器并让内部 Input 自适应。 */
+._memory-profile-input-adornment {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+}
+._memory-profile-input-adornment > input {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+}

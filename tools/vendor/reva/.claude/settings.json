@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "additionalDirectories": ["../ghidra"],
+    "allow": [
+      "Search(path:../ghidra)",
+      "Read(../ghidra/**)"
+    ],
+    "deny": []
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/setup-remote-env.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

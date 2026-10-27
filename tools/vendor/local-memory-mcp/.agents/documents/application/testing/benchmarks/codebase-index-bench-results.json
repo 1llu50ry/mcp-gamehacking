@@ -1,0 +1,93 @@
+{
+  "meta": {
+    "task": "TASK-481",
+    "date": "2026-08-22T17:21:26.880Z",
+    "commitSha": "0c7d4e832eaad95a2119109107ecfdc1d7502263",
+    "branch": "main",
+    "dirty": true,
+    "node": "v24.18.0",
+    "webTreeSitter": "0.26.11",
+    "treeSitter": null,
+    "concurrency": 4,
+    "parser": "real-tree-sitter-wasm",
+    "fileCounts": [
+      1000,
+      10000
+    ],
+    "changedRatio": 0.01
+  },
+  "scenarios": [
+    {
+      "fileCount": 1000,
+      "phase": "initial",
+      "changedFiles": 1000,
+      "unchangedFiles": 0,
+      "parseCount": 1000,
+      "parsedFiles": 1000,
+      "skippedFiles": 0,
+      "skippedByMtime": 0,
+      "totalSymbols": 3799,
+      "durationMs": 4459,
+      "cpuUserMs": 3523,
+      "cpuSystemMs": 1279,
+      "heapUsedBytes": 1818096,
+      "peakHeapBytes": 23028384,
+      "rssBytes": 156561408,
+      "success": true
+    },
+    {
+      "fileCount": 1000,
+      "phase": "incremental",
+      "changedFiles": 10,
+      "unchangedFiles": 990,
+      "parseCount": 10,
+      "parsedFiles": 10,
+      "skippedFiles": 990,
+      "skippedByMtime": 990,
+      "totalSymbols": 49,
+      "durationMs": 367,
+      "cpuUserMs": 215,
+      "cpuSystemMs": 101,
+      "heapUsedBytes": -548904,
+      "peakHeapBytes": 20083376,
+      "rssBytes": 157347840,
+      "success": true
+    },
+    {
+      "fileCount": 10000,
+      "phase": "initial",
+      "changedFiles": 10000,
+      "unchangedFiles": 0,
+      "parseCount": 10000,
+      "parsedFiles": 10000,
+      "skippedFiles": 0,
+      "skippedByMtime": 0,
+      "totalSymbols": 37999,
+      "durationMs": 46990,
+      "cpuUserMs": 30681,
+      "cpuSystemMs": 10753,
+      "heapUsedBytes": 21690344,
+      "peakHeapBytes": 51501600,
+      "rssBytes": 255860736,
+      "success": true
+    },
+    {
+      "fileCount": 10000,
+      "phase": "incremental",
+      "changedFiles": 100,
+      "unchangedFiles": 9900,
+      "parseCount": 100,
+      "parsedFiles": 100,
+      "skippedFiles": 9900,
+      "skippedByMtime": 9900,
+      "totalSymbols": 479,
+      "durationMs": 875,
+      "cpuUserMs": 929,
+      "cpuSystemMs": 288,
+      "heapUsedBytes": -16450328,
+      "peakHeapBytes": 37219440,
+      "rssBytes": 268136448,
+      "success": true
+    }
+  ]
+}

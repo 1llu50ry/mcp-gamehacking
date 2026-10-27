@@ -1,0 +1,106 @@
+{
+  "$schema": "../../dist/dxt-manifest.schema.json",
+  "dxt_version": "0.1",
+  "name": "cheat-engine-server-python",
+  "display_name": "MCP Cheat Engine Server",
+  "version": "0.1.0",
+  "description": "A Python MCP server for safe Cheat Engine functionality",
+  "long_description": "This extension provides safe, structured access to Cheat Engine functionality for code debugging, memory analysis, and educational reverse engineering through the Model Context Protocol.",
+  "author": {
+    "name": "Anthropic",
+    "email": "support@anthropic.com",
+    "url": "https://github.com/anthropics"
+  },
+  "server": {
+    "type": "python",
+    "entry_point": "server/main.py",
+    "mcp_config": {
+      "command": "python",
+      "args": [
+        "${__dirname}/server/main.py",
+        "--workspace=${user_config.workspace_directory}"
+      ],
+      "env": {
+        "DEBUG": "${user_config.debug_mode}",
+        "PYTHONPATH": "${__dirname}/server/lib"
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "list_processes",
+      "description": "Enumerate running processes available for attachment"
+    },
+    {
+      "name": "attach_to_process",
+      "description": "Attach debugger to specified process"
+    },
+    {
+      "name": "get_process_info",
+      "description": "Get detailed information about attached process"
+    },
+    {
+      "name": "detach_process",
+      "description": "Safely detach from current process"
+    },
+    {
+      "name": "read_memory_region",
+      "description": "Read and analyze a memory region from attached process"
+    },
+    {
+      "name": "scan_memory",
+      "description": "Pattern scanning within memory regions"
+    },
+    {
+      "name": "get_memory_regions",
+      "description": "Get virtual memory layout of attached process"
+    },
+    {
+      "name": "analyze_data_structure",
+      "description": "Analyze memory region and identify probable data structures"
+    },
+    {
+      "name": "find_pointers",
+      "description": "Find pointer chains targeting specific addresses"
+    },
+    {
+      "name": "disassemble_region",
+      "description": "Disassemble assembly code from memory region"
+    }
+  ],
+  "keywords": [
+    "memory",
+    "debugging",
+    "reverse-engineering",
+    "cheat-engine",
+    "analysis"
+  ],
+  "license": "MIT",
+  "user_config": {
+    "workspace_directory": {
+      "type": "directory",
+      "title": "Workspace Directory",
+      "description": "Directory to use as workspace",
+      "default": "${HOME}/Documents",
+      "required": false
+    },
+    "debug_mode": {
+      "type": "boolean",
+      "title": "Debug Mode",
+      "description": "Enable debug output",
+      "default": false,
+      "required": false
+    }
+  },
+  "compatibility": {
+    "claude_desktop": ">=0.10.0",
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "python": ">=3.8.0 <4"
+    }
+  }
+}

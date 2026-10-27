@@ -1,0 +1,12 @@
+{
+    "service_name": "ChatWebInterface",
+    "metric_name": "response_time_ms",
+    "baseline_value": 14,
+    "min_value": 14,
+    "max_value": 15,
+    "success_rate": 100,
+    "warning_threshold": 21,
+    "critical_threshold": 42,
+    "measurement_date": "2026-02-20T09:45:40-07:00",
+    "iterations": 5
+}

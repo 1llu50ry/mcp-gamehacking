@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${title != null ? title + ' - Ghidra Analysis API' : 'Ghidra Analysis API'}">Ghidra Analysis API</title>
+    <style>
+        :root {
+            /* D2-inspired color palette */
+            --d2-bg-primary: #0a0a0a;
+            --d2-bg-secondary: #1a1a1a;
+            --d2-bg-tertiary: #2a2a2a;
+            --d2-text-primary: #c7b377;
+            --d2-text-secondary: #8b7355;
+            --d2-border: #4a4a4a;
+            --d2-gold: #d4af37;
+            --d2-red: #c41e3a;
+            --d2-blue: #4169e1;
+            --d2-green: #32cd32;
+            --d2-orange: #ff8c00;
+            --d2-rare: #ffff00;
+            --d2-set: #00ff00;
+            --d2-unique: #8b4513;
+            --d2-magic: #4169e1;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, var(--d2-bg-primary) 0%, var(--d2-bg-secondary) 100%);
+            color: var(--d2-text-primary);
+            font-family: 'Courier New', monospace;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .header {
+            background: var(--d2-bg-secondary);
+            border-bottom: 3px solid var(--d2-gold);
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .header h1 {
+            color: var(--d2-gold);
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            font-size: 2rem;
+            letter-spacing: 2px;
+        }
+
+        .nav {
+            background: var(--d2-bg-tertiary);
+            padding: 1rem 2rem;
+            border-bottom: 2px solid var(--d2-border);
+        }
+
+        .nav-links {
+            list-style: none;
+            display: flex;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            color: var(--d2-text-primary);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: bold;
+        }
+
+        .nav-links a:hover {
+            border-color: var(--d2-gold);
+            color: var(--d2-gold);
+            background: rgba(212, 175, 55, 0.1);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        .card {
+            background: var(--d2-bg-secondary);
+            border: 2px solid var(--d2-border);
+            border-radius: 8px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            position: relative;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(45deg, var(--d2-gold), var(--d2-orange), var(--d2-gold));
+            border-radius: 8px;
+            z-index: -1;
+            opacity: 0.3;
+        }
+
+        .card h2 {
+            color: var(--d2-gold);
+            margin-bottom: 1rem;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--d2-gold), var(--d2-orange));
+            color: var(--d2-bg-primary);
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 4px;
+            font-weight: bold;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(212, 175, 55, 0.4);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, var(--d2-blue), var(--d2-magic));
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--d2-red), #8b0000);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--d2-bg-tertiary);
+            border: 1px solid var(--d2-border);
+            padding: 1.5rem;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            color: var(--d2-gold);
+            font-weight: bold;
+        }
+
+        .stat-label {
+            color: var(--d2-text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .error {
+            color: var(--d2-red);
+            background: rgba(196, 30, 58, 0.1);
+            border: 1px solid var(--d2-red);
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+
+        .success {
+            color: var(--d2-green);
+            background: rgba(50, 205, 50, 0.1);
+            border: 1px solid var(--d2-green);
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--d2-text-primary);
+            font-weight: bold;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.8rem;
+            border: 2px solid var(--d2-border);
+            background: var(--d2-bg-tertiary);
+            color: var(--d2-text-primary);
+            border-radius: 4px;
+            font-family: inherit;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--d2-gold);
+        }
+
+        .footer {
+            background: var(--d2-bg-secondary);
+            border-top: 2px solid var(--d2-border);
+            padding: 2rem;
+            text-align: center;
+            color: var(--d2-text-secondary);
+            margin-top: 4rem;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>⚔️ Ghidra Analysis API</h1>
+    </header>
+
+    <nav class="nav">
+        <ul class="nav-links">
+            <li><a th:href="@{/}">Dashboard</a></li>
+            <li><a th:href="@{/projects}">Projects</a></li>
+            <li><a th:href="@{/upload}">Upload Binary</a></li>
+            <li><a th:href="@{/bsim}">BSim Database</a></li>
+        </ul>
+    </nav>
+
+    <main class="container">
+        <div th:fragment="content">
+            <!-- Page content will be inserted here -->
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2026 Ghidra Analysis API - Powered by Spring Boot & Diablo II Aesthetics</p>
+    </footer>
+</body>
+</html>

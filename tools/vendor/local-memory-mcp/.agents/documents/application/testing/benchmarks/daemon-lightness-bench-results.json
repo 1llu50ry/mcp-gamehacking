@@ -1,0 +1,200 @@
+{
+	"generatedAt": "2026-09-21T09:17:46.248Z",
+	"node": "v24.16.0",
+	"platform": "linux",
+	"arch": "x64",
+	"options": {
+		"sampleIntervalMs": 250,
+		"settleMs": 15000,
+		"idleMs": 300000,
+		"restartCount": 3,
+		"burstWrites": 100,
+		"corpusSize": 200,
+		"enableWatcher": false,
+		"lazyWarmup": true,
+		"verbose": true
+	},
+	"scenarios": [
+		{
+			"scenario": "clean-startup",
+			"boots": 1,
+			"backfilledRows": 0,
+			"backfilledPerBoot": [
+				0
+			],
+			"lazyWarmup": true,
+			"capabilities": {
+				"semantic": "idle",
+				"indexing": "idle",
+				"watcher": "unavailable",
+				"maintenance": "ready",
+				"dashboard": "ready"
+			},
+			"durationMs": 21483,
+			"peakCpuPercent": 146.71814671814673,
+			"averageCpuPercent": 16.37018443741133,
+			"peakThreadCount": 11,
+			"finalThreadCount": 11,
+			"peakVmRssBytes": 277991424,
+			"finalVmRssBytes": 277991424,
+			"peakVmHwmBytes": 277991424,
+			"peakVmSizeBytes": 1843896320,
+			"dbBytes": 733184,
+			"pageCount": 179,
+			"freelistCount": 30,
+			"freelistBytes": 122880
+		},
+		{
+			"scenario": "repeated-restart",
+			"boots": 3,
+			"backfilledRows": 200,
+			"backfilledPerBoot": [
+				200,
+				0,
+				0
+			],
+			"lazyWarmup": true,
+			"note": "pre-seeded corpus: 200 memories (first boot backfills, later boots must enqueue 0)",
+			"capabilities": {
+				"semantic": "idle",
+				"indexing": "idle",
+				"watcher": "unavailable",
+				"maintenance": "ready",
+				"dashboard": "ready"
+			},
+			"durationMs": 55180,
+			"peakCpuPercent": 318.7250996015936,
+			"averageCpuPercent": 94.96255956432947,
+			"peakThreadCount": 14,
+			"finalThreadCount": 7,
+			"peakVmRssBytes": 492523520,
+			"finalVmRssBytes": 280539136,
+			"peakVmHwmBytes": 492523520,
+			"peakVmSizeBytes": 2181812224,
+			"dbBytes": 1392640,
+			"pageCount": 340,
+			"freelistCount": 0,
+			"freelistBytes": 0
+		},
+		{
+			"scenario": "write-read-burst",
+			"boots": 1,
+			"backfilledRows": 0,
+			"backfilledPerBoot": [
+				0
+			],
+			"lazyWarmup": true,
+			"burstWallMs": 872,
+			"capabilities": {
+				"semantic": "idle",
+				"indexing": "idle",
+				"watcher": "unavailable",
+				"maintenance": "ready",
+				"dashboard": "ready"
+			},
+			"writesCompleted": 100,
+			"readsCompleted": 100,
+			"durationMs": 14004,
+			"peakCpuPercent": 181.8181818181818,
+			"averageCpuPercent": 24.798326859874514,
+			"peakThreadCount": 11,
+			"finalThreadCount": 11,
+			"peakVmRssBytes": 282308608,
+			"finalVmRssBytes": 282308608,
+			"peakVmHwmBytes": 282308608,
+			"peakVmSizeBytes": 1846255616,
+			"dbBytes": 733184,
+			"pageCount": 179,
+			"freelistCount": 13,
+			"freelistBytes": 53248
+		},
+		{
+			"scenario": "idle",
+			"boots": 1,
+			"backfilledRows": 0,
+			"backfilledPerBoot": [
+				0
+			],
+			"lazyWarmup": true,
+			"capabilities": {
+				"semantic": "idle",
+				"indexing": "idle",
+				"watcher": "unavailable",
+				"maintenance": "ready",
+				"dashboard": "ready"
+			},
+			"durationMs": 305373,
+			"peakCpuPercent": 145.59386973180074,
+			"averageCpuPercent": 1.2004801920768309,
+			"peakThreadCount": 11,
+			"finalThreadCount": 11,
+			"peakVmRssBytes": 279539712,
+			"finalVmRssBytes": 120815616,
+			"peakVmHwmBytes": 280420352,
+			"peakVmSizeBytes": 1844961280,
+			"dbBytes": 733184,
+			"pageCount": 179,
+			"freelistCount": 30,
+			"freelistBytes": 122880
+		},
+		{
+			"scenario": "idle-eager",
+			"boots": 1,
+			"backfilledRows": 0,
+			"backfilledPerBoot": [
+				0
+			],
+			"lazyWarmup": false,
+			"capabilities": {
+				"semantic": "ready",
+				"indexing": "idle",
+				"watcher": "unavailable",
+				"maintenance": "ready",
+				"dashboard": "ready"
+			},
+			"durationMs": 307226,
+			"peakCpuPercent": 148,
+			"averageCpuPercent": 1.7497211892871276,
+			"peakThreadCount": 14,
+			"finalThreadCount": 14,
+			"peakVmRssBytes": 389668864,
+			"finalVmRssBytes": 130273280,
+			"peakVmHwmBytes": 391110656,
+			"peakVmSizeBytes": 2143973376,
+			"dbBytes": 733184,
+			"pageCount": 179,
+			"freelistCount": 30,
+			"freelistBytes": 122880
+		},
+		{
+			"scenario": "engines-active",
+			"boots": 1,
+			"backfilledRows": 0,
+			"backfilledPerBoot": [
+				0
+			],
+			"lazyWarmup": true,
+			"note": "proactive engines enabled against a fixture project; capability states are the evidence",
+			"capabilities": {
+				"semantic": "idle",
+				"indexing": "ready",
+				"watcher": "ready",
+				"maintenance": "ready",
+				"dashboard": "ready"
+			},
+			"durationMs": 21409,
+			"peakCpuPercent": 169.96047430830038,
+			"averageCpuPercent": 20.444487204156243,
+			"peakThreadCount": 11,
+			"finalThreadCount": 11,
+			"peakVmRssBytes": 315441152,
+			"finalVmRssBytes": 315441152,
+			"peakVmHwmBytes": 315441152,
+			"peakVmSizeBytes": 10587271168,
+			"dbBytes": 733184,
+			"pageCount": 179,
+			"freelistCount": 30,
+			"freelistBytes": 122880
+		}
+	]
+}

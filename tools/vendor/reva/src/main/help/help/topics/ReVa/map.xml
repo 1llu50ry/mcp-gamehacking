@@ -1,0 +1,46 @@
+<?xml version='1.0' encoding='ISO-8859-1' ?>
+
+<!-- ReVa - Reverse Engineering Assistant -->
+<!-- Help ID to URL mapping -->
+
+<map version="1.0">
+
+    <!-- Overview -->
+    <mapID target="ReVa_Overview"
+           url="help/topics/ReVa/ReVa_overview.html" />
+    <mapID target="ReVa_DesignPhilosophy"
+           url="help/topics/ReVa/ReVa_overview.html#DesignPhilosophy" />
+    <mapID target="ReVa_OperationalModes"
+           url="help/topics/ReVa/ReVa_overview.html#OperationalModes" />
+    <mapID target="ReVa_Capabilities"
+           url="help/topics/ReVa/ReVa_overview.html#Capabilities" />
+
+    <!-- Installation and Setup -->
+    <mapID target="ReVa_Installation"
+           url="help/topics/ReVa/ReVa_installation.html" />
+    <mapID target="ReVa_PluginInstallation"
+           url="help/topics/ReVa/ReVa_installation.html#PluginInstallation" />
+    <mapID target="ReVa_PluginActivation"
+           url="help/topics/ReVa/ReVa_installation.html#PluginActivation" />
+    <mapID target="ReVa_ClientConfiguration"
+           url="help/topics/ReVa/ReVa_installation.html#ClientConfiguration" />
+    <mapID target="ReVa_CLIInstallation"
+           url="help/topics/ReVa/ReVa_installation.html#CLIInstallation" />
+    <mapID target="ReVa_Configuration"
+           url="help/topics/ReVa/ReVa_installation.html#Configuration" />
+    <mapID target="Follow_Me"
+           url="help/topics/ReVa/ReVa_installation.html#Follow_Me" />
+    <mapID target="Follow_Me_Filters"
+           url="help/topics/ReVa/ReVa_installation.html#Follow_Me_Filters" />
+    <mapID target="Follow_Me_MultiProgram"
+           url="help/topics/ReVa/ReVa_installation.html#Follow_Me_MultiProgram" />
+    <mapID target="ReVa_BuildFromSource"
+           url="help/topics/ReVa/ReVa_installation.html#BuildFromSource" />
+    <mapID target="ReVa_Troubleshooting"
+           url="help/topics/ReVa/ReVa_installation.html#Troubleshooting" />
+
+    <!-- Skills and Analysis Workflows -->
+    <mapID target="ReVa_Skills"
+           url="help/topics/ReVa/ReVa_skills.html" />
+
+</map>

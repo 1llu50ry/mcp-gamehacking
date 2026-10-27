@@ -1,0 +1,18 @@
+# decomp.anything on a server (or any computer with Docker): docker compose up -d, then
+#   docker compose exec decomp decomp url     the address that opens it (signed in)
+# For a team room at your own address, also publish the room port (decomp share <project> --address ...).
+services:
+  decomp:
+    build: install
+    container_name: decomp-anything
+    restart: unless-stopped
+    init: true
+    environment:
+      DECOMP_PORT: "6464"
+      DECOMP_SOURCE: branch:main   # a branch on GitHub; set DECOMP_WHEEL with release for a pinned wheel
+    ports:
+      - "127.0.0.1:6464:6464"
+    volumes:
+      - decomp-anything-home:/home/decomp
+volumes:
+  decomp-anything-home:

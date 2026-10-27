@@ -1,0 +1,22 @@
+==================================================================
+Diablo 2 Function Matching Analysis Report
+Generated: Sun Jan  4 04:42:16 MST 2026
+==================================================================
+
+DATABASE COVERAGE:
+ diablo2_113c.exe |             3 |               5 |               5 |                 0 |           100.00 |            0.816 | 2026-01-04 07:27:59.417816
+ diablo2_114d.exe |             4 |               5 |               5 |                 0 |           100.00 |            0.880 | 2026-01-04 07:27:59.417816
+ diablo2_109d.exe |             2 |               5 |               5 |                 0 |           100.00 |            0.870 | 2026-01-04 07:27:59.417816
+
+
+FUNCTION STATISTICS:
+ Total Named Functions: 15 | Average Significance: 0.855 | Function Categories: 5
+
+
+RECENT OPERATIONS:
+
+RECOMMENDATIONS:
+- Use advanced matching for cross-version analysis
+- Review low-confidence matches manually
+- Validate critical game functions (player, item, skill)
+- Monitor for naming conflicts during propagation

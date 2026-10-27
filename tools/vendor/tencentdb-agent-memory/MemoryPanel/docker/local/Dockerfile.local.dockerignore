@@ -1,0 +1,66 @@
+# Dockerfile.local 专用忽略清单（BuildKit：<dockerfile>.dockerignore 优先于根 .dockerignore）
+# 目的：缩小构建上下文，并避免把宿主机产物拷进镜像
+#   —— 尤其是 node_modules（better-sqlite3 原生二进制按宿主机平台编译，入镜像会崩，
+#      镜像内会重新 npm install 重编），以及 data/（含真实用户 SQLite 数据）。
+
+# 依赖（镜像内重新安装）
+**/node_modules
+.pnpm-store/
+
+# 构建产物（镜像内重新构建）
+**/dist
+**/build
+**/*.js.map
+**/*.tsbuildinfo
+frontend/src/**/*.js
+frontend/src/**/*.js.map
+
+# 环境与本地数据（禁止入镜像）
+# ⚠️ config/*.json 含真实 kernel api_key（bearer token），必须通过运行时挂载或
+#    K8s Secret 注入，绝不能打进镜像。运行时映射示例：
+#      -v /path/to/metadata-instances.json:/app/config/metadata-instances.json:ro
+.env
+.env.*
+config/*.json
+config/*.yaml
+config/*.yml
+data/
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/*.sqlite
+
+# 日志 / 覆盖率 / e2e 输出
+**/logs
+**/*.log
+coverage/
+frontend/test-results/
+frontend/playwright-report/
+
+# 版本控制与工具元数据
+.git
+.gitignore
+.idea/
+.vscode/
+.iwiki
+.codebuddy
+
+# OS / 编辑器杂项
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# 临时目录
+tmp/
+.tmp/
+
+# 文档不参与运行（可选，进一步瘦身上下文）
+docs/
+
+# 测试脚本不参与 runtime（shell 里硬编码内部路径 `/root/git.woa.com/cloud_nosql/tdai`，
+# 打进镜像会泄漏内部 GitLab 域名与部署习惯）
+tests/
+**/*.e2e.sh
+e2e-*.sh

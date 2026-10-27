@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+
+{% block title %}Discussion - Ghidra RE Platform{% endblock %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header flex flex-between flex-center">
+        <h2>Discussion Board</h2>
+        {% if can_post %}
+            <button class="btn btn-primary" onclick="document.getElementById('new-comment-form').style.display = document.getElementById('new-comment-form').style.display === 'none' ? 'block' : 'none';">
+                + New Post
+            </button>
+        {% else %}
+            <a href="{% url 'account_login' %}" class="btn">Log in to post</a>
+        {% endif %}
+    </div>
+    <div class="panel-content">
+        {% if can_post %}
+            <div id="new-comment-form" style="display: none; margin-bottom: 1.5rem;">
+                <form action="{% url 'core:post_comment' %}" method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="entity_type" value="general">
+                    <div class="form-group">
+                        <label for="content">Your comment (Markdown supported)</label>
+                        <textarea name="content" id="content" class="form-control" placeholder="Write your thoughts, questions, or share analysis findings..."></textarea>
+                    </div>
+                    <div class="flex gap-1">
+                        <button type="submit" class="btn btn-primary">Post Comment</button>
+                        <button type="button" class="btn" onclick="document.getElementById('new-comment-form').style.display = 'none';">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        {% endif %}
+
+        {% if comments %}
+            {% for comment in comments %}
+                <div class="comment" id="comment-{{ comment.id }}">
+                    <div class="comment-header">
+                        <div class="comment-avatar">{{ comment.user.username.0|upper }}</div>
+                        <span class="comment-author">{{ comment.user.username }}</span>
+                        <span class="comment-time">{{ comment.created_at|timesince }} ago</span>
+                    </div>
+                    <div class="comment-content">
+                        {{ comment.content_html|safe }}
+                    </div>
+                    <div class="comment-actions">
+                        {% if can_post %}
+                            <a href="#" class="comment-action" onclick="toggleReply({{ comment.id }}); return false;">↩ Reply</a>
+                        {% endif %}
+                        {% if user == comment.user or user.is_staff %}
+                            <a href="#" class="comment-action" onclick="toggleEdit({{ comment.id }}); return false;">✎ Edit</a>
+                            <a href="{% url 'core:delete_comment' comment.id %}" class="comment-action" style="color: var(--accent-red-light);" onclick="return confirm('Delete this comment?');">🗑 Delete</a>
+                        {% endif %}
+                        {% if comment.reply_count > 0 %}
+                            <span class="comment-action" style="margin-left: auto;">{{ comment.reply_count }} repl{{ comment.reply_count|pluralize:"y,ies" }}</span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Reply form (hidden) -->
+                    {% if can_post %}
+                        <div id="reply-form-{{ comment.id }}" style="display: none; margin-top: 1rem;">
+                            <form action="{% url 'core:post_comment' %}" method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="entity_type" value="general">
+                                <input type="hidden" name="parent_id" value="{{ comment.id }}">
+                                <div class="form-group">
+                                    <textarea name="content" class="form-control" placeholder="Write your reply..."></textarea>
+                                </div>
+                                <div class="flex gap-1">
+                                    <button type="submit" class="btn btn-primary">Post Reply</button>
+                                    <button type="button" class="btn" onclick="toggleReply({{ comment.id }});">Cancel</button>
+                                </div>
+                            </form>
+                        </div>
+                    {% endif %}
+
+                    <!-- Replies -->
+                    {% if comment.replies.all %}
+                        <div class="comment-replies">
+                            {% for reply in comment.replies.all %}
+                                {% if not reply.is_deleted %}
+                                    <div class="comment" id="comment-{{ reply.id }}">
+                                        <div class="comment-header">
+                                            <div class="comment-avatar" style="background: var(--color-set);">{{ reply.user.username.0|upper }}</div>
+                                            <span class="comment-author" style="color: var(--color-set);">{{ reply.user.username }}</span>
+                                            <span class="comment-time">{{ reply.created_at|timesince }} ago</span>
+                                        </div>
+                                        <div class="comment-content">
+                                            {{ reply.content_html|safe }}
+                                        </div>
+                                        {% if user == reply.user or user.is_staff %}
+                                            <div class="comment-actions">
+                                                <a href="{% url 'core:delete_comment' reply.id %}" class="comment-action" style="color: var(--accent-red-light);" onclick="return confirm('Delete this reply?');">🗑 Delete</a>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+
+            <!-- Pagination -->
+            {% if comments.has_other_pages %}
+                <div class="pagination">
+                    {% if comments.has_previous %}
+                        <a href="?page={{ comments.previous_page_number }}">&laquo; Prev</a>
+                    {% endif %}
+                    
+                    {% for num in comments.paginator.page_range %}
+                        {% if comments.number == num %}
+                            <span class="current">{{ num }}</span>
+                        {% else %}
+                            <a href="?page={{ num }}">{{ num }}</a>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if comments.has_next %}
+                        <a href="?page={{ comments.next_page_number }}">Next &raquo;</a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        {% else %}
+            <p class="text-center" style="color: var(--text-muted); padding: 3rem;">
+                No discussions yet. Be the first to start a conversation!
+            </p>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function toggleReply(commentId) {
+    var form = document.getElementById('reply-form-' + commentId);
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleEdit(commentId) {
+    // TODO: Implement inline editing
+    alert('Edit functionality coming soon!');
+}
+</script>
+{% endblock %}

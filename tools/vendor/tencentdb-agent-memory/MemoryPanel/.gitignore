@@ -1,0 +1,86 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build
+dist/
+build/
+*.js.map
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# 实例注册表：含 tdai kernel bearer token，禁止入仓。
+# 各开发机本地按 config/metadata-instances.example.json 自建真值文件。
+# 历史 commit 里存过真值，属于遗留问题（仓库不外发场景可暂不清历史）；
+# 若未来要开源/给客户看仓库，需用 git filter-repo 清历史。
+config/metadata-instances.json
+!config/metadata-instances.example.json
+
+# Local data (SQLite 运行库，含真实用户身份数据，禁止提交)
+data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.codebuddy
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Test coverage
+coverage/
+
+# Temporary
+tmp/
+.tmp/
+
+# iWiki plugin files
+.iwiki
+
+# tsc incremental build info
+*.tsbuildinfo
+
+# vite / tsc 编译产物：frontend/src 源码只允许 .ts/.tsx，编译产物不入库
+frontend/src/**/*.js
+frontend/src/**/*.js.map
+
+# Playwright e2e 测试输出
+frontend/test-results/
+frontend/playwright-report/
+
+specs/
+.cursor/
+
+# Instance registry with secrets (use metadata-instances.example.json)
+config/metadata-instances.json
+
+# Internal / company-only docs (keep local copies; do not publish)
+docs/internal/
+
+# Generated E2E reports
+docs/test-reports/
+
+# Smoke credentials (generated locally)
+scripts/smoke/
+
+# Internal architecture docs (keep local copies; do not publish)
+docs/architecture/*.md
+
+# Draft contributing guides live outside default commits until open-source PR
+CONTRIBUTING.md
+CONTRIBUTING_CN.md

@@ -1,0 +1,32 @@
+# Django Web Application for Ghidra RE Platform
+# Core Framework
+Django>=5.0,<6.0
+gunicorn>=21.0.0
+
+# Database
+psycopg2-binary>=2.9.9
+
+# Authentication
+django-allauth>=0.59.0
+
+# API (optional, for future REST endpoints)
+djangorestframework>=3.14.0
+
+# Security
+django-cors-headers>=4.3.0
+
+# Environment Configuration
+python-dotenv>=1.0.0
+
+# Development
+django-debug-toolbar>=4.2.0
+
+# Template enhancements
+django-widget-tweaks>=1.5.0
+
+# Markdown support for comments
+markdown>=3.5.0
+
+# Celery for async Ghidra tasks (optional)
+# celery>=5.3.0
+# redis>=5.0.0

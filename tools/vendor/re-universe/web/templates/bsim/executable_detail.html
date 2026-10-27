@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ executable.name_exec }} - Ghidra RE Platform{% endblock %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        <h2>{{ executable.name_exec }}</h2>
+    </div>
+    <div class="panel-content">
+        <div class="flex gap-2 mb-2">
+            <div>
+                <span style="color: var(--text-muted); font-size: 0.8rem;">MD5</span><br>
+                <span class="mono text-magic">{{ executable.md5 }}</span>
+            </div>
+            <div>
+                <span style="color: var(--text-muted); font-size: 0.8rem;">Architecture</span><br>
+                <span class="text-unique">{{ executable.architecture|default:"-" }}</span>
+            </div>
+            <div>
+                <span style="color: var(--text-muted); font-size: 0.8rem;">Compiler</span><br>
+                <span class="text-secondary">{{ executable.name_compiler|default:"-" }}</span>
+            </div>
+            <div>
+                <span style="color: var(--text-muted); font-size: 0.8rem;">Functions</span><br>
+                <span class="text-set mono">{{ function_count }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-header flex flex-between flex-center">
+        <h2>Functions</h2>
+        <form method="get" class="flex gap-1">
+            <input type="text" name="func" class="form-control" placeholder="Filter functions..." value="{{ func_query }}" style="width: 200px;">
+            <button type="submit" class="btn">Filter</button>
+        </form>
+    </div>
+    <div class="panel-content">
+        {% if functions %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Function Name</th>
+                        <th>Address</th>
+                        <th>Flags</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for func in functions %}
+                    <tr>
+                        <td class="mono text-magic">{{ func.name_func }}</td>
+                        <td class="mono text-unique">{{ func.address_hex }}</td>
+                        <td class="mono text-muted">{{ func.flags }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            {% if functions.has_other_pages %}
+                <div class="pagination">
+                    {% if functions.has_previous %}
+                        <a href="?page={{ functions.previous_page_number }}{% if func_query %}&func={{ func_query }}{% endif %}">&laquo; Prev</a>
+                    {% endif %}
+                    
+                    {% for num in functions.paginator.page_range %}
+                        {% if functions.number == num %}
+                            <span class="current">{{ num }}</span>
+                        {% elif num > functions.number|add:'-3' and num < functions.number|add:'3' %}
+                            <a href="?page={{ num }}{% if func_query %}&func={{ func_query }}{% endif %}">{{ num }}</a>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if functions.has_next %}
+                        <a href="?page={{ functions.next_page_number }}{% if func_query %}&func={{ func_query }}{% endif %}">Next &raquo;</a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        {% else %}
+            <p class="text-center" style="color: var(--text-muted); padding: 2rem;">
+                {% if func_query %}
+                    No functions matching "{{ func_query }}"
+                {% else %}
+                    No functions found for this executable.
+                {% endif %}
+            </p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

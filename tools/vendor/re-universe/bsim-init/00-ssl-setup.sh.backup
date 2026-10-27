@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# PostgreSQL SSL Certificate Generation for BSim
+# This script generates self-signed SSL certificates for PostgreSQL
+
+set -e
+
+echo "=== BSim PostgreSQL SSL Setup ==="
+
+# SSL directory
+SSL_DIR="/var/lib/postgresql/ssl"
+DATA_DIR="/var/lib/postgresql/data"
+
+# Create SSL directory if it doesn't exist
+mkdir -p "$SSL_DIR"
+
+# Check if certificates already exist
+if [[ -f "$DATA_DIR/server.crt" && -f "$DATA_DIR/server.key" ]]; then
+    echo "SSL certificates already exist, skipping generation"
+    exit 0
+fi
+
+echo "Generating SSL certificate for PostgreSQL..."
+
+# Generate private key
+openssl genrsa -out "$SSL_DIR/server.key" 2048
+
+# Generate certificate signing request
+openssl req -new -key "$SSL_DIR/server.key" -out "$SSL_DIR/server.csr" -subj "/C=US/ST=State/L=City/O=Organization/OU=BSim/CN=localhost"
+
+# Generate self-signed certificate
+openssl x509 -req -in "$SSL_DIR/server.csr" -signkey "$SSL_DIR/server.key" -out "$SSL_DIR/server.crt" -days 365
+
+# Generate CA certificate (copy of server cert for simplicity)
+cp "$SSL_DIR/server.crt" "$SSL_DIR/ca.crt"
+
+# Copy certificates to data directory (where PostgreSQL expects them)
+cp "$SSL_DIR/server.crt" "$DATA_DIR/server.crt"
+cp "$SSL_DIR/server.key" "$DATA_DIR/server.key"
+cp "$SSL_DIR/ca.crt" "$DATA_DIR/ca.crt"
+
+# Set proper ownership and permissions
+chown postgres:postgres "$DATA_DIR/server.crt" "$DATA_DIR/server.key" "$DATA_DIR/ca.crt"
+chmod 600 "$DATA_DIR/server.key"
+chmod 644 "$DATA_DIR/server.crt" "$DATA_DIR/ca.crt"
+
+# Clean up temporary files
+rm -f "$SSL_DIR/server.csr"
+
+echo "SSL certificate generated successfully"
+echo "SSL setup complete"

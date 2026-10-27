@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+
+{% block title %}BSim Database - Ghidra RE Platform{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ exe_count }}</div>
+        <div class="stat-label">Executables</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ func_count }}</div>
+        <div class="stat-label">Functions</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ template }}</div>
+        <div class="stat-label">Template</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">k={{ k_value }} L={{ l_value }}</div>
+        <div class="stat-label">LSH Parameters</div>
+    </div>
+</div>
+
+<div class="flex gap-2">
+    <div style="flex: 2;">
+        <div class="panel">
+            <div class="panel-header">
+                <h2>BSim Configuration</h2>
+            </div>
+            <div class="panel-content">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Key</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for key, value in config.items %}
+                        <tr>
+                            <td class="mono text-magic">{{ key }}</td>
+                            <td class="mono" style="max-width: 400px; overflow: hidden; text-overflow: ellipsis;">{{ value|truncatechars:100 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div style="flex: 1;">
+        <div class="panel">
+            <div class="panel-header">
+                <h2>Quick Actions</h2>
+            </div>
+            <div class="panel-content">
+                <div class="flex gap-1" style="flex-direction: column;">
+                    <a href="{% url 'bsim:executables' %}" class="btn btn-primary">📁 Browse Executables</a>
+                    <a href="{% url 'bsim:search_functions' %}" class="btn">🔍 Search Functions</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <h2>Database Info</h2>
+            </div>
+            <div class="panel-content">
+                <p style="color: var(--text-secondary); font-size: 0.85rem; line-height: 1.6;">
+                    BSim (Binary Similarity) database stores function signatures using 
+                    Locality-Sensitive Hashing (LSH) for fast similarity search.
+                </p>
+                <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem;">
+                    Template <span class="text-unique">{{ template }}</span> supports up to 
+                    {% if template == 'large_32' %}~100 million{% else %}~10 million{% endif %} functions.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

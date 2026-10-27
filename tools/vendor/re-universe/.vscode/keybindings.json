@@ -1,0 +1,42 @@
+[
+    {
+        "key": "ctrl+shift+f5",
+        "command": "workbench.action.tasks.runTask",
+        "args": "🚀 Start Ghidra Server"
+    },
+    {
+        "key": "ctrl+shift+f6",
+        "command": "workbench.action.tasks.runTask",
+        "args": "🛑 Stop Ghidra Server"
+    },
+    {
+        "key": "ctrl+shift+f7",
+        "command": "workbench.action.tasks.runTask",
+        "args": "🔍 Test Connectivity"
+    },
+    {
+        "key": "ctrl+shift+f8",
+        "command": "workbench.action.tasks.runTask",
+        "args": "⚙️ Validate Configuration"
+    },
+    {
+        "key": "ctrl+shift+f9",
+        "command": "workbench.action.tasks.runTask",
+        "args": "💾 Create Backup"
+    },
+    {
+        "key": "ctrl+shift+f10",
+        "command": "workbench.action.tasks.runTask",
+        "args": "📊 Docker Status"
+    },
+    {
+        "key": "ctrl+shift+f11",
+        "command": "workbench.action.tasks.runTask",
+        "args": "🧹 Clean Data Folders (Preview)"
+    },
+    {
+        "key": "ctrl+shift+f12",
+        "command": "workbench.action.tasks.runTask",
+        "args": "🧹 Force Clean Data Folders"
+    }
+]

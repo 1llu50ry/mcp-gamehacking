@@ -1,0 +1,59 @@
+/* Demo Quest DS, linked by CodeWarrior's linker like DS games. Written for decomp.wtf (CC0). */
+/* The ARM9 program: secure area, start-up code and build info, code, constants, static initializers, data. */
+/* .bss starts where the autoload blocks are (they're copied away first); then the ITCM and DTCM parts. */
+MEMORY {
+    ARM9 : ORIGIN = 0x02000000 > arm9.bin
+    ITCM : ORIGIN = 0x01FF8000 > itcm.bin
+    DTCM : ORIGIN = 0x027E0000 > dtcm.bin
+    ARM9_BSS : ORIGIN = AFTER(ARM9)
+}
+
+KEEP_SECTION {
+    .secure,
+    .crt0,
+    .init,
+    .ctor,
+    .itcm,
+    .dtcm
+}
+
+SECTIONS {
+    .arm9 : {
+        ALIGNALL(4);
+        crt0.o(.secure)
+        crt0.o(.crt0)
+        * (.text)
+        . = ALIGN(4);
+        * (.init)
+        . = ALIGN(4);
+        * (.rodata)
+        . = ALIGN(4);
+        __ctor_start = .;
+        * (.ctor)
+        WRITEW(0);
+        . = ALIGN(32);
+        * (.data)
+        . = ALIGN(32);
+        __autoload_blocks = .;
+    } > ARM9
+
+    .arm9_bss : {
+        ALIGNALL(4);
+        __bss_start = .;
+        * (.bss)
+        . = ALIGN(32);
+        __bss_end = .;
+    } > ARM9_BSS
+
+    .itcm : {
+        ALIGNALL(4);
+        * (.itcm)
+        . = ALIGN(32);
+    } > ITCM
+
+    .dtcm : {
+        ALIGNALL(4);
+        * (.dtcm)
+        . = ALIGN(32);
+    } > DTCM
+}

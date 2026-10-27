@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Version Key Fix Test</title>
+</head>
+<body>
+    <h1>Version Key Extraction Fix Test</h1>
+    <div id="results"></div>
+
+    <script>
+        // Simulate the problematic scenario
+        const selectedVersion = "Classic/1.04c";
+        const funcData = {
+            functions: {
+                "func1": {
+                    addresses: {
+                        "1.04c": "0x12345",
+                        "1.05": "0x54321"
+                    }
+                },
+                "func2": {
+                    addresses: {
+                        "1.04c": "0x67890",
+                        "1.05": "0x09876"
+                    }
+                }
+            }
+        };
+
+        // Before fix (BROKEN):
+        let funcKeys = ["func1", "func2"];
+        const brokenFilter = funcKeys.filter(key => {
+            const func = funcData.functions[key];
+            return func.addresses && func.addresses[selectedVersion]; // This fails!
+        });
+
+        // After fix (WORKING):
+        funcKeys = ["func1", "func2"];
+        const versionKey = selectedVersion.split('/')[1] || selectedVersion; // Extract "1.04c"
+        const fixedFilter = funcKeys.filter(key => {
+            const func = funcData.functions[key];
+            return func.addresses && func.addresses[versionKey]; // This works!
+        });
+
+        document.getElementById('results').innerHTML = `
+            <p><strong>Selected Version:</strong> "${selectedVersion}"</p>
+            <p><strong>Function Address Keys:</strong> ${JSON.stringify(Object.keys(funcData.functions.func1.addresses))}</p>
+            <p><strong>Before Fix:</strong> ${brokenFilter.length} functions found (addresses[selectedVersion])</p>
+            <p><strong>After Fix:</strong> ${fixedFilter.length} functions found (addresses[versionKey] where versionKey="${versionKey}")</p>
+            <p><strong>Result:</strong> ${fixedFilter.length > 0 ? '✅ Fix successful!' : '❌ Still broken'}</p>
+        `;
+    </script>
+</body>
+</html>

@@ -1,0 +1,172 @@
+[MASTER]
+# Specify a configuration file
+#rcfile=
+
+# Python code to execute, usually for sys.path manipulation
+#init-hook=
+
+# Add files or directories to the blacklist
+ignore=.git,tests
+
+# Use multiple processes to speed up Pylint
+jobs=4
+
+# List of plugins
+load-plugins=
+
+# Use the python 3 checker
+py-version=3.13
+
+# Pickle collected data for later comparisons
+persistent=yes
+
+# When enabled, pylint would attempt to guess common misconfiguration and emit
+# user-friendly hints instead of false-positive error messages
+suggestion-mode=yes
+
+[MESSAGES CONTROL]
+# Only show these messages
+# enable=
+
+# Disable the message, report, category or checker
+disable=raw-checker-failed,
+        bad-inline-option,
+        locally-disabled,
+        file-ignored,
+        suppressed-message,
+        useless-suppression,
+        deprecated-pragma,
+        use-symbolic-message-instead,
+        missing-module-docstring,
+        missing-function-docstring,
+        missing-class-docstring,
+        no-name-in-module,
+        no-member,
+        import-error,
+        wrong-import-order,
+        wrong-import-position,
+        invalid-name,
+        too-many-arguments,
+        too-few-public-methods,
+        too-many-instance-attributes,
+        too-many-public-methods,
+        too-many-locals,
+        too-many-branches,
+        too-many-statements,
+        too-many-return-statements,
+        too-many-nested-blocks,
+        line-too-long,
+        broad-except,
+        fixme,
+        logging-fstring-interpolation,
+        logging-format-interpolation,
+        duplicate-code
+
+[REPORTS]
+# Set the output format
+output-format=text
+
+# Tells whether to display a full report or only the messages
+reports=no
+
+# Python expression which should return a note less than 10
+evaluation=10.0 - ((float(5 * error + warning + refactor + convention) / statement) * 10)
+
+[BASIC]
+# Good variable names which should always be accepted, separated by a comma
+good-names=i, j, k, ex, Run, _, e, id, db, fp, T, f
+
+# Regular expression which should only match function or class names that do
+# not require a docstring.
+no-docstring-rgx=^_
+
+# Minimum line length for functions/classes that require docstrings
+docstring-min-length=10
+
+[FORMAT]
+# Maximum number of characters on a single line.
+max-line-length=100
+
+# Maximum number of lines in a module
+max-module-lines=1000
+
+# Allow the body of a class to be on the same line as the declaration if body
+# contains single statement.
+single-line-class-stmt=no
+
+# Allow the body of an if to be on the same line as the test if there is no
+# else.
+single-line-if-stmt=no
+
+[SIMILARITIES]
+# Minimum lines number of a similarity.
+min-similarity-lines=8
+
+# Ignore comments when computing similarities.
+ignore-comments=yes
+
+# Ignore docstrings when computing similarities.
+ignore-docstrings=yes
+
+# Ignore imports when computing similarities.
+ignore-imports=yes
+
+[VARIABLES]
+# Tells whether we should check for unused import in __init__ files.
+init-import=no
+
+# A regular expression matching the name of dummy variables (i.e. expectedly
+# not used).
+dummy-variables-rgx=_$|dummy|unused
+
+[TYPECHECK]
+# List of members which are set dynamically and missed by pylint inference
+generated-members=REQUEST,acl_users,aq_parent,objects,DoesNotExist,id,pk,_meta,base_fields,context
+
+# List of Python modules that will be skipped for C extension member checks
+extension-pkg-allow-list=yara
+
+# List of decorators that produce context managers
+contextmanager-decorators=contextlib.contextmanager,contextlib.asynccontextmanager
+
+[CLASSES]
+# List of method names used to declare (i.e. assign) instance attributes.
+defining-attr-methods=__init__,__new__,setUp,__post_init__
+
+# List of valid names for the first argument in a class method.
+valid-classmethod-first-arg=cls
+
+# List of valid names for the first argument in a metaclass class method.
+valid-metaclass-classmethod-first-arg=mcs
+
+[IMPORTS]
+# Allow wildcard imports from modules that define __all__.
+allow-wildcard-with-all=no
+
+[DESIGN]
+# Maximum number of arguments for function / method
+max-args=8
+
+# Maximum number of attributes for a class (see R0902).
+max-attributes=15
+
+# Maximum number of boolean expressions in a if statement
+max-bool-expr=5
+
+# Maximum number of branch for function / method body
+max-branches=12
+
+# Maximum number of locals for function / method body
+max-locals=25
+
+# Maximum number of return / yield for function / method body
+max-returns=8
+
+# Maximum number of statements in function / method body
+max-statements=50
+
+# Minimum number of public methods for a class (see R0903).
+min-public-methods=1
+
+# Maximum number of public methods for a class (see R0904).
+max-public-methods=35

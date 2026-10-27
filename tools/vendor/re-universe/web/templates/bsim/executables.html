@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+
+{% block title %}Executables - Ghidra RE Platform{% endblock %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header flex flex-between flex-center">
+        <h2>Executables in BSim Database</h2>
+        <form method="get" class="flex gap-1">
+            <input type="text" name="q" class="form-control" placeholder="Search by name..." value="{{ query }}" style="width: 200px;">
+            <select name="arch" class="form-control" style="width: 120px;" onchange="this.form.submit()">
+                <option value="">All Arch</option>
+                {% for arch in architectures %}
+                    <option value="{{ arch }}" {% if current_arch == arch %}selected{% endif %}>{{ arch }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn">Search</button>
+        </form>
+    </div>
+    <div class="panel-content">
+        {% if executables %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Architecture</th>
+                        <th>MD5</th>
+                        <th>Ingested</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for exe in executables %}
+                    <tr>
+                        <td><a href="{% url 'bsim:executable_detail' exe.id %}" class="text-magic">{{ exe.name_exec }}</a></td>
+                        <td class="mono text-unique">{{ exe.architecture|default:"-" }}</td>
+                        <td class="mono text-muted">{{ exe.md5|slice:":16" }}...</td>
+                        <td class="text-muted">{{ exe.ingest_date|timesince }} ago</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            {% if executables.has_other_pages %}
+                <div class="pagination">
+                    {% if executables.has_previous %}
+                        <a href="?page={{ executables.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if current_arch %}&arch={{ current_arch }}{% endif %}">&laquo; Prev</a>
+                    {% endif %}
+                    
+                    {% for num in executables.paginator.page_range %}
+                        {% if executables.number == num %}
+                            <span class="current">{{ num }}</span>
+                        {% elif num > executables.number|add:'-3' and num < executables.number|add:'3' %}
+                            <a href="?page={{ num }}{% if query %}&q={{ query }}{% endif %}{% if current_arch %}&arch={{ current_arch }}{% endif %}">{{ num }}</a>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if executables.has_next %}
+                        <a href="?page={{ executables.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if current_arch %}&arch={{ current_arch }}{% endif %}">Next &raquo;</a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        {% else %}
+            <p class="text-center" style="color: var(--text-muted); padding: 3rem;">
+                {% if query or current_arch %}
+                    No executables found matching your criteria.
+                {% else %}
+                    No executables in the database yet. Ingest binaries using Ghidra BSim tools.
+                {% endif %}
+            </p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
