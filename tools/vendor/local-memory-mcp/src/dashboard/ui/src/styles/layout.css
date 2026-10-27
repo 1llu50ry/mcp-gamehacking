@@ -1,0 +1,172 @@
+/* ─── Glowing Cards ──────────────────────────────────────────────────────── */
+.glass-card {
+	border-radius: var(--radius-lg);
+	padding: 20px;
+	position: relative;
+	overflow: hidden;
+}
+
+.glass-card::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, transparent 60%);
+	pointer-events: none;
+	z-index: 0;
+}
+
+.dark .glass-card::after {
+	background: linear-gradient(135deg, rgba(148, 163, 184, 0.04) 0%, transparent 60%);
+}
+
+/* ─── Layout ──────────────────────────────────────────────────────────────── */
+.app-layout {
+	display: flex;
+	min-height: 100vh;
+}
+
+.sidebar {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: var(--sidebar-width);
+	height: 100dvh;
+	overflow: hidden;
+	overflow-y: auto;
+	scrollbar-width: thin;
+	transition: width 0.3s var(--ease-smooth);
+	z-index: var(--z-sidebar, 40);
+}
+
+.sidebar.collapsed {
+	width: var(--sidebar-collapsed-width);
+}
+
+.main-content {
+	flex: 1;
+	min-width: 0;
+	margin-left: var(--sidebar-width);
+	transition: margin-left 0.3s var(--ease-smooth);
+}
+
+/* Shell padding is a TOKEN, not a magic number. It was `20px`, off the 8pt
+   scale, while `.arena-fullwidth` cancelled it with `--space-5` (24px) — a 4px
+   mismatch per side that produced a permanent horizontal scrollbar on the arena
+   route. Anything that needs to escape this padding must reference the same
+   custom property. */
+.dashboard-shell {
+	--shell-pad: var(--space-5);
+	padding: var(--shell-pad);
+	min-height: calc(100vh - var(--header-height));
+	min-width: 0;
+}
+
+.sidebar.collapsed ~ .main-content,
+.main-content.sidebar-collapsed {
+	margin-left: var(--sidebar-collapsed-width);
+}
+
+@media (max-width: 1024px) {
+	.app-layout > .sidebar {
+		display: none !important;
+	}
+	.main-content {
+		margin-left: 0 !important;
+	}
+}
+
+.mobile-sidebar-shell {
+	position: fixed;
+	inset: 0 auto 0 0;
+	width: min(320px, 86vw);
+	height: 100dvh;
+	z-index: var(--z-mobile-shell, 39);
+	display: flex;
+	flex-direction: column;
+}
+
+.mobile-sidebar-shell .sidebar {
+	display: flex !important;
+	position: relative !important;
+	width: 100% !important;
+	height: 100dvh !important;
+}
+
+.top-bar {
+	position: sticky;
+	top: 0;
+	z-index: var(--z-topbar, 30);
+}
+
+/* ─── Tab Buttons ───────────────────────────────────────────────────────────── */
+/* NOTE (TASK-425): the content-area horizontal tab strip (.tab-nav/.tabs-wrap)
+   was removed — navigation lives in the RepoSidebar (lib/navigation.ts). The
+   .tab-btn style below is retained for TimeStatsWidget's period tabs. */
+.tab-btn {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-height: 40px;
+	padding: 8px 14px;
+	border-radius: 9px;
+	font-size: 0.8rem;
+	font-weight: 600;
+	color: var(--color-text-muted);
+	transition: all var(--duration-base) var(--ease-smooth);
+	cursor: pointer;
+	border: none;
+	background: transparent;
+	white-space: nowrap;
+	position: relative;
+	overflow: hidden;
+}
+
+.tab-btn::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: radial-gradient(circle at center, rgba(14, 165, 233, 0.12), transparent 70%);
+	opacity: 0;
+	transition: opacity var(--duration-base) ease;
+	pointer-events: none;
+}
+
+.tab-btn:hover {
+	color: var(--color-text);
+}
+.tab-btn:hover::after {
+	opacity: 1;
+}
+
+.dark .tab-btn:hover {
+	color: var(--color-text);
+}
+
+.tab-btn.active {
+	background: white;
+	color: var(--color-primary);
+	box-shadow:
+		0 2px 10px rgba(0, 0, 0, 0.07),
+		0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.tab-btn.active::after {
+	opacity: 0;
+}
+
+.dark .tab-btn.active {
+	background: rgba(10, 18, 38, 0.95);
+	color: #7dd3fc;
+	box-shadow:
+		0 0 0 1px rgba(56, 189, 248, 0.2),
+		0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+/* The 40px .tab-btn clears the pointer minimum but not the WCAG 2.2 touch
+   floor; the tokens.css mobile override shrinks its padding further. */
+@media (pointer: coarse) {
+	.tab-btn {
+		min-height: 44px;
+	}
+}

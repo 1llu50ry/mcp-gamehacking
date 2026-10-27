@@ -1,0 +1,114 @@
+name: Performance & Load Testing
+
+on:
+  schedule:
+    # Run performance tests weekly on Sundays at 3 AM UTC
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+    inputs:
+      test_duration:
+        description: 'Test duration in minutes'
+        required: false
+        default: '10'
+        type: string
+      load_level:
+        description: 'Load level (light, medium, heavy)'
+        required: false
+        default: 'medium'
+        type: choice
+        options:
+        - light
+        - medium
+        - heavy
+
+jobs:
+  performance-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup test environment
+      run: |
+        chmod +x *.sh
+        ./setup.sh
+        sudo apt-get update
+        sudo apt-get install -y htop iotop sysstat
+    
+    - name: Start platform for performance testing
+      run: |
+        ./start.sh
+        sleep 30
+        ./test-connectivity.sh
+    
+    - name: Run performance monitoring
+      run: |
+        # Start monitoring in background
+        iostat -x 1 > iostat.log &
+        IOSTAT_PID=$!
+        
+        vmstat 1 > vmstat.log &
+        VMSTAT_PID=$!
+        
+        # Monitor Docker container resources
+        docker stats --no-stream > docker-stats-initial.log
+        
+        echo "Performance monitoring started..."
+        
+        # Run load test based on input
+        DURATION="${{ github.event.inputs.test_duration || '10' }}"
+        LOAD_LEVEL="${{ github.event.inputs.load_level || 'medium' }}"
+        
+        case "$LOAD_LEVEL" in
+          "light")
+            echo "Running light load test for $DURATION minutes..."
+            timeout ${DURATION}m bash -c 'while true; do ./test-connectivity.sh >/dev/null 2>&1; sleep 5; done' || true
+            ;;
+          "medium") 
+            echo "Running medium load test for $DURATION minutes..."
+            timeout ${DURATION}m bash -c 'while true; do ./test-connectivity.sh >/dev/null 2>&1; sleep 2; done' || true
+            ;;
+          "heavy")
+            echo "Running heavy load test for $DURATION minutes..."
+            timeout ${DURATION}m bash -c 'while true; do ./test-connectivity.sh >/dev/null 2>&1; sleep 1; done' || true
+            ;;
+        esac
+        
+        # Stop monitoring
+        kill $IOSTAT_PID $VMSTAT_PID 2>/dev/null || true
+        
+        # Final resource snapshot
+        docker stats --no-stream > docker-stats-final.log
+        
+        echo "Performance test completed"
+    
+    - name: Analyze performance results
+      run: |
+        echo "=== Performance Test Results ==="
+        echo "Test Duration: ${{ github.event.inputs.test_duration || '10' }} minutes"
+        echo "Load Level: ${{ github.event.inputs.load_level || 'medium' }}"
+        echo ""
+        
+        echo "=== Docker Container Performance ==="
+        echo "Initial Stats:"
+        cat docker-stats-initial.log
+        echo ""
+        echo "Final Stats:"
+        cat docker-stats-final.log
+    
+    - name: Cleanup performance test
+      if: always()
+      run: |
+        ./stop.sh || true
+        docker compose down --volumes --remove-orphans || true
+    
+    - name: Upload performance artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: performance-test-results
+        path: |
+          *.log
+          docker-stats-*.log

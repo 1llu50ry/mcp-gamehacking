@@ -1,0 +1,70 @@
+<?xml version='1.0' encoding='ISO-8859-1' ?>
+
+<!-- ReVa - Reverse Engineering Assistant -->
+<!-- Table of Contents definition for Ghidra help system -->
+
+<tocroot>
+
+    <tocref id="Ghidra Functionality">
+
+        <tocdef id="ReVa"
+                text="ReVa - Reverse Engineering Assistant"
+                target="help/topics/ReVa/ReVa_overview.html">
+
+            <tocdef id="ReVa_Installation"
+                    sortgroup="a"
+                    text="Installation and Setup"
+                    target="help/topics/ReVa/ReVa_installation.html">
+
+                <tocdef id="ReVa_PluginInstallation"
+                        sortgroup="a"
+                        text="Plugin Installation"
+                        target="help/topics/ReVa/ReVa_installation.html#PluginInstallation"/>
+
+                <tocdef id="ReVa_PluginActivation"
+                        sortgroup="b"
+                        text="Plugin Activation"
+                        target="help/topics/ReVa/ReVa_installation.html#PluginActivation"/>
+
+                <tocdef id="ReVa_ClientConfiguration"
+                        sortgroup="c"
+                        text="MCP Client Configuration"
+                        target="help/topics/ReVa/ReVa_installation.html#ClientConfiguration"/>
+
+                <tocdef id="ReVa_CLIInstallation"
+                        sortgroup="d"
+                        text="CLI Setup"
+                        target="help/topics/ReVa/ReVa_installation.html#CLIInstallation"/>
+
+                <tocdef id="ReVa_Configuration"
+                        sortgroup="e"
+                        text="Configuration Options"
+                        target="help/topics/ReVa/ReVa_installation.html#Configuration"/>
+
+                <tocdef id="Follow_Me"
+                        sortgroup="f"
+                        text="Follow Me Mode"
+                        target="help/topics/ReVa/ReVa_installation.html#Follow_Me"/>
+
+                <tocdef id="ReVa_BuildFromSource"
+                        sortgroup="g"
+                        text="Build from Source"
+                        target="help/topics/ReVa/ReVa_installation.html#BuildFromSource"/>
+
+                <tocdef id="ReVa_Troubleshooting"
+                        sortgroup="h"
+                        text="Troubleshooting"
+                        target="help/topics/ReVa/ReVa_installation.html#Troubleshooting"/>
+
+            </tocdef>
+
+            <tocdef id="ReVa_Skills"
+                    sortgroup="b"
+                    text="Skills and Analysis Workflows"
+                    target="help/topics/ReVa/ReVa_skills.html"/>
+
+        </tocdef>
+
+    </tocref>
+
+</tocroot>

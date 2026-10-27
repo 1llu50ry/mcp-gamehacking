@@ -1,0 +1,312 @@
+/* ###
+ * IP: GHIDRA
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package reva.server;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+import java.lang.reflect.Field;
+import java.time.Duration;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.junit.Before;
+import org.junit.Test;
+
+import io.modelcontextprotocol.spec.HttpHeaders;
+import io.modelcontextprotocol.spec.McpSchema;
+import io.modelcontextprotocol.spec.McpStreamableServerSession;
+import jakarta.servlet.AsyncContext;
+import jakarta.servlet.ReadListener;
+import jakarta.servlet.ServletInputStream;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+/**
+ * Regression tests for the resilience fork's session lifecycle.
+ *
+ * <p>Reproduces the failure observed in the field: toggling tool groups broadcasts a
+ * burst of {@code tools/list_changed} notifications, and if one of those writes lands
+ * on a listening SSE stream whose connection the client has already recycled, the
+ * write fails. The transport must close only that stream and keep the session in the
+ * map, so the client's GET reconnect (with Last-Event-ID) resolves instead of hitting
+ * a 404 and dropping every registered tool.
+ */
+public class ResilientStreamableServerTransportProviderTest {
+
+	private static final String ENDPOINT = "/mcp/message";
+	private static final String SESSION_ID = "test-session";
+
+	private ResilientStreamableServerTransportProvider provider;
+
+	@Before
+	public void setUp() throws Exception {
+		// No keep-alive interval: avoids spinning up the scheduler thread in tests.
+		provider = ResilientStreamableServerTransportProvider.builder()
+			.mcpEndpoint(ENDPOINT)
+			.build();
+
+		// Insert a real session directly. Going through doPost(initialize) would require
+		// a wired McpServer/session factory; the session map is the only private detail
+		// we need, and a real session exercises the genuine notify -> listeningStream ->
+		// transport.sendMessage path that the broadcast travels.
+		McpStreamableServerSession session = new McpStreamableServerSession(SESSION_ID, null, null,
+				Duration.ofSeconds(1), new HashMap<>(), new HashMap<>());
+		sessions(provider).put(SESSION_ID, session);
+	}
+
+	@Test
+	public void brokenListeningStreamWriteKeepsSessionAlive() throws Exception {
+		// Establish the listening SSE stream over a writer whose connection is dead.
+		AsyncContext asyncContext = establishListeningStream(failingWriter());
+
+		// Broadcast as a tool toggle would: write fails on the dead connection.
+		provider.notifyClients(McpSchema.METHOD_NOTIFICATION_TOOLS_LIST_CHANGED, null).block();
+
+		// The session must survive — only the stream is gone.
+		assertTrue("Session must remain after a listening-stream write failure",
+				sessions(provider).containsKey(SESSION_ID));
+		// The dead stream's async context is completed (stream closed, not leaked).
+		verify(asyncContext, atLeastOnce()).complete();
+	}
+
+	@Test
+	public void sessionSurvivesBrokenStreamSoGetReconnectResolves() throws Exception {
+		// First GET establishes a stream that then fails on broadcast.
+		establishListeningStream(failingWriter());
+		provider.notifyClients(McpSchema.METHOD_NOTIFICATION_TOOLS_LIST_CHANGED, null).block();
+
+		// Client reconnects the GET stream with Last-Event-ID to resume.
+		HttpServletResponse reconnect = mock(HttpServletResponse.class);
+		when(reconnect.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
+		AsyncContext reconnectAsync = mock(AsyncContext.class);
+		HttpServletRequest reconnectRequest = getRequest(reconnectAsync);
+		when(reconnectRequest.getHeader(HttpHeaders.LAST_EVENT_ID)).thenReturn("5");
+
+		provider.doGet(reconnectRequest, reconnect);
+
+		// Reconnect resolved: the session was found, so no error response of any kind
+		// (neither sendError overload) and the stream re-opened.
+		verify(reconnect, never()).sendError(eq(HttpServletResponse.SC_NOT_FOUND));
+		verify(reconnect, never()).sendError(anyInt());
+		verify(reconnect, never()).sendError(anyInt(), anyString());
+		verify(reconnectRequest).startAsync();
+	}
+
+	@Test
+	public void serializationFailureDropsMessageButKeepsSessionAndStream() throws Exception {
+		// The other half of the fork's contract: upstream removes the session and
+		// completes the stream on ANY sendMessage exception, so one unserializable
+		// message permanently kills the session. The fork must drop only the message.
+		AsyncContext asyncContext = establishListeningStream(new PrintWriter(new StringWriter()));
+
+		// Bare Object has no serializer (FAIL_ON_EMPTY_BEANS is on by default), so
+		// building the notification JSON fails inside transport.sendMessage.
+		provider.notifyClients(McpSchema.METHOD_NOTIFICATION_TOOLS_LIST_CHANGED, new Object()).block();
+
+		assertTrue("Session must remain after a serialization failure",
+				sessions(provider).containsKey(SESSION_ID));
+		verify(asyncContext, never()).complete();
+	}
+
+	@Test
+	public void initializeBeforeSessionFactoryWiredReturns503() throws Exception {
+		// Issue #366: a provider the built McpServer never wired (restartServer() used to
+		// swap in a fresh instance under the already-built server) NPE'd on initialize and
+		// answered 500. It must instead fail retryable with 503 until the factory is set.
+		ResilientStreamableServerTransportProvider unwired =
+				ResilientStreamableServerTransportProvider.builder().mcpEndpoint(ENDPOINT).build();
+
+		HttpServletRequest request = mock(HttpServletRequest.class);
+		when(request.getRequestURI()).thenReturn(ENDPOINT);
+		when(request.getHeader("Accept")).thenReturn("text/event-stream, application/json");
+		when(request.getHeaderNames()).thenReturn(Collections.enumeration(Collections.emptyList()));
+		when(request.getInputStream()).thenReturn(servletInput((
+				"{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{"
+						+ "\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},"
+						+ "\"clientInfo\":{\"name\":\"test-client\",\"version\":\"1.0\"}}}")
+				.getBytes(StandardCharsets.UTF_8)));
+
+		HttpServletResponse response = mock(HttpServletResponse.class);
+		unwired.doPost(request, response);
+
+		verify(response).sendError(eq(HttpServletResponse.SC_SERVICE_UNAVAILABLE), anyString());
+	}
+
+	@Test
+	public void oversizedContentLengthRejectedWith413() throws Exception {
+		// Upstream SDK 2.0.1 hardening the fork was missing: a body declaring an
+		// oversized Content-Length is rejected before anything is buffered.
+		ResilientStreamableServerTransportProvider limited = ResilientStreamableServerTransportProvider.builder()
+			.mcpEndpoint(ENDPOINT)
+			.maxRequestSize(64)
+			.build();
+
+		HttpServletRequest request = mock(HttpServletRequest.class);
+		when(request.getRequestURI()).thenReturn(ENDPOINT);
+		when(request.getContentLengthLong()).thenReturn(4096L);
+
+		HttpServletResponse response = mock(HttpServletResponse.class);
+		limited.doPost(request, response);
+
+		verify(response).sendError(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE);
+		verify(request, never()).getInputStream();
+	}
+
+	@Test
+	public void chunkedBodyOverLimitRejectedWith413() throws Exception {
+		// Chunked requests (Content-Length: -1) bypass the pre-check; the bounded read
+		// itself must stop at the limit and produce a 413.
+		ResilientStreamableServerTransportProvider limited = ResilientStreamableServerTransportProvider.builder()
+			.mcpEndpoint(ENDPOINT)
+			.maxRequestSize(64)
+			.build();
+
+		HttpServletRequest request = mock(HttpServletRequest.class);
+		when(request.getRequestURI()).thenReturn(ENDPOINT);
+		when(request.getContentLengthLong()).thenReturn(-1L);
+		when(request.getHeaderNames()).thenReturn(Collections.enumeration(Collections.emptyList()));
+		when(request.getInputStream()).thenReturn(servletInput(new byte[100]));
+
+		HttpServletResponse response = mock(HttpServletResponse.class);
+		limited.doPost(request, response);
+
+		verify(response).sendError(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE);
+	}
+
+	@Test
+	public void readBodyFallsBackToUtf8AndEnforcesLimit() throws Exception {
+		// The fork previously decoded via request.getReader(), which defaults to
+		// ISO-8859-1 when clients omit the charset — mangling non-ASCII JSON (e.g.
+		// Japanese strings in tool arguments). readBody must default to UTF-8.
+		HttpServletRequest request = mock(HttpServletRequest.class);
+		when(request.getCharacterEncoding()).thenReturn(null);
+		when(request.getInputStream()).thenReturn(
+				servletInput("{\"name\":\"日本語\"}".getBytes(StandardCharsets.UTF_8)));
+
+		assertEquals("{\"name\":\"日本語\"}", ResilientStreamableServerTransportProvider.readBody(request, 1024));
+
+		// And it must enforce the byte cap while streaming.
+		when(request.getInputStream()).thenReturn(servletInput(new byte[65]));
+		try {
+			ResilientStreamableServerTransportProvider.readBody(request, 64);
+			fail("readBody must throw MaxSizeExceededException past the limit");
+		}
+		catch (ResilientStreamableServerTransportProvider.MaxSizeExceededException expected) {
+			// expected
+		}
+	}
+
+	/** Wraps bytes as a ServletInputStream for mocks (what readBody consumes). */
+	private static ServletInputStream servletInput(byte[] bytes) {
+		ByteArrayInputStream delegate = new ByteArrayInputStream(bytes);
+		return new ServletInputStream() {
+			@Override
+			public boolean isFinished() {
+				return delegate.available() == 0;
+			}
+
+			@Override
+			public boolean isReady() {
+				return true;
+			}
+
+			@Override
+			public void setReadListener(ReadListener readListener) {
+			}
+
+			@Override
+			public int read() {
+				return delegate.read();
+			}
+
+			@Override
+			public int read(byte[] b, int off, int len) {
+				return delegate.read(b, off, len);
+			}
+		};
+	}
+
+	// --- helpers ---------------------------------------------------------------
+
+	/** Drives doGet to attach a listening stream backed by the given writer. */
+	private AsyncContext establishListeningStream(PrintWriter writer) throws Exception {
+		HttpServletResponse response = mock(HttpServletResponse.class);
+		when(response.getWriter()).thenReturn(writer);
+		AsyncContext asyncContext = mock(AsyncContext.class);
+		HttpServletRequest request = getRequest(asyncContext);
+		// Fresh listening stream (no replay).
+		when(request.getHeader(HttpHeaders.LAST_EVENT_ID)).thenReturn(null);
+
+		provider.doGet(request, response);
+		return asyncContext;
+	}
+
+	/** A mock GET request for our session, returning the given async context. */
+	private HttpServletRequest getRequest(AsyncContext asyncContext) {
+		HttpServletRequest request = mock(HttpServletRequest.class);
+		when(request.getRequestURI()).thenReturn(ENDPOINT);
+		when(request.getHeader("Accept")).thenReturn("text/event-stream, application/json");
+		when(request.getHeader(HttpHeaders.MCP_SESSION_ID)).thenReturn(SESSION_ID);
+		when(request.getHeaderNames()).thenReturn(Collections.enumeration(Collections.emptyList()));
+		when(request.startAsync()).thenReturn(asyncContext);
+		return request;
+	}
+
+	/** A PrintWriter whose underlying connection is dead: every write trips checkError(). */
+	private static PrintWriter failingWriter() {
+		Writer dead = new Writer() {
+			@Override
+			public void write(char[] cbuf, int off, int len) throws IOException {
+				throw new IOException("client disconnected");
+			}
+
+			@Override
+			public void flush() throws IOException {
+				throw new IOException("client disconnected");
+			}
+
+			@Override
+			public void close() {
+			}
+		};
+		return new PrintWriter(dead);
+	}
+
+	@SuppressWarnings("unchecked")
+	private static Map<String, McpStreamableServerSession> sessions(
+			ResilientStreamableServerTransportProvider provider) throws Exception {
+		Field field = ResilientStreamableServerTransportProvider.class.getDeclaredField("sessions");
+		field.setAccessible(true);
+		return (Map<String, McpStreamableServerSession>) field.get(provider);
+	}
+}

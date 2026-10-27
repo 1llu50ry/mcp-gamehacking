@@ -1,0 +1,274 @@
+/* ─── Data Tables ────────────────────────────────────────────────────────────
+   Single canonical stylesheet for dashboard data tables (.mem-table-wrap,
+   .mem-table, .mem-thead-row, .mem-th, .mem-td, .mem-row, .row-actions,
+   .row-action-btn).
+
+   Consistent styling:
+   - Header: subtle surface bg, uppercase, size/weight/letter-spacing
+   - Cells: padding + bottom hairline border
+   - Row hover: subtle highlight
+   - Selected row: single accent color (--color-primary-soft / --color-primary-soft-strong)
+   - Action buttons: token-based size (36px min, 44px coarse), radius (--radius-sm)
+   - Mobile card fallbacks: shared grid gap (12px), card padding (16px), radius (--radius-lg)
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* ── Table Wrapper ── */
+.mem-table-wrap {
+	overflow-x: auto;
+	border-radius: var(--radius-md);
+	border: 1px solid var(--color-border);
+	background: var(--color-surface);
+}
+
+/* ── Table Base ── */
+.mem-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: var(--text-body);
+}
+
+/* ── Head ── */
+.mem-thead-row {
+	border-bottom: 1px solid var(--color-border);
+	background: rgba(248, 250, 252, 0.9);
+}
+
+.dark .mem-thead-row,
+html.dark .mem-thead-row {
+	background: rgba(10, 18, 38, 0.85);
+}
+
+.mem-th {
+	padding: 10px 12px;
+	text-align: left;
+	font-size: var(--text-label);
+	font-weight: var(--weight-bold);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--color-text-muted);
+	white-space: nowrap;
+	user-select: none;
+}
+
+.mem-th.sortable {
+	cursor: pointer;
+}
+
+.mem-th.sortable:hover {
+	color: var(--color-text);
+}
+
+/* ── Body Cells & Rows ── */
+.mem-td {
+	padding: 10px 12px;
+	border-bottom: 1px solid var(--color-border);
+	vertical-align: middle;
+}
+
+.dark .mem-td,
+html.dark .mem-td {
+	border-color: rgba(148, 163, 184, 0.08);
+}
+
+.mem-row {
+	transition: background var(--duration-fast) ease;
+}
+
+.mem-row.clickable,
+.mem-row[role="button"],
+.mem-row[tabindex] {
+	cursor: pointer;
+}
+
+.mem-row:hover {
+	background: var(--color-surface-hover);
+}
+
+.dark .mem-row:hover,
+html.dark .mem-row:hover {
+	background: rgba(14, 165, 233, 0.05);
+}
+
+.mem-row.selected {
+	background: var(--color-primary-soft);
+}
+
+.dark .mem-row.selected,
+html.dark .mem-row.selected {
+	background: var(--color-primary-soft);
+}
+
+/* Last row in table: no bottom border */
+.mem-row:last-child .mem-td {
+	border-bottom: none;
+}
+
+/* ── Row Action Buttons ── */
+.row-actions {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	white-space: nowrap;
+}
+
+/* For tables where actions reveal on hover */
+.mem-row .row-actions.reveal-on-hover {
+	opacity: 0;
+	transition: opacity var(--duration-fast) ease;
+}
+
+.mem-row:hover .row-actions.reveal-on-hover,
+.mem-row:focus-within .row-actions.reveal-on-hover {
+	opacity: 1;
+}
+
+.row-action-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	min-width: 36px;
+	min-height: 36px;
+	padding: 0;
+	border-radius: var(--radius-sm);
+	border: 1px solid transparent;
+	cursor: pointer;
+	background: transparent;
+	transition:
+		background var(--duration-fast) ease,
+		color var(--duration-fast) ease,
+		border-color var(--duration-fast) ease;
+	color: var(--color-text-muted);
+}
+
+@media (max-width: 640px) {
+	/* Ensure tap targets >= 32px (and 44px on touch) without layout shifts */
+	.row-action-btn {
+		min-width: 32px;
+		min-height: 32px;
+	}
+}
+
+.row-action-btn.has-label {
+	width: auto;
+	padding: 5px 9px;
+	gap: 5px;
+	font-size: 0.72rem;
+	font-weight: var(--weight-bold);
+	border-color: var(--color-border);
+}
+
+.row-action-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+@media (pointer: coarse) {
+	.row-action-btn {
+		min-width: 44px;
+		min-height: 44px;
+		width: 44px;
+		height: 44px;
+	}
+	.row-action-btn.has-label {
+		width: auto;
+	}
+}
+
+.row-action-btn.edit-btn:hover:not(:disabled) {
+	background: var(--color-primary-soft);
+	color: var(--color-primary);
+}
+
+.row-action-btn.retry-btn:hover:not(:disabled) {
+	background: var(--color-primary-soft);
+	color: var(--color-primary);
+	border-color: rgba(37, 99, 235, 0.25);
+}
+
+.row-action-btn.delete-btn:hover:not(:disabled) {
+	background: rgba(239, 68, 68, 0.1);
+	color: var(--color-danger);
+	border-color: rgba(239, 68, 68, 0.25);
+}
+
+.dark .row-action-btn.delete-btn:hover:not(:disabled),
+html.dark .row-action-btn.delete-btn:hover:not(:disabled) {
+	background: rgba(239, 68, 68, 0.15);
+	color: #fca5a5;
+}
+
+/* ── Standard Mobile Cards Fallback ── */
+.data-cards {
+	display: none;
+}
+
+.data-card {
+	display: grid;
+	gap: var(--space-3);
+	padding: var(--space-4);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-lg);
+	background: var(--color-surface);
+	transition:
+		border-color var(--duration-fast) ease,
+		box-shadow var(--duration-fast) ease;
+}
+
+.data-card.selected {
+	border-color: var(--color-primary);
+	background: var(--color-primary-soft);
+}
+
+/* ── Shared Table Pagination ── */
+.table-pagination {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-3);
+	margin-top: var(--space-3);
+}
+
+.table-pagination-info {
+	font-size: var(--text-label);
+	color: var(--color-text-muted);
+	font-variant-numeric: tabular-nums;
+	user-select: none;
+}
+
+.table-pagination-controls {
+	display: flex;
+	align-items: center;
+	gap: var(--space-1);
+}
+
+.table-pagination-btn {
+	min-width: 32px;
+	padding-left: 8px;
+	padding-right: 8px;
+}
+
+@media (max-width: 720px) {
+	.mem-table-wrap {
+		display: none;
+	}
+	.data-cards {
+		display: grid;
+		gap: var(--space-3);
+	}
+	.table-pagination {
+		justify-content: space-between;
+		flex-wrap: wrap;
+	}
+	.table-pagination-info {
+		order: -1;
+		width: 100%;
+		text-align: center;
+	}
+	.table-pagination-controls {
+		width: 100%;
+		justify-content: center;
+		flex-wrap: wrap;
+	}
+}

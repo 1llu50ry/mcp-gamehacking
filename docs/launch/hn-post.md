@@ -18,7 +18,7 @@ I spent a few months collapsing my game-RE toolbelt into one MCP server. The res
 
 **Why**: switching between IDA, Ghidra, x64dbg, Cheat Engine, Frida, mitmproxy, and Volatility costs more hours than the actual reversing. One MCP connection + one shared mesh fixes that.
 
-**Repo**: https://github.com/whory/mcp-gamehacking
+**Repo**: https://github.com/1llu50ry/mcp-gamehacking
 
 **Ethics**: security research, cheat *detection*, defensive engineering, education. Doesn't ship cheats and doesn't drive gameplay.
 

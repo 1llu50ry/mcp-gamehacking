@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Diablo 2 Sorceress Build Analysis</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        h2 {
+            color: #34495e;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 5px;
+            margin-bottom: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 12px;
+        }
+
+        th {
+            background-color: #3498db;
+            color: white;
+            padding: 12px 8px;
+            text-align: left;
+            border: 1px solid #ddd;
+            font-weight: bold;
+        }
+
+        td {
+            padding: 10px 8px;
+            border: 1px solid #ddd;
+            vertical-align: top;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        tr:hover {
+            background-color: #f0f8ff;
+        }
+
+        .fire {
+            background-color: #ffebee;
+        }
+
+        .lightning {
+            background-color: #fff3e0;
+        }
+
+        .cold {
+            background-color: #e8f5e8;
+        }
+
+        .build-type {
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+            color: white;
+        }
+
+        .fire-type {
+            background-color: #f44336;
+        }
+
+        .lightning-type {
+            background-color: #ff9800;
+        }
+
+        .cold-type {
+            background-color: #4caf50;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .stat-box {
+            background-color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Project Diablo 2 Sorceress Build Analysis</h1>
+
+        <div class="section">
+            <h2>Build Type Overview</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Build Type</th>
+                        <th>Example Character</th>
+                        <th>Rank</th>
+                        <th>Primary Focus</th>
+                        <th>Survivability</th>
+                        <th>Damage Style</th>
+                        <th>Difficulty</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="fire">
+                        <td><span class="build-type fire-type">Fire</span></td>
+                        <td>Nuknooob_Oca</td>
+                        <td>#1</td>
+                        <td>Balanced Offense</td>
+                        <td>Moderate</td>
+                        <td>Multi-skill synergy</td>
+                        <td>Beginner Friendly</td>
+                    </tr>
+                    <tr class="lightning">
+                        <td><span class="build-type lightning-type">Lightning</span></td>
+                        <td>ElecSys</td>
+                        <td>#23</td>
+                        <td>High Damage/Mana</td>
+                        <td>Energy Shield</td>
+                        <td>Burst damage</td>
+                        <td>Advanced</td>
+                    </tr>
+                    <tr class="cold">
+                        <td><span class="build-type cold-type">Cold</span></td>
+                        <td>IcyHippo</td>
+                        <td>#24</td>
+                        <td>Survivability</td>
+                        <td>Very High</td>
+                        <td>Control + damage</td>
+                        <td>Safe Farming</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>Detailed Character Analysis</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Character</th>
+                        <th>Build Type</th>
+                        <th>Level</th>
+                        <th>Life</th>
+                        <th>Mana</th>
+                        <th>Strength</th>
+                        <th>Dexterity</th>
+                        <th>Vitality</th>
+                        <th>Energy</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="fire">
+                        <td>Nuknooob_Oca</td>
+                        <td><span class="build-type fire-type">Fire</span></td>
+                        <td>99</td>
+                        <td>899</td>
+                        <td>782</td>
+                        <td>67</td>
+                        <td>25</td>
+                        <td>333</td>
+                        <td>160</td>
+                    </tr>
+                    <tr class="lightning">
+                        <td>ElecSys</td>
+                        <td><span class="build-type lightning-type">Lightning</span></td>
+                        <td>99</td>
+                        <td>907</td>
+                        <td>1617</td>
+                        <td>136</td>
+                        <td>184</td>
+                        <td>10</td>
+                        <td>255</td>
+                    </tr>
+                    <tr class="cold">
+                        <td>IcyHippo</td>
+                        <td><span class="build-type cold-type">Cold</span></td>
+                        <td>99</td>
+                        <td>1814</td>
+                        <td>546</td>
+                        <td>93</td>
+                        <td>25</td>
+                        <td>432</td>
+                        <td>35</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>Skill Point Distribution</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Skill Category</th>
+                        <th>Fire Build (Nuknooob_Oca)</th>
+                        <th>Lightning Build (ElecSys)</th>
+                        <th>Cold Build (IcyHippo)</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Primary Damage Skills</strong></td>
+                        <td>Inferno (20), Blaze (20), Fire Ball (20), Meteor (20)</td>
+                        <td>Charged Bolt (20), Lightning (20)</td>
+                        <td>Ice Bolt (20), Frost Nova (20), Frozen Orb (20)</td>
+                        <td>All builds max 3-4 core skills</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Mastery Skills</strong></td>
+                        <td>Fire Mastery (20)</td>
+                        <td>Lightning Mastery (20)</td>
+                        <td>Cold Mastery (20)</td>
+                        <td>Universal 20-point investment</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Defensive Skills</strong></td>
+                        <td>-</td>
+                        <td>Energy Shield (20)</td>
+                        <td>Shiver Armor (1)</td>
+                        <td>Lightning relies on ES</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Utility Skills</strong></td>
+                        <td>Teleport (1), Static Field (1), Telekinesis (1), Warmth (1)</td>
+                        <td>Teleport (2), Static Field (1), Telekinesis (20), Warmth (1)</td>
+                        <td>Teleport (19), Telekinesis (1), Warmth (1)</td>
+                        <td>Teleport priority varies by build</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Secondary Skills</strong></td>
+                        <td>Enchant (3), Fire Bolt (1), Fire Wall (1), Lesser Hydra (1)</td>
+                        <td>Thunder Storm (4), Nova (1), Chain Lightning (1)</td>
+                        <td>Glacial Spike (1), Blizzard (1), Ice Blast (1), Cold Enchant (1)</td>
+                        <td>Build-specific synergies</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>Character Names by Build Type</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Build Type</th>
+                        <th>Example Character Names</th>
+                        <th>Common Themes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="fire">
+                        <td><span class="build-type fire-type">Fire</span></td>
+                        <td>Pyromaniac, CombUUUst, Nuknooob_Oca</td>
+                        <td>Heat, combustion, fire references</td>
+                    </tr>
+                    <tr class="lightning">
+                        <td><span class="build-type lightning-type">Lightning</span></td>
+                        <td>ElecSys, Electrica, Charged_Bolt, ShartBolt, Flash</td>
+                        <td>Electric, bolt, lightning terms</td>
+                    </tr>
+                    <tr class="cold">
+                        <td><span class="build-type cold-type">Cold</span></td>
+                        <td>IcyHippo, IceBernz, IcyMagic, H-IceBarrage, R-Coldslaw, VC-ColdBeer</td>
+                        <td>Ice, cold, frost references</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Magic Find</strong></td>
+                        <td>MF_MACHINE, MfSargonia, EhvanMF, mf-pdII</td>
+                        <td>MF abbreviations, farming focus</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>Universal Build Patterns</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Pattern</th>
+                        <th>Description</th>
+                        <th>All Builds</th>
+                        <th>Exceptions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Teleport Investment</strong></td>
+                        <td>Mobility skill for positioning and escape</td>
+                        <td>✓ (1-19 points)</td>
+                        <td>Cold builds invest heavily (19 pts)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Static Field</strong></td>
+                        <td>Crowd control and boss damage</td>
+                        <td>✓ (1 point)</td>
+                        <td>None observed</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Warmth</strong></td>
+                        <td>Mana regeneration utility</td>
+                        <td>✓ (1 point)</td>
+                        <td>None observed</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Elemental Mastery</strong></td>
+                        <td>20-point damage amplification</td>
+                        <td>✓ (20 points)</td>
+                        <td>None observed</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Multi-Element Access</strong></td>
+                        <td>Basic skills from other trees</td>
+                        <td>✓ (1 point each)</td>
+                        <td>Build-dependent selection</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>Build Recommendations</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Player Type</th>
+                        <th>Recommended Build</th>
+                        <th>Reasoning</th>
+                        <th>Key Advantages</th>
+                        <th>Considerations</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="fire">
+                        <td><strong>New Players</strong></td>
+                        <td><span class="build-type fire-type">Fire</span></td>
+                        <td>Balanced stats, straightforward gameplay</td>
+                        <td>Multiple damage skills, moderate survivability</td>
+                        <td>Requires diverse skill point investment</td>
+                    </tr>
+                    <tr class="lightning">
+                        <td><strong>Experienced Players</strong></td>
+                        <td><span class="build-type lightning-type">Lightning</span></td>
+                        <td>High damage potential, complex management</td>
+                        <td>Excellent clear speed, Energy Shield synergy</td>
+                        <td>Mana management critical, glass cannon</td>
+                    </tr>
+                    <tr class="cold">
+                        <td><strong>Safe Farmers</strong></td>
+                        <td><span class="build-type cold-type">Cold</span></td>
+                        <td>Maximum survivability for consistent runs</td>
+                        <td>Highest HP, crowd control, reliable farming</td>
+                        <td>Lower damage output, slower clear speed</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-value">200</div>
+                <div class="stat-label">Characters Analyzed</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">3</div>
+                <div class="stat-label">Major Build Types</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">96-99</div>
+                <div class="stat-label">Level Range</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">100%</div>
+                <div class="stat-label">Use Teleport</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

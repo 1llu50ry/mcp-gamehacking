@@ -1,0 +1,235 @@
+name: Automated Testing Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  windows-tests:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Test PowerShell Scripts
+      shell: powershell
+      run: |
+        Write-Host "=== PowerShell Script Validation ===" -ForegroundColor Cyan
+        
+        # Test essential scripts exist
+        $scripts = @("config.ps1", "start.ps1", "stop.ps1", "backup.ps1", "test-connectivity.ps1")
+        foreach ($script in $scripts) {
+          if (Test-Path $script) {
+            Write-Host "✅ $script exists" -ForegroundColor Green
+          } else {
+            Write-Host "❌ Missing: $script" -ForegroundColor Red
+            exit 1
+          }
+        }
+        
+        # Test configuration management
+        .\config.ps1 -Action validate
+        Write-Host "✅ Configuration validation passed" -ForegroundColor Green
+    
+    - name: Test Environment Setup
+      shell: powershell
+      run: |
+        # Test that .env.example exists and can create .env
+        if (!(Test-Path ".env.example")) {
+          Write-Host "❌ .env.example missing" -ForegroundColor Red
+          exit 1
+        }
+        
+        # Test directory creation
+        $dirs = @("repo-data", "sync-logs", "backups")
+        foreach ($dir in $dirs) {
+          if (!(Test-Path $dir)) {
+            New-Item -ItemType Directory -Path $dir -Force | Out-Null
+          }
+          Write-Host "✅ Directory ready: $dir" -ForegroundColor Green
+        }
+
+  linux-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Setup Test Environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y jq bc
+        chmod +x *.sh
+    
+    - name: Test Bash Scripts
+      run: |
+        echo "=== Bash Script Validation ==="
+        
+        # Test essential scripts exist and have valid syntax
+        scripts=("config.sh" "start.sh" "stop.sh" "backup.sh" "test-connectivity.sh")
+        for script in "${scripts[@]}"; do
+          if [[ -f "$script" ]]; then
+            echo "✅ $script exists"
+            if bash -n "$script"; then
+              echo "✅ $script syntax valid"
+            else
+              echo "❌ $script syntax error"
+              exit 1
+            fi
+          else
+            echo "❌ Missing: $script"
+            exit 1
+          fi
+        done
+        
+        # Test configuration management
+        ./config.sh -Action validate
+        echo "✅ Configuration validation passed"
+    
+    - name: Test Docker Configuration
+      run: |
+        # Validate docker-compose syntax
+        docker compose config > /dev/null
+        echo "✅ docker-compose.yml syntax valid"
+        
+        # Check that ghidra-server service is defined
+        if docker compose config | grep -q "ghidra-server"; then
+          echo "✅ ghidra-server service defined"
+        else
+          echo "❌ ghidra-server service missing"
+          exit 1
+        fi
+
+  integration-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [linux-tests]
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Setup Integration Test
+      run: |
+        chmod +x *.sh
+        sudo apt-get update
+        sudo apt-get install -y jq bc
+    
+    - name: Run Quick Integration Test
+      run: |
+        echo "=== Quick Integration Test ==="
+        
+        # Test setup process
+        ./setup.sh
+        echo "✅ Setup completed"
+        
+        # Test configuration
+        ./config.sh -Action validate
+        echo "✅ Configuration valid"
+        
+        # Test Docker Compose (syntax only in CI)
+        docker compose config > /dev/null
+        echo "✅ Docker configuration valid"
+        
+        # Test that .env was created properly
+        if [[ -f ".env" ]]; then
+          echo "✅ .env file created"
+        else
+          echo "❌ .env file not created"
+          exit 1
+        fi
+    
+    - name: Upload Integration Artifacts
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: integration-test-artifacts
+        path: |
+          .env
+          *.log
+
+  documentation-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Validate Documentation
+      run: |
+        echo "=== Documentation Validation ==="
+        
+        # Check required documentation files
+        docs=("README.md" "CONTRIBUTING.md" "SECURITY.md" "CODE_OF_CONDUCT.md" "LICENSE")
+        for doc in "${docs[@]}"; do
+          if [[ -f "$doc" ]]; then
+            lines=$(wc -l < "$doc")
+            if (( lines > 5 )); then
+              echo "✅ $doc exists and has content ($lines lines)"
+            else
+              echo "⚠️  $doc exists but may be incomplete ($lines lines)"
+            fi
+          else
+            echo "❌ Missing: $doc"
+            exit 1
+          fi
+        done
+    
+    - name: Validate VS Code Configuration
+      run: |
+        echo "=== VS Code Configuration Validation ==="
+        
+        # Check VS Code files
+        if [[ -f ".vscode/tasks.json" ]]; then
+          if jq . .vscode/tasks.json > /dev/null; then
+            echo "✅ tasks.json syntax valid"
+          else
+            echo "❌ tasks.json syntax error"
+            exit 1
+          fi
+        else
+          echo "❌ tasks.json missing"
+          exit 1
+        fi
+        
+        if [[ -f ".vscode/extensions.json" ]]; then
+          if jq . .vscode/extensions.json > /dev/null; then
+            echo "✅ extensions.json syntax valid"
+          else
+            echo "❌ extensions.json syntax error"
+            exit 1
+          fi
+        else
+          echo "❌ extensions.json missing"
+          exit 1
+        fi
+
+  test-summary:
+    runs-on: ubuntu-latest
+    needs: [windows-tests, linux-tests, integration-test, documentation-validation]
+    if: always()
+    
+    steps:
+    - name: Summary
+      run: |
+        echo "=== Test Results Summary ==="
+        echo "Windows Tests: ${{ needs.windows-tests.result }}"
+        echo "Linux Tests: ${{ needs.linux-tests.result }}"
+        echo "Integration Test: ${{ needs.integration-test.result }}"
+        echo "Documentation: ${{ needs.documentation-validation.result }}"
+        
+        if [[ "${{ needs.windows-tests.result }}" == "success" && 
+              "${{ needs.linux-tests.result }}" == "success" && 
+              "${{ needs.integration-test.result }}" == "success" ]]; then
+          echo "🎉 All tests passed! Platform ready for production."
+        else
+          echo "⚠️  Some tests failed. Check individual job results."
+        fi

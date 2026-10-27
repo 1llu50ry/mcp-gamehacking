@@ -1,0 +1,40 @@
+# Chat Interface Service Dependencies
+# Core web framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# WebSocket support
+websockets==12.0
+
+# HTTP client for AI orchestration
+httpx==0.25.2
+
+# Database support
+psycopg2-binary==2.9.7
+asyncpg==0.29.0
+alembic==1.13.1
+
+# Configuration and validation
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Session and authentication
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# WebSocket and real-time features
+python-socketio==5.11.0
+
+# Monitoring and logging
+structlog==23.2.0
+python-json-logger==2.0.7
+
+# Rate limiting
+slowapi==0.1.9
+
+# Date utilities
+python-dateutil==2.8.2
+
+# Development and testing
+pytest==7.4.3
+pytest-asyncio==0.21.1

@@ -1,0 +1,12 @@
+{
+    "service_name": "AIOrchestration",
+    "metric_name": "response_time_ms",
+    "baseline_value": 15,
+    "min_value": 14,
+    "max_value": 16,
+    "success_rate": 100,
+    "warning_threshold": 22,
+    "critical_threshold": 45,
+    "measurement_date": "2026-02-20T09:45:04-07:00",
+    "iterations": 5
+}

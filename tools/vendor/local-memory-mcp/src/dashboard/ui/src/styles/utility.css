@@ -1,0 +1,321 @@
+/* ─── Dropdown/Badge ───────────────────────────────────────────────────────── */
+.badge {
+	display: inline-flex;
+	align-items: center;
+	padding: 1px 8px;
+	border-radius: 9999px;
+	font-size: 0.62rem;
+	font-weight: 700;
+	letter-spacing: 0.03em;
+}
+
+/* ─── Section labels ────────────────────────────────────────────────────────
+   A GLOBAL rule already existed here, yet six components each redefined
+   `.section-label` in their own <style> block at 0.65rem/700/uppercase —
+   10.4px shouty text overriding a global they never needed to override.
+   Those local copies are deleted; this is the single definition.
+
+   Dropped to a normal-case 12px medium: uppercase-tracked-bold at 10px is
+   decoration pretending to be hierarchy, and it is measurably harder to read. */
+.section-label {
+	font-size: var(--text-label);
+	font-weight: var(--weight-medium);
+	letter-spacing: 0.01em;
+	color: var(--color-text-muted);
+	margin-bottom: var(--space-2);
+}
+
+/* ─── Glow Pulse Dot (active indicator) ─────────────────────────────────── */
+.status-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 9999px;
+	flex-shrink: 0;
+}
+
+.status-dot-online {
+	background: #10b981;
+	box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+	animation: pulse-glow 2.4s ease-in-out infinite;
+}
+
+/* ─── Icon Wrapper ────────────────────────────────────────────────────────── */
+.icon-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	border-radius: var(--radius-sm);
+	border: none;
+	background: transparent;
+	color: var(--color-text-muted);
+	cursor: pointer;
+	transition: all var(--duration-base) var(--ease-smooth);
+}
+
+.icon-btn:hover {
+	background: rgba(241, 245, 249, 0.9);
+	color: var(--color-text);
+	transform: scale(1.1);
+}
+
+.dark .icon-btn:hover {
+	background: rgba(30, 41, 59, 0.8);
+}
+
+.icon-btn svg {
+	transition: transform var(--duration-base) var(--ease-spring);
+}
+
+.icon-btn:hover svg {
+	transform: scale(1.05);
+}
+
+/* ─── Utility ─────────────────────────────────────────────────────────────── */
+.truncate {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.min-w-0 {
+	min-width: 0;
+}
+.flex {
+	display: flex;
+}
+.flex-col {
+	flex-direction: column;
+}
+.flex-1 {
+	flex: 1;
+}
+.items-center {
+	align-items: center;
+}
+.items-start {
+	align-items: flex-start;
+}
+.justify-between {
+	justify-content: space-between;
+}
+.justify-center {
+	justify-content: center;
+}
+.gap-1 {
+	gap: 4px;
+}
+.gap-2 {
+	gap: 8px;
+}
+.gap-3 {
+	gap: 12px;
+}
+.gap-4 {
+	gap: 16px;
+}
+.gap-5 {
+	gap: 20px;
+}
+.p-2 {
+	padding: 8px;
+}
+.p-3 {
+	padding: 12px;
+}
+.p-4 {
+	padding: 16px;
+}
+.p-5 {
+	padding: 20px;
+}
+.px-3 {
+	padding-left: 12px;
+	padding-right: 12px;
+}
+.px-4 {
+	padding-left: 16px;
+	padding-right: 16px;
+}
+.py-2 {
+	padding-top: 8px;
+	padding-bottom: 8px;
+}
+.py-3 {
+	padding-top: 12px;
+	padding-bottom: 12px;
+}
+.mt-1 {
+	margin-top: 4px;
+}
+.mt-2 {
+	margin-top: 8px;
+}
+.mt-3 {
+	margin-top: 12px;
+}
+.mt-4 {
+	margin-top: 16px;
+}
+.mb-1 {
+	margin-bottom: 4px;
+}
+.mb-2 {
+	margin-bottom: 8px;
+}
+.mb-3 {
+	margin-bottom: 12px;
+}
+.mb-4 {
+	margin-bottom: 16px;
+}
+.text-sm {
+	font-size: 0.875rem;
+}
+.text-xs {
+	font-size: 0.75rem;
+}
+.font-medium {
+	font-weight: 500;
+}
+.font-semibold {
+	font-weight: 600;
+}
+.font-bold {
+	font-weight: 700;
+}
+.font-extrabold {
+	font-weight: 800;
+}
+.opacity-0 {
+	opacity: 0;
+}
+.opacity-50 {
+	opacity: 0.5;
+}
+.opacity-60 {
+	opacity: 0.6;
+}
+.opacity-70 {
+	opacity: 0.7;
+}
+.w-full {
+	width: 100%;
+}
+.h-full {
+	height: 100%;
+}
+.overflow-hidden {
+	overflow: hidden;
+}
+.overflow-auto {
+	overflow: auto;
+}
+.overflow-y-auto {
+	overflow-y: auto;
+}
+.rounded-full {
+	border-radius: 9999px;
+}
+.rounded-lg {
+	border-radius: 12px;
+}
+.rounded-xl {
+	border-radius: 16px;
+}
+.relative {
+	position: relative;
+}
+.absolute {
+	position: absolute;
+}
+.inset-0 {
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
+}
+.z-10 {
+	z-index: 10;
+}
+.z-50 {
+	z-index: 50;
+}
+.hidden {
+	display: none;
+}
+.grid {
+	display: grid;
+}
+.cursor-pointer {
+	cursor: pointer;
+}
+.select-none {
+	user-select: none;
+}
+.pointer-events-none {
+	pointer-events: none;
+}
+.shrink-0 {
+	flex-shrink: 0;
+}
+.text-center {
+	text-align: center;
+}
+
+/* ─── Priority Dots ─────────────────────────────────────────────────────── */
+.priority-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 9999px;
+	flex-shrink: 0;
+}
+
+.priority-1 {
+	background: #94a3b8;
+}
+.priority-2 {
+	background: #3b82f6;
+	box-shadow: 0 0 6px rgba(59, 130, 246, 0.5);
+}
+.priority-3 {
+	background: #f59e0b;
+	box-shadow: 0 0 6px rgba(245, 158, 11, 0.5);
+}
+.priority-4 {
+	background: #f97316;
+	box-shadow: 0 0 6px rgba(249, 115, 22, 0.5);
+}
+.priority-5 {
+	background: #ef4444;
+	box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+	animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* ─── Divider ────────────────────────────────────────────────────────────── */
+.divider {
+	height: 1px;
+	background: var(--color-border);
+	margin: 12px 0;
+}
+
+.dark .divider {
+	background: rgba(148, 163, 184, 0.1);
+}
+
+/* ─── Hover Glow effect for panels ──────────────────────────────────────── */
+.hover-glow {
+	transition: box-shadow var(--duration-base) ease;
+}
+
+.hover-glow:hover {
+	box-shadow:
+		var(--glass-shadow-elevated),
+		0 0 24px rgba(14, 165, 233, 0.08);
+}
+
+.dark .hover-glow:hover {
+	box-shadow:
+		var(--panel-dark-shadow),
+		0 0 24px rgba(56, 189, 248, 0.08);
+}

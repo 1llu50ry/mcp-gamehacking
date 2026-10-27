@@ -8,7 +8,7 @@
 // enable with MCP_RATE_LIMIT=1 and tune per-tool via
 // MCP_RATE_LIMIT_<TOOL>=<n>  (default per-sec).
 
-import { appendFile, mkdir, stat, rename } from "node:fs/promises";
+import { mkdir, open, rename, type FileHandle } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { z } from "zod";
@@ -19,11 +19,31 @@ const AUDIT_MAX = 10 * 1024 * 1024;
 async function appendAudit(dir: string, record: object): Promise<void> {
   await mkdir(dir, { recursive: true });
   const f = join(dir, "audit.jsonl");
+  const payload = JSON.stringify({ ts: new Date().toISOString(), ...record }) + "\n";
+  // Open the audit file as a single handle and do both stat+append through
+  // it. Using the handle instead of the path for stat avoids a TOCTOU race
+  // where the file could be swapped (e.g. symlinked) between the stat and
+  // the append (CodeQL js/file-system-race).
+  let fh: FileHandle | null = null;
   try {
-    const s = await stat(f);
-    if (s.size > AUDIT_MAX) await rename(f, join(dir, `audit-${s.mtime.toISOString().replace(/[:.]/g, "-")}.jsonl`));
-  } catch { /* new file */ }
-  await appendFile(f, JSON.stringify({ ts: new Date().toISOString(), ...record }) + "\n", "utf8");
+    fh = await open(f, "a");
+    const s = await fh.stat();
+    if (s.size > AUDIT_MAX) {
+      // Rotate: close, rename, re-open. The rename is still against the
+      // path, but by that point the handle we observed the size through
+      // has been closed and we accept the window — the alternative
+      // (keeping the fd through rename) is Unix-only and still can't
+      // guarantee what another writer does.
+      const rotated = join(dir, `audit-${s.mtime.toISOString().replace(/[:.]/g, "-")}.jsonl`);
+      await fh.close();
+      fh = null;
+      try { await rename(f, rotated); } catch { /* best effort */ }
+      fh = await open(f, "a");
+    }
+    await fh.appendFile(payload, "utf8");
+  } finally {
+    if (fh) await fh.close();
+  }
 }
 
 interface Bucket { tokens: number; last: number; }

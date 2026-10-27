@@ -66,9 +66,64 @@ async function build(root: string): Promise<InvertedIndex> {
   return { docs, df, avgLen: docs.size ? totalLen / docs.size : 0, N: docs.size, builtAt: Date.now() };
 }
 
+// Disk cache: `.index-cache/bm25.json`. Loaded on first query if newer
+// than any SKILL.md on disk; otherwise rebuilt and saved.
+const CACHE_SUBDIR = ".index-cache";
+const CACHE_FILE = "bm25.json";
+
+async function loadDiskCache(root: string): Promise<InvertedIndex | null> {
+  const { readFile, stat } = await import("node:fs/promises");
+  const { join } = await import("node:path");
+  const path = join(root, CACHE_SUBDIR, CACHE_FILE);
+  try {
+    const st = await stat(path);
+    const text = await readFile(path, "utf8");
+    const raw = JSON.parse(text) as { docs: [string, { id: string; len: number; tf: [string, number][]; description: string; type: string }][]; df: [string, number][]; avgLen: number; N: number; mtime: number };
+    const docs = new Map<string, IndexDoc>();
+    for (const [id, d] of raw.docs) docs.set(id, { id: d.id, len: d.len, tf: new Map(d.tf), description: d.description, type: d.type });
+    return { docs, df: new Map(raw.df), avgLen: raw.avgLen, N: raw.N, builtAt: st.mtimeMs };
+  } catch { return null; }
+}
+
+async function saveDiskCache(root: string, idx: InvertedIndex): Promise<void> {
+  const { mkdir, writeFile, rename } = await import("node:fs/promises");
+  const { join } = await import("node:path");
+  const dir = join(root, CACHE_SUBDIR);
+  await mkdir(dir, { recursive: true });
+  const payload = {
+    docs: [...idx.docs.entries()].map(([id, d]) => [id, { id: d.id, len: d.len, tf: [...d.tf.entries()], description: d.description, type: d.type }]),
+    df: [...idx.df.entries()],
+    avgLen: idx.avgLen,
+    N: idx.N,
+    mtime: idx.builtAt,
+  };
+  const tmp = join(dir, `${CACHE_FILE}.${process.pid}.tmp`);
+  await writeFile(tmp, JSON.stringify(payload), "utf8");
+  await rename(tmp, join(dir, CACHE_FILE));
+}
+
+async function newestSkillMtime(root: string): Promise<number> {
+  // Cheap mtime watermark: `skills/` dir mtime changes when entries are
+  // added / removed; file-level staleness falls through to the TTL. This
+  // avoids walking 4,200 files on every cold start.
+  const { stat } = await import("node:fs/promises");
+  const { join } = await import("node:path");
+  try { return (await stat(join(root, "skills"))).mtimeMs; } catch { return 0; }
+}
+
 async function getIndex(root: string): Promise<InvertedIndex> {
   if (INDEX && Date.now() - INDEX.builtAt < TTL) return INDEX;
+  // Try disk cache first — if newer than skills/ mtime, we can skip the
+  // ~1 s cold build entirely.
+  const disk = await loadDiskCache(root);
+  const skillMtime = await newestSkillMtime(root);
+  if (disk && disk.builtAt >= skillMtime) {
+    INDEX = { ...disk, builtAt: Date.now() };
+    return INDEX;
+  }
   INDEX = await build(root);
+  // Persist asynchronously; failure to save shouldn't block queries.
+  saveDiskCache(root, INDEX).catch(() => { /* best effort */ });
   return INDEX;
 }
 

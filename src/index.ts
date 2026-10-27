@@ -21,6 +21,7 @@ import { registerCompositeTools } from "./composite-tools.js";
 import { registerBm25Search } from "./bm25-search.js";
 import { registerAuditAndRate } from "./audit-rate.js";
 import { registerDynamicResources } from "./dynamic-resources.js";
+import { registerNativeDisasm } from "./native-disasm.js";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const DIRS = {
@@ -70,41 +71,63 @@ interface SkillIndex {
 
 let _index: Map<string, SkillIndex> | null = null;
 let _indexTime = 0;
+let _indexBuild: Promise<Map<string, SkillIndex>> | null = null;
 const INDEX_TTL = 120_000;
+const INDEX_CHUNK = 64;
 
-async function getIndex(): Promise<Map<string, SkillIndex>> {
-  const now = Date.now();
-  if (_index && now - _indexTime < INDEX_TTL) return _index;
-
+async function buildIndex(): Promise<Map<string, SkillIndex>> {
   const entries = await readdir(DIRS.skills, { withFileTypes: true });
   const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
   const idx = new Map<string, SkillIndex>();
 
-  const batch = dirs.map(async (name) => {
-    const content = await safeRead(join(DIRS.skills, name, "SKILL.md"));
-    if (!content) return;
-    const parsed = parseFrontmatter(content);
-    const hasSource = await fileExists(join(DIRS.skills, name, "source.txt"));
-    const topics = parsed.meta.topics ?? [];
-    const searchText = [
-      name, parsed.meta.name, parsed.meta.description, ...topics,
-      ...(parsed.meta.games ?? []), ...(parsed.meta.engines ?? []),
-    ].join(" ").toLowerCase();
+  // Bounded concurrency: walk in fixed chunks so open file handles stay flat
+  // even on a 4,000+ skill library. The unbounded Promise.all here used to
+  // exhaust handles under load and silently drop entries (because safeRead
+  // returns null on error, indistinguishable from "file genuinely absent").
+  for (let i = 0; i < dirs.length; i += INDEX_CHUNK) {
+    const slice = dirs.slice(i, i + INDEX_CHUNK);
+    await Promise.all(slice.map(async (name) => {
+      const content = await safeRead(join(DIRS.skills, name, "SKILL.md"));
+      if (!content) return;
+      const parsed = parseFrontmatter(content);
+      const hasSource = await fileExists(join(DIRS.skills, name, "source.txt"));
+      const topics = parsed.meta.topics ?? [];
+      const searchText = [
+        name, parsed.meta.name, parsed.meta.description, ...topics,
+        ...(parsed.meta.games ?? []), ...(parsed.meta.engines ?? []),
+      ].join(" ").toLowerCase();
 
-    idx.set(name, {
-      name,
-      description: parsed.meta.description,
-      type: parsed.meta.type ?? "unknown",
-      topics,
-      hasSource,
-      searchText,
-    });
-  });
+      idx.set(name, {
+        name,
+        description: parsed.meta.description,
+        type: parsed.meta.type ?? "unknown",
+        topics,
+        hasSource,
+        searchText,
+      });
+    }));
+  }
 
-  await Promise.all(batch);
-  _index = idx;
-  _indexTime = now;
   return idx;
+}
+
+async function getIndex(): Promise<Map<string, SkillIndex>> {
+  const now = Date.now();
+  if (_index && now - _indexTime < INDEX_TTL) return _index;
+  // Single-flight: concurrent callers await the build already running
+  // instead of each starting their own (which multiplied handle pressure
+  // and could produce different results per caller on the same cold tree).
+  if (_indexBuild) return _indexBuild;
+
+  _indexBuild = buildIndex();
+  try {
+    const idx = await _indexBuild;
+    _index = idx;
+    _indexTime = Date.now(); // stamp on completion, not start, so TTL counts real freshness
+    return idx;
+  } finally {
+    _indexBuild = null;
+  }
 }
 
 // Component caches
@@ -131,7 +154,9 @@ function parseFrontmatter(content: string): ParsedFile {
   const raw = match[1];
   const body = match[2].trim();
 
-  const str = (key: string) => raw.match(new RegExp(`^${key}:\\s*"?(.+?)"?$`, "m"))?.[1]?.trim();
+  // Allow leading whitespace so nested keys (e.g. `  type:` under `metadata:`) are read.
+  // Pre-existing array matcher is already unanchored, so this just brings scalars in line.
+  const str = (key: string) => raw.match(new RegExp(`^\\s*${key}:\\s*"?(.+?)"?$`, "m"))?.[1]?.trim();
   const arr = (key: string) => {
     const m = raw.match(new RegExp(`${key}:\\s*\\[([^\\]]*)\\]`));
     return m ? m[1].split(",").map((t) => t.trim().replace(/^['"]|['"]$/g, "")).filter(Boolean) : undefined;
@@ -333,9 +358,15 @@ function scoreSkill(idx: SkillIndex, keywords: string[]): number {
 // SERVER
 // ============================================================
 
+// Read version from package.json so serverInfo stays in lockstep with
+// package.json instead of being hardcoded (previously stuck at 3.0.0).
+const PKG_VERSION = JSON.parse(
+  await readFile(join(ROOT, "package.json"), "utf8")
+).version as string;
+
 const server = new McpServer({
   name: "mcp-gamehacking",
-  version: "3.0.0",
+  version: PKG_VERSION,
 });
 
 // ============================================================
@@ -975,23 +1006,89 @@ server.tool(
     const src = await safeRead(join(DIRS.skills, name, "source.txt"));
     if (!src) return err(`No source.txt for "${name}".`);
 
-    const filePathRegex = /^={3,}\s*(?:File|PATH):\s*(.+?)(?:\s*={3,})?$/gim;
     const paths: string[] = [];
-    let match;
+    const dirSet = new Set<string>();
+    let match: RegExpExecArray | null;
 
-    while ((match = filePathRegex.exec(src)) !== null) {
-      paths.push(match[1].trim());
-      if (paths.length >= max_entries) break;
+    // Pattern A (primary) — the format source.txt actually uses: a
+    // "Source Tree:" marker followed by a fenced block containing a
+    // Unicode box-drawing listing. Example:
+    //   Source Tree:
+    //   ```txt
+    //   project-root
+    //   ├── README.md
+    //   ├── src
+    //   │   ├── main.cpp
+    //   └── utils.hpp
+    //   ```
+    // Depth is derived from the 4-column indent prefix; a line is a
+    // directory when the NEXT line is deeper.
+    const treeMarker = /Source Tree:\s*\r?\n+```[^\n]*\r?\n([\s\S]*?)\r?\n```/i;
+    const treeMatch = src.match(treeMarker);
+    if (treeMatch) {
+      const block = treeMatch[1];
+      const lines = block.split(/\r?\n/);
+      // Capture the leading indent (spaces + box-drawing filler like "│   ")
+      // and the entry name. 4 columns per depth level is the standard tree(1) output.
+      const treeLine = /^([\s│├└─]*?)[├└]──\s*(.+?)\s*$/;
+      type Entry = { depth: number; name: string; parentPath: string };
+      const stack: string[] = [];
+      // Push the root (first non-blank, non-tree line) if present.
+      let rootPath = "";
+      for (const ln of lines) {
+        if (!ln.trim()) continue;
+        if (treeLine.test(ln)) break;
+        rootPath = ln.trim();
+        break;
+      }
+      if (rootPath) stack.push(rootPath);
+
+      const entries: Entry[] = [];
+      for (const ln of lines) {
+        const m = ln.match(treeLine);
+        if (!m) continue;
+        const indent = m[1];
+        // Count depth by taking 4 columns per level; the "├──" marker itself
+        // is 4 cols at the current depth so the prefix is always `depth * 4`.
+        const depth = Math.floor(indent.length / 4) + (rootPath ? 1 : 0);
+        const nm = m[2].trim();
+        // Trim trailing comment/annotation after whitespace (`name   # note`)
+        const nameClean = nm.replace(/\s{2,}.*$/, "").replace(/\/+$/, "");
+        // Maintain parent-path stack by truncating to `depth`
+        while (stack.length > depth) stack.pop();
+        const parentPath = stack.join("/");
+        entries.push({ depth, name: nameClean, parentPath });
+        // Tentatively push this entry; we'll pop it if the next line isn't deeper.
+        stack.push(nameClean);
+      }
+      // Classify: an entry is a directory iff ANOTHER entry has a deeper
+      // depth AND follows it before the depth drops back.
+      for (let i = 0; i < entries.length && paths.length < max_entries; i++) {
+        const e = entries[i];
+        const full = e.parentPath ? `${e.parentPath}/${e.name}` : e.name;
+        let isDir = false;
+        for (let j = i + 1; j < entries.length; j++) {
+          if (entries[j].depth > e.depth) { isDir = true; break; }
+          if (entries[j].depth <= e.depth) break;
+        }
+        if (isDir) dirSet.add(full);
+        else paths.push(full);
+      }
     }
 
+    // Pattern B (fallback) — explicit "File:" / "PATH:" markers with === rules.
     if (!paths.length) {
-      const lineRegex = /^[-─]+\s*(.+\.[a-zA-Z]{1,5})\s*[-─]*$/gm;
-      while ((match = lineRegex.exec(src)) !== null) {
+      const filePathRegex = /^={3,}\s*(?:File|PATH):\s*(.+?)(?:\s*={3,})?$/gim;
+      while ((match = filePathRegex.exec(src)) !== null) {
         paths.push(match[1].trim());
         if (paths.length >= max_entries) break;
       }
     }
 
+    // Pattern C (fallback) — explicit `// file:` / `# path:` / `; source:` labels.
+    // Note: no bare `- name.ext` fallback — that previously matched prose
+    // bullets (e.g. `- http://processhacker.sourceforge.net`) and returned
+    // confident wrong results.
     if (!paths.length) {
       const extRegex = /^(?:\/\/|#|;)\s*(?:file|path|source):\s*(.+)/gim;
       while ((match = extRegex.exec(src)) !== null) {
@@ -1000,17 +1097,18 @@ server.tool(
       }
     }
 
-    if (!paths.length) return err(`Could not extract file tree from "${name}". Source may not use standard file markers.`);
+    if (!paths.length) return err(`Could not extract file tree from "${name}". Source may not use a recognised layout.`);
 
-    const dirs = new Set<string>();
-    for (const p of paths) {
-      const parts = p.split(/[/\\]/);
-      for (let i = 1; i < parts.length; i++) {
-        dirs.add(parts.slice(0, i).join("/"));
+    // Fallback dir enumeration from path segments (patterns B/C don't yield
+    // explicit directories).
+    if (!dirSet.size) {
+      for (const p of paths) {
+        const parts = p.split(/[/\\]/);
+        for (let i = 1; i < parts.length; i++) dirSet.add(parts.slice(0, i).join("/"));
       }
     }
 
-    return ok(`# File Tree: ${name}\n\n${paths.length} files, ${dirs.size} directories:\n\n\`\`\`\n${paths.join("\n")}\n\`\`\``);
+    return ok(`# File Tree: ${name}\n\n${paths.length} files, ${dirSet.size} directories:\n\n\`\`\`\n${paths.join("\n")}\n\`\`\``);
   }
 );
 
@@ -1554,6 +1652,9 @@ registerAuditAndRate(server, ROOT);
 // gamehacking://plugins/{category}/{name}, etc.
 registerDynamicResources(server, ROOT);
 
+// Native x86-64 mini-disassembler (prologue/epilogue coverage).
+registerNativeDisasm(server);
+
 // ============================================================
 // MAIN
 // ============================================================
@@ -1563,16 +1664,40 @@ async function main() {
   if (mode === "http" || mode === "sse" || mode === "streamable-http") {
     const port = Number(process.env.MCP_HTTP_PORT ?? 7777);
     const host = process.env.MCP_HTTP_HOST ?? "127.0.0.1";
+    // Optional bearer-token auth for the HTTP transport. Set MCP_AUTH_TOKEN
+    // to require `Authorization: Bearer <token>` on /mcp (and the HTTP
+    // JSON-RPC path). /healthz is always open so a load balancer can poll
+    // without credentials; /metrics is gated when auth is on so running
+    // tool counts and uptime aren't leaked to unauth'd probes.
+    const AUTH_TOKEN = process.env.MCP_AUTH_TOKEN ?? "";
+    const authRequired = AUTH_TOKEN.length > 0;
+    const checkAuth = (req: import("node:http").IncomingMessage): boolean => {
+      if (!authRequired) return true;
+      const h = req.headers.authorization;
+      if (!h || typeof h !== "string") return false;
+      if (!h.startsWith("Bearer ")) return false;
+      const got = h.slice("Bearer ".length).trim();
+      // Constant-time compare to avoid trivial timing leaks on the token.
+      if (got.length !== AUTH_TOKEN.length) return false;
+      let diff = 0;
+      for (let i = 0; i < got.length; i++) diff |= got.charCodeAt(i) ^ AUTH_TOKEN.charCodeAt(i);
+      return diff === 0;
+    };
     const transports = new Map<string, StreamableHTTPServerTransport>();
     const httpServer = createServer(async (req, res) => {
-      // /healthz: readiness probe
+      // /healthz: readiness probe — always open
       if (req.method === "GET" && req.url === "/healthz") {
         res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({ status: "ok", pid: process.pid, uptime: process.uptime(), version: "4.3.0" }));
+        res.end(JSON.stringify({ status: "ok", pid: process.pid, uptime: process.uptime(), version: PKG_VERSION, auth: authRequired ? "on" : "off" }));
         return;
       }
-      // /metrics: Prometheus-style
+      // /metrics: Prometheus-style — gated when auth is on
       if (req.method === "GET" && req.url === "/metrics") {
+        if (!checkAuth(req)) {
+          res.writeHead(401, { "content-type": "text/plain; charset=utf-8", "www-authenticate": "Bearer" });
+          res.end("unauthorized");
+          return;
+        }
         const mu = process.memoryUsage();
         const metrics = [
           `# HELP mcp_gamehacking_rss_bytes Process RSS`,
@@ -1592,8 +1717,13 @@ async function main() {
         res.end(metrics);
         return;
       }
-      // MCP endpoint: use streamable HTTP transport
+      // MCP endpoint: use streamable HTTP transport. Gated when auth is on.
       if (req.url === "/mcp" || req.url?.startsWith("/mcp?") || req.url?.startsWith("/mcp/")) {
+        if (!checkAuth(req)) {
+          res.writeHead(401, { "content-type": "text/plain; charset=utf-8", "www-authenticate": "Bearer" });
+          res.end("unauthorized");
+          return;
+        }
         try {
           const sessionId = (req.headers["mcp-session-id"] as string | undefined) ?? randomUUID();
           let transport = transports.get(sessionId);
@@ -1606,12 +1736,18 @@ async function main() {
           await transport.handleRequest(req, res);
           return;
         } catch (e) {
-          res.writeHead(500);
-          res.end(`transport error: ${(e as Error).message}`);
+          // CodeQL js/xss-through-exception: exception messages can be
+          // influenced by request content. Serve the error body as
+          // text/plain so no HTML interpretation can happen, and strip
+          // any carriage returns / newlines just in case a message
+          // contains header-injection bait.
+          const msg = (e as Error).message.replace(/[\r\n]+/g, " ");
+          res.writeHead(500, { "content-type": "text/plain; charset=utf-8" });
+          res.end(`transport error: ${msg}`);
           return;
         }
       }
-      res.writeHead(404);
+      res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
       res.end("not found. endpoints: /mcp, /healthz, /metrics");
     });
     httpServer.listen(port, host, () => {

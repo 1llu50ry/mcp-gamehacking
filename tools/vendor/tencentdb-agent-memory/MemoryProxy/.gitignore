@@ -1,0 +1,40 @@
+node_modules/
+/logs/
+context-proxy.jsonl
+context-proxy-bak.jsonl
+*.log
+*.pid
+nohup.out
+*pycache*
+config.yaml
+config.yaml.bak.*
+config.*.local.yaml
+gateway/node_modules/
+gateway/gateway-config.yaml
+.idea/
+
+# E2E suite: never commit filled env.sh (contains secrets)
+docs/e2e-suite/examples/env.sh
+
+# Local Claude Code project notes / skills — not part of the public artifact
+.claude/
+
+# E2E run artifacts — do not commit
+docs/e2e-suite/logs/
+
+# Local backup of config (defense-in-depth over config.yaml.bak.* above)
+*.bak.keep-*
+
+.archive
+.archive/
+
+# Env files — never commit filled envs
+.env
+.env.*
+!.env.example
+
+# JSONL runtime artifacts anywhere in the tree
+*.jsonl
+
+# Unix sockets
+*.sock

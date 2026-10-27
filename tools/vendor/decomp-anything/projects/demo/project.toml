@@ -1,0 +1,26 @@
+name = "Demo Quest"
+slug = "demo"
+description = "Toy x86-64 game for trying DecompNet end to end. Swap in a real ROM project (IDO, KMC GCC, MWCC, EE-GCC) the same way."
+
+[legal]
+basis = "own-code"
+license = "CC0-1.0"
+notes = "Demo Quest was written for DecompNet; its full source is in original/."
+
+[compiler]
+# {src} {obj} {include} are substituted; runs inside the sandbox.
+cmd = ["gcc", "-c", "-std=gnu11", "-O2", "-fno-pic", "-fno-asynchronous-unwind-tables", "-fcf-protection=none",
+       "-fno-stack-protector", "-fno-inline", "-fno-tree-vectorize", "-fno-reorder-blocks-and-partition",
+       "-ffunction-sections", "-fno-ident", "-flive-patching=inline-only-static", "-I{include}", "{src}", "-o", "{obj}"]
+timeout = 15
+sandbox = "auto"
+
+[target]
+objects = ["target/game.o"]
+# Demo only: real projects produce target objects from the ROM (splat + assembler).
+build = ["gcc", "-c", "-std=gnu11", "-O2", "-fno-pic", "-fno-asynchronous-unwind-tables", "-fcf-protection=none",
+         "-fno-stack-protector", "-fno-inline", "-fno-tree-vectorize", "-fno-reorder-blocks-and-partition",
+         "-ffunction-sections", "-fno-ident", "-flive-patching=inline-only-static", "-Ioriginal", "original/game.c", "-o", "target/game.o"]
+
+[context]
+file = "include/context.h"

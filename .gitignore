@@ -8,3 +8,16 @@ dist/
 npm-debug.log*
 .DS_Store
 Thumbs.db
+
+# Upstream repo mirror for development — contents land under tools/vendor/
+# via the vendoring process. Do not publish the raw clones.
+/better-options/
+
+# Server runtime scratch
+/.export/
+/.agent-mesh/
+/.audit/
+/.ghidra-projects/
+/.fakepdb-scripts/
+/.docker-data/
+/.index-cache/

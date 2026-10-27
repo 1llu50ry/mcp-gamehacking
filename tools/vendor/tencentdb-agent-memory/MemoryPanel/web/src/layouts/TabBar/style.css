@@ -1,0 +1,84 @@
+._memory-tabbar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  height: 36px;
+  padding: 0 8px;
+  background: var(--tea-color-bg-primary-default);
+  border-bottom: 1px solid var(--tea-color-border-primary-default);
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+
+._memory-tabbar-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 12px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--tea-color-text-secondary);
+  border-bottom: 2px solid transparent;
+  border-radius: 4px 4px 0 0;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+._memory-tabbar-item:hover {
+  color: var(--tea-color-text-primary);
+  background: var(--tea-color-bg-secondary-default);
+}
+
+._memory-tabbar-item--active {
+  color: var(--tea-color-text-primary);
+  font-weight: 500;
+  border-bottom-color: var(--tea-color-border-brand-default);
+  background: var(--tea-color-bg-primary-default);
+}
+
+._memory-tabbar-icon {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: inherit;
+}
+
+._memory-tabbar-label {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+._memory-tabbar-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--tea-color-text-secondary);
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+._memory-tabbar-item:hover ._memory-tabbar-close,
+._memory-tabbar-item--active ._memory-tabbar-close {
+  opacity: 1;
+}
+
+._memory-tabbar-close:hover {
+  background: var(--tea-color-bg-secondary-hover);
+  color: var(--tea-color-text-primary);
+}
+
+/* 键盘可达性：tab 项焦点环 */
+._memory-tabbar-item:focus-visible {
+  outline: 2px solid var(--tea-color-border-brand-default);
+  outline-offset: -2px;
+}

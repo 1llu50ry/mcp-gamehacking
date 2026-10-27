@@ -1,0 +1,90 @@
+version: 2
+updates:
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+        exclude-patterns:
+          - "@xterm/*"
+      security:
+        applies-to: security-updates
+        patterns:
+          - '*'
+        exclude-patterns:
+          - react-router
+          - react-router-dom
+    ignore:
+      # Stop the post-merge flood of breaking majors (Vite 8, ESLint 10, Tailwind 4, …).
+      # Security updates are not affected.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@xterm/*"
+      - dependency-name: react-router
+        update-types: ["version-update:semver-major"]
+      - dependency-name: react-router-dom
+        update-types: ["version-update:semver-major"]
+    labels:
+      - dependencies
+
+  - package-ecosystem: npm
+    directory: /mcp
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+      security:
+        applies-to: security-updates
+        patterns:
+          - '*'
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    labels:
+      - dependencies
+
+  - package-ecosystem: npm
+    directory: /hosted
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      wrangler-and-types:
+        applies-to: version-updates
+        patterns:
+          - wrangler
+          - "@cloudflare/workers-types"
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+      security:
+        applies-to: security-updates
+        patterns:
+          - '*'
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    labels:
+      - dependencies
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+      - ci

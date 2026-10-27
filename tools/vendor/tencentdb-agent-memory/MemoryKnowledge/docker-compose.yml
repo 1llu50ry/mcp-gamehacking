@@ -1,0 +1,50 @@
+# Knowledge Service — one-shot local / user-side run
+#
+#   cp docker/env.example docker/env.docker
+#   docker compose --env-file docker/env.docker up -d
+#
+# Or pass vars inline:
+#   PUBLIC_URL=http://203.0.113.10:8421/v3 \
+#   TMC_CALLBACK=http://203.0.113.10:8123 \
+#   LLM_MODE=custom LLM_API_KEY=sk-xxx \
+#   LLM_BASE_URL=https://api.example.com/v1 \
+#   docker compose up -d --build
+# 默认 LLM_MODE=proxy 时无需 LLM_API_KEY/LLM_BASE_URL（走 context_proxy 绑定）。
+
+services:
+  knowledge:
+    build: .
+    image: ${TEAM_KNOWLEDGE_IMAGE:-team-knowledge:latest}
+    ports:
+      - "${TEAM_KNOWLEDGE_HOST_PORT:-8421}:8421"
+    volumes:
+      - knowledge-data:/app/data
+    environment:
+      KNOWLEDGE_CLICKHOUSE_ENABLED: ${KNOWLEDGE_CLICKHOUSE_ENABLED:-false}
+      KNOWLEDGE_CLICKHOUSE_URL: ${KNOWLEDGE_CLICKHOUSE_URL:-}
+      KNOWLEDGE_CLICKHOUSE_DATABASE: ${KNOWLEDGE_CLICKHOUSE_DATABASE:-default}
+      KNOWLEDGE_CLICKHOUSE_TABLE: ${KNOWLEDGE_CLICKHOUSE_TABLE:-tool_call_logs}
+      KNOWLEDGE_CLICKHOUSE_USER: ${KNOWLEDGE_CLICKHOUSE_USER:-default}
+      KNOWLEDGE_CLICKHOUSE_PASSWORD: ${KNOWLEDGE_CLICKHOUSE_PASSWORD:-}
+      KNOWLEDGE_CLICKHOUSE_FLUSH_INTERVAL_MS: ${KNOWLEDGE_CLICKHOUSE_FLUSH_INTERVAL_MS:-5000}
+      KNOWLEDGE_CLICKHOUSE_FLUSH_THRESHOLD: ${KNOWLEDGE_CLICKHOUSE_FLUSH_THRESHOLD:-50}
+      KNOWLEDGE_CLICKHOUSE_TTL_DAYS: ${KNOWLEDGE_CLICKHOUSE_TTL_DAYS:-90}
+      KNOWLEDGE_CLICKHOUSE_REQUEST_TIMEOUT_MS: ${KNOWLEDGE_CLICKHOUSE_REQUEST_TIMEOUT_MS:-5000}
+    restart: unless-stopped
+    command:
+      - --public-url=${PUBLIC_URL:?set PUBLIC_URL e.g. http://203.0.113.10:8421/v3}
+      - --tmc-callback=${TMC_CALLBACK:-}
+      # proxy（默认）走 context_proxy 绑定；custom 才需 --llm-key/--llm-base-url。
+      - --llm-mode=${LLM_MODE:-proxy}
+      - --llm-key=${LLM_API_KEY:-}
+      - --llm-base-url=${LLM_BASE_URL:-}
+      - --llm-model=${LLM_MODEL:-gpt-4o-mini}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8421/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  knowledge-data:

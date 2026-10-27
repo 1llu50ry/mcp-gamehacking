@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compare Functions Panel - Strategy Mockups</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .strategy {
+            background: white;
+            margin: 30px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .strategy-header {
+            background: #2c3e50;
+            color: white;
+            padding: 15px 20px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .mockup {
+            padding: 20px;
+            border: 2px dashed #ddd;
+            margin: 10px;
+            background: #fafafa;
+        }
+
+        /* Strategy 1: Enhanced Multi-Modal */
+        .multi-modal {
+            display: flex;
+            flex-direction: column;
+            height: 500px;
+        }
+
+        .tab-bar {
+            display: flex;
+            background: #34495e;
+            border-bottom: 1px solid #2c3e50;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            color: #bdc3c7;
+            border-right: 1px solid #2c3e50;
+            cursor: pointer;
+        }
+
+        .tab.active {
+            background: #3498db;
+            color: white;
+        }
+
+        .content-area {
+            flex: 1;
+            display: flex;
+        }
+
+        .side-panel {
+            flex: 1;
+            padding: 15px;
+            border-right: 1px solid #ddd;
+        }
+
+        .side-panel:last-child {
+            border-right: none;
+        }
+
+        .function-header {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .assembly-line {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            margin: 2px 0;
+            padding: 1px 5px;
+        }
+
+        .addr { color: #7f8c8d; }
+        .mnemonic { color: #e74c3c; font-weight: bold; }
+        .operand { color: #2980b9; }
+        .highlight { background: #f1c40f; }
+
+        /* Strategy 2: Diff-Style */
+        .diff-interface {
+            height: 500px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .diff-toolbar {
+            background: #ecf0f1;
+            padding: 10px;
+            border-bottom: 1px solid #bdc3c7;
+            display: flex;
+            gap: 10px;
+        }
+
+        .diff-button {
+            padding: 5px 10px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+
+        .diff-content {
+            flex: 1;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            overflow-y: auto;
+        }
+
+        .diff-line {
+            display: flex;
+            margin: 0;
+            padding: 2px 5px;
+            white-space: pre;
+        }
+
+        .line-number {
+            width: 40px;
+            color: #7f8c8d;
+            text-align: right;
+            margin-right: 10px;
+        }
+
+        .added { background: #d5f4e6; }
+        .removed { background: #ffeaea; }
+        .modified { background: #fff3cd; }
+
+        /* Strategy 3: Visual Dashboard */
+        .visual-dashboard {
+            height: 500px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .chart-panel {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-title {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .heatmap {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 2px;
+        }
+
+        .heatmap-cell {
+            aspect-ratio: 1;
+            border-radius: 2px;
+        }
+
+        .heat-high { background: #e74c3c; }
+        .heat-med { background: #f39c12; }
+        .heat-low { background: #27ae60; }
+
+        .radar-chart {
+            flex: 1;
+            background: radial-gradient(circle, #ecf0f1 50%, transparent 50%);
+            border-radius: 50%;
+            position: relative;
+        }
+
+        /* Strategy 4: Contextual Analysis */
+        .contextual-analysis {
+            height: 500px;
+            display: flex;
+        }
+
+        .analysis-sidebar {
+            width: 200px;
+            background: #34495e;
+            color: white;
+            padding: 15px;
+        }
+
+        .analysis-category {
+            padding: 8px 0;
+            border-bottom: 1px solid #2c3e50;
+            cursor: pointer;
+        }
+
+        .analysis-category.active {
+            background: #3498db;
+            margin: 0 -15px;
+            padding-left: 15px;
+        }
+
+        .analysis-main {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .insight-card {
+            background: #ecf0f1;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+
+        .insight-title {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        /* Strategy 5: Collaborative Workspace */
+        .collaborative-workspace {
+            height: 500px;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: auto 1fr auto;
+            gap: 10px;
+        }
+
+        .function-column {
+            background: #ecf0f1;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .column-header {
+            background: #34495e;
+            color: white;
+            padding: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .column-content {
+            padding: 15px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 11px;
+        }
+
+        .annotation-bar {
+            grid-column: 1 / -1;
+            background: #f8f9fa;
+            padding: 10px;
+            border-top: 1px solid #ddd;
+        }
+
+        .annotation-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+
+        /* Strategy 6: AI-Assisted */
+        .ai-assisted {
+            height: 500px;
+            display: flex;
+        }
+
+        .comparison-area {
+            flex: 2;
+            display: flex;
+        }
+
+        .ai-panel {
+            flex: 1;
+            background: #f8f9fa;
+            border-left: 1px solid #ddd;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .ai-insight {
+            background: white;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .ai-label {
+            background: #3498db;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .confidence-bar {
+            height: 4px;
+            background: #ecf0f1;
+            border-radius: 2px;
+            margin: 5px 0;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            border-radius: 2px;
+        }
+
+        .conf-high { background: #27ae60; width: 85%; }
+        .conf-med { background: #f39c12; width: 60%; }
+        .conf-low { background: #e74c3c; width: 30%; }
+    </style>
+</head>
+<body>
+    <h1>Compare Functions Panel - Strategy Mockups</h1>
+
+    <!-- Strategy 1: Enhanced Multi-Modal -->
+    <div class="strategy">
+        <div class="strategy-header">Strategy 1: Enhanced Multi-Modal Comparison</div>
+        <div class="mockup">
+            <div class="multi-modal">
+                <div class="tab-bar">
+                    <div class="tab active">Assembly</div>
+                    <div class="tab">Pseudocode</div>
+                    <div class="tab">Binary Hex</div>
+                    <div class="tab">Control Flow</div>
+                    <div class="tab">Current Data</div>
+                </div>
+                <div class="content-area">
+                    <div class="side-panel">
+                        <div class="function-header">malloc_v1.2 @ 0x1401000</div>
+                        <div class="assembly-line"><span class="addr">1401000:</span> <span class="mnemonic">mov</span> <span class="operand">rdi, rcx</span></div>
+                        <div class="assembly-line highlight"><span class="addr">1401003:</span> <span class="mnemonic">test</span> <span class="operand">rdi, rdi</span></div>
+                        <div class="assembly-line"><span class="addr">1401006:</span> <span class="mnemonic">je</span> <span class="operand">short loc_140101A</span></div>
+                        <div class="assembly-line"><span class="addr">1401008:</span> <span class="mnemonic">call</span> <span class="operand">HeapAlloc</span></div>
+                        <div class="assembly-line highlight"><span class="addr">140100D:</span> <span class="mnemonic">test</span> <span class="operand">rax, rax</span></div>
+                        <div class="assembly-line"><span class="addr">1401010:</span> <span class="mnemonic">jz</span> <span class="operand">short loc_140101A</span></div>
+                        <div class="assembly-line"><span class="addr">1401012:</span> <span class="mnemonic">ret</span></div>
+                    </div>
+                    <div class="side-panel">
+                        <div class="function-header">malloc_v1.3 @ 0x1402000</div>
+                        <div class="assembly-line"><span class="addr">1402000:</span> <span class="mnemonic">mov</span> <span class="operand">rdi, rcx</span></div>
+                        <div class="assembly-line highlight"><span class="addr">1402003:</span> <span class="mnemonic">cmp</span> <span class="operand">rdi, 0</span></div>
+                        <div class="assembly-line"><span class="addr">1402007:</span> <span class="mnemonic">je</span> <span class="operand">short loc_140201E</span></div>
+                        <div class="assembly-line"><span class="addr">1402009:</span> <span class="mnemonic">call</span> <span class="operand">HeapAlloc</span></div>
+                        <div class="assembly-line highlight"><span class="addr">140200E:</span> <span class="mnemonic">cmp</span> <span class="operand">rax, 0</span></div>
+                        <div class="assembly-line"><span class="addr">1402012:</span> <span class="mnemonic">jz</span> <span class="operand">short loc_140201E</span></div>
+                        <div class="assembly-line"><span class="addr">1402014:</span> <span class="mnemonic">ret</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Strategy 2: Diff-Style Interface -->
+    <div class="strategy">
+        <div class="strategy-header">Strategy 2: Interactive Diff-Style Interface</div>
+        <div class="mockup">
+            <div class="diff-interface">
+                <div class="diff-toolbar">
+                    <button class="diff-button">Split View</button>
+                    <button class="diff-button">Unified</button>
+                    <button class="diff-button">Hide Unchanged</button>
+                    <button class="diff-button">Word Diff</button>
+                    <span style="margin-left: auto; color: #7f8c8d;">85% Similar</span>
+                </div>
+                <div class="diff-content">
+                    <div class="diff-line">
+                        <span class="line-number">1</span>
+                        <span>1401000: mov    rdi, rcx</span>
+                        <span class="line-number">1</span>
+                        <span>1402000: mov    rdi, rcx</span>
+                    </div>
+                    <div class="diff-line removed">
+                        <span class="line-number">2</span>
+                        <span>1401003: test   rdi, rdi</span>
+                        <span class="line-number">-</span>
+                        <span></span>
+                    </div>
+                    <div class="diff-line added">
+                        <span class="line-number">-</span>
+                        <span></span>
+                        <span class="line-number">2</span>
+                        <span>1402003: cmp    rdi, 0</span>
+                    </div>
+                    <div class="diff-line">
+                        <span class="line-number">3</span>
+                        <span>1401006: je     short loc_140101A</span>
+                        <span class="line-number">3</span>
+                        <span>1402007: je     short loc_140201E</span>
+                    </div>
+                    <div class="diff-line">
+                        <span class="line-number">4</span>
+                        <span>1401008: call   HeapAlloc</span>
+                        <span class="line-number">4</span>
+                        <span>1402009: call   HeapAlloc</span>
+                    </div>
+                    <div class="diff-line modified">
+                        <span class="line-number">5</span>
+                        <span>140100D: test   rax, rax</span>
+                        <span class="line-number">5</span>
+                        <span>140200E: cmp    rax, 0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Strategy 3: Visual Dashboard -->
+    <div class="strategy">
+        <div class="strategy-header">Strategy 3: Visual Similarity Dashboard</div>
+        <div class="mockup">
+            <div class="visual-dashboard">
+                <div class="chart-panel">
+                    <div class="chart-title">Similarity Heatmap</div>
+                    <div class="heatmap">
+                        <div class="heatmap-cell heat-high" title="Instructions: 95%"></div>
+                        <div class="heatmap-cell heat-high" title="Structure: 92%"></div>
+                        <div class="heatmap-cell heat-med" title="Constants: 75%"></div>
+                        <div class="heatmap-cell heat-low" title="Strings: 45%"></div>
+                        <div class="heatmap-cell heat-high" title="Callees: 88%"></div>
+                        <div class="heatmap-cell heat-med" title="Control Flow: 70%"></div>
+                        <div class="heatmap-cell heat-high" title="API Usage: 90%"></div>
+                        <div class="heatmap-cell heat-low" title="Globals: 30%"></div>
+                    </div>
+                </div>
+                <div class="chart-panel">
+                    <div class="chart-title">Feature Radar</div>
+                    <div class="radar-chart">
+                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 24px; color: #3498db;">87%</div>
+                    </div>
+                </div>
+                <div class="chart-panel">
+                    <div class="chart-title">Version Timeline</div>
+                    <div style="height: 100px; background: linear-gradient(to right, #e74c3c, #f39c12, #27ae60); border-radius: 5px; margin: 20px 0; position: relative;">
+                        <div style="position: absolute; left: 20%; top: -20px; color: #2c3e50; font-size: 12px;">v1.0</div>
+                        <div style="position: absolute; left: 60%; top: -20px; color: #2c3e50; font-size: 12px;">v1.2</div>
+                        <div style="position: absolute; left: 90%; top: -20px; color: #2c3e50; font-size: 12px;">v1.3</div>
+                    </div>
+                </div>
+                <div class="chart-panel">
+                    <div class="chart-title">Function Clusters</div>
+                    <div style="height: 150px; position: relative; background: #f8f9fa; border-radius: 5px;">
+                        <div style="position: absolute; top: 30%; left: 20%; width: 8px; height: 8px; background: #3498db; border-radius: 50%;"></div>
+                        <div style="position: absolute; top: 25%; left: 25%; width: 8px; height: 8px; background: #3498db; border-radius: 50%;"></div>
+                        <div style="position: absolute; top: 35%; left: 30%; width: 8px; height: 8px; background: #e74c3c; border-radius: 50%;"></div>
+                        <div style="position: absolute; top: 60%; left: 70%; width: 8px; height: 8px; background: #27ae60; border-radius: 50%;"></div>
+                        <div style="position: absolute; top: 65%; left: 75%; width: 8px; height: 8px; background: #27ae60; border-radius: 50%;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Strategy 4: Contextual Analysis -->
+    <div class="strategy">
+        <div class="strategy-header">Strategy 4: Contextual Analysis Panel</div>
+        <div class="mockup">
+            <div class="contextual-analysis">
+                <div class="analysis-sidebar">
+                    <div class="analysis-category active">Compiler Changes</div>
+                    <div class="analysis-category">Security Impact</div>
+                    <div class="analysis-category">Performance</div>
+                    <div class="analysis-category">Semantic Analysis</div>
+                    <div class="analysis-category">Pattern Detection</div>
+                </div>
+                <div class="analysis-main">
+                    <div class="insight-card">
+                        <div class="insight-title">🔧 Compiler Optimization Detected</div>
+                        <div>The change from 'test rdi, rdi' to 'cmp rdi, 0' indicates compiler optimization. Both instructions achieve identical semantic result but 'cmp' may have different performance characteristics on this architecture.</div>
+                    </div>
+                    <div class="insight-card">
+                        <div class="insight-title">⚡ Performance Impact</div>
+                        <div>Instruction count reduced by 2%. Memory access patterns unchanged. Branch prediction behavior may differ due to different flag setting mechanisms.</div>
+                    </div>
+                    <div class="insight-card">
+                        <div class="insight-title">🛡️ Security Assessment</div>
+                        <div>No security-relevant changes detected. Both versions maintain identical null pointer checking behavior. No new attack vectors introduced.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Strategy 5: Collaborative Workspace -->
+    <div class="strategy">
+        <div class="strategy-header">Strategy 5: Collaborative Investigation Workspace</div>
+        <div class="mockup">
+            <div class="collaborative-workspace">
+                <div class="function-column">
+                    <div class="column-header">malloc_v1.0</div>
+                    <div class="column-content">
+mov    rdi, rcx
+test   rdi, rdi
+je     short fail
+call   HeapAlloc
+test   rax, rax
+jz     short fail
+ret
+                    </div>
+                </div>
+                <div class="function-column">
+                    <div class="column-header">malloc_v1.2</div>
+                    <div class="column-content">
+mov    rdi, rcx
+test   rdi, rdi
+je     short fail
+call   HeapAlloc
+test   rax, rax
+jz     short fail
+ret
+                    </div>
+                </div>
+                <div class="function-column">
+                    <div class="column-header">malloc_v1.3</div>
+                    <div class="column-content">
+mov    rdi, rcx
+cmp    rdi, 0
+je     short fail
+call   HeapAlloc
+cmp    rax, 0
+jz     short fail
+ret
+                    </div>
+                </div>
+                <div class="annotation-bar">
+                    <input type="text" class="annotation-input" placeholder="Add investigation notes... @analyst mentions work here">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Strategy 6: AI-Assisted -->
+    <div class="strategy">
+        <div class="strategy-header">Strategy 6: AI-Assisted Analysis Panel</div>
+        <div class="mockup">
+            <div class="ai-assisted">
+                <div class="comparison-area">
+                    <div class="side-panel">
+                        <div class="function-header">malloc_v1.2 @ 0x1401000</div>
+                        <div class="assembly-line"><span class="addr">1401000:</span> <span class="mnemonic">mov</span> <span class="operand">rdi, rcx</span></div>
+                        <div class="assembly-line highlight"><span class="addr">1401003:</span> <span class="mnemonic">test</span> <span class="operand">rdi, rdi</span></div>
+                        <div class="assembly-line"><span class="addr">1401006:</span> <span class="mnemonic">je</span> <span class="operand">short fail</span></div>
+                        <div class="assembly-line"><span class="addr">1401008:</span> <span class="mnemonic">call</span> <span class="operand">HeapAlloc</span></div>
+                    </div>
+                    <div class="side-panel">
+                        <div class="function-header">malloc_v1.3 @ 0x1402000</div>
+                        <div class="assembly-line"><span class="addr">1402000:</span> <span class="mnemonic">mov</span> <span class="operand">rdi, rcx</span></div>
+                        <div class="assembly-line highlight"><span class="addr">1402003:</span> <span class="mnemonic">cmp</span> <span class="operand">rdi, 0</span></div>
+                        <div class="assembly-line"><span class="addr">1402007:</span> <span class="mnemonic">je</span> <span class="operand">short fail</span></div>
+                        <div class="assembly-line"><span class="addr">1402009:</span> <span class="mnemonic">call</span> <span class="operand">HeapAlloc</span></div>
+                    </div>
+                </div>
+                <div class="ai-panel">
+                    <div class="ai-insight">
+                        <span class="ai-label">SIMILARITY</span>
+                        <div class="confidence-bar"><div class="confidence-fill conf-high"></div></div>
+                        <div style="margin-top: 8px; font-size: 13px;">
+                            Functions are <strong>85% similar</strong>. Primary difference is instruction choice for zero comparison.
+                        </div>
+                    </div>
+
+                    <div class="ai-insight">
+                        <span class="ai-label">CHANGE ANALYSIS</span>
+                        <div class="confidence-bar"><div class="confidence-fill conf-med"></div></div>
+                        <div style="margin-top: 8px; font-size: 13px;">
+                            <strong>Compiler optimization:</strong> 'test reg, reg' replaced with 'cmp reg, 0'. Semantically identical but different performance profile.
+                        </div>
+                    </div>
+
+                    <div class="ai-insight">
+                        <span class="ai-label">SECURITY</span>
+                        <div class="confidence-bar"><div class="confidence-fill conf-high"></div></div>
+                        <div style="margin-top: 8px; font-size: 13px;">
+                            <strong>No security impact.</strong> Both versions maintain proper null pointer validation.
+                        </div>
+                    </div>
+
+                    <div class="ai-insight">
+                        <span class="ai-label">RECOMMENDATION</span>
+                        <div style="margin-top: 8px; font-size: 13px;">
+                            Consider these functions <strong>functionally identical</strong>. Version difference likely due to compiler settings or optimization level changes.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

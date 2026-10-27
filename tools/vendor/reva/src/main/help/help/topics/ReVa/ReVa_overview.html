@@ -1,0 +1,232 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<HTML>
+  <HEAD>
+    <META http-equiv="Content-Type" content="text/html; charset=windows-1252">
+    <TITLE>ReVa - Reverse Engineering Assistant</TITLE>
+    <LINK rel="stylesheet" type="text/css" href="help/shared/DefaultStyle.css">
+  </HEAD>
+
+  <BODY>
+
+    <H1><A name="ReVa_Overview"></A>ReVa - Reverse Engineering Assistant</H1>
+
+    <BLOCKQUOTE>
+
+      <P>ReVa connects AI assistants to Ghidra. You describe what you want to
+      know about a binary in plain language, and the AI uses Ghidra's analysis
+      tools to answer your questions, annotate the database, and help you
+      understand the program.</P>
+
+      <P>ReVa works through the
+      <A href="https://modelcontextprotocol.io/">Model Context Protocol (MCP)</A>,
+      which means it works with any MCP-compatible AI client &mdash; Claude Code,
+      VS Code with Copilot, Cursor, or any other client that supports the
+      protocol.</P>
+
+      <H2><A name="DesignPhilosophy"></A>How It Works</H2>
+
+      <BLOCKQUOTE>
+
+        <P>You talk to the AI assistant in natural language. The assistant
+        translates your questions into Ghidra operations &mdash; decompiling
+        functions, following cross-references, searching strings, tracing data
+        flow &mdash; and synthesizes the results into an answer.</P>
+
+        <P>Every operation the assistant performs is visible to you. You can
+        see which functions it examined, what cross-references it followed, and
+        what changes it made. All modifications to the program database happen
+        through Ghidra transactions and can be undone with
+        <B>Edit<IMG alt="" src="help/shared/arrow.gif" border="0">Undo</B>.</P>
+
+      </BLOCKQUOTE>
+
+      <H2><A name="WhatCanYouDo"></A>What Can You Do With ReVa?</H2>
+
+      <BLOCKQUOTE>
+
+        <P>Here are some examples of things you can ask:</P>
+
+        <TABLE border="1" cellpadding="4" cellspacing="0">
+          <TR>
+            <TH>Task</TH>
+            <TH>Example Prompt</TH>
+          </TR>
+          <TR>
+            <TD><B>Triage a binary</B></TD>
+            <TD><I>"What does this program do? Survey the imports, strings,
+            and key functions."</I></TD>
+          </TR>
+          <TR>
+            <TD><B>Understand a function</B></TD>
+            <TD><I>"Decompile the function at 0x00401000 and explain what
+            it does."</I></TD>
+          </TR>
+          <TR>
+            <TD><B>Trace data flow</B></TD>
+            <TD><I>"Where does the user input from recv() end up? Is there
+            a buffer overflow?"</I></TD>
+          </TR>
+          <TR>
+            <TD><B>Identify algorithms</B></TD>
+            <TD><I>"What cryptographic algorithm does this function implement?
+            Check for known constants."</I></TD>
+          </TR>
+          <TR>
+            <TD><B>Annotate the database</B></TD>
+            <TD><I>"Rename the variables in this function to meaningful
+            names and add a summary comment."</I></TD>
+          </TR>
+          <TR>
+            <TD><B>Define structures</B></TD>
+            <TD><I>"This function parses a network packet. Define a C
+            structure for the packet format."</I></TD>
+          </TR>
+          <TR>
+            <TD><B>Map the call graph</B></TD>
+            <TD><I>"What functions call the encryption routine, and what
+            do they pass as the key?"</I></TD>
+          </TR>
+          <TR>
+            <TD><B>Find vulnerabilities</B></TD>
+            <TD><I>"Check whether the input buffer at 0x00401200 has
+            bounds checking before the memcpy."</I></TD>
+          </TR>
+          <TR>
+            <TD><B>Import and analyze</B></TD>
+            <TD><I>"Import /tmp/firmware.bin and give me an overview."</I></TD>
+          </TR>
+        </TABLE>
+
+      </BLOCKQUOTE>
+
+      <H2><A name="OperationalModes"></A>Three Ways to Use ReVa</H2>
+
+      <BLOCKQUOTE>
+
+        <H3><A name="GUIMode"></A>GUI Mode (Ghidra Plugin)</H3>
+
+        <BLOCKQUOTE>
+          <P>Run ReVa alongside Ghidra's graphical interface. The AI assistant
+          connects over HTTP while you work in the CodeBrowser. You see changes
+          as they happen and can undo anything the assistant does.</P>
+
+          <P>This is the recommended mode for interactive analysis.</P>
+        </BLOCKQUOTE>
+
+        <H3><A name="CLIMode"></A>CLI Mode (Claude Code)</H3>
+
+        <BLOCKQUOTE>
+          <P>Use the <CODE>mcp-reva</CODE> command to integrate directly with
+          Claude Code or other CLI-based AI tools. ReVa manages its own
+          Ghidra project automatically &mdash; just point it at a binary and
+          start asking questions.</P>
+        </BLOCKQUOTE>
+
+        <H3><A name="HeadlessMode"></A>Headless Mode</H3>
+
+        <BLOCKQUOTE>
+          <P>Run ReVa without the Ghidra GUI for automation, scripting, and
+          CI/CD pipelines. Useful for batch analysis of multiple binaries.</P>
+        </BLOCKQUOTE>
+
+      </BLOCKQUOTE>
+
+      <H2><A name="Capabilities"></A>Capabilities at a Glance</H2>
+
+      <BLOCKQUOTE>
+
+        <TABLE border="1" cellpadding="4" cellspacing="0">
+          <TR>
+            <TH>Area</TH>
+            <TH>What the AI Can Do</TH>
+          </TR>
+          <TR>
+            <TD><B>Decompilation</B></TD>
+            <TD>Decompile functions, search across all decompilations,
+            rename variables, change data types, add comments</TD>
+          </TR>
+          <TR>
+            <TD><B>Functions</B></TD>
+            <TD>List, search, and filter functions; set prototypes and
+            signatures; manage function tags</TD>
+          </TR>
+          <TR>
+            <TD><B>Cross-References</B></TD>
+            <TD>Find all references to/from any address; trace data flow
+            forward and backward</TD>
+          </TR>
+          <TR>
+            <TD><B>Call Graphs</B></TD>
+            <TD>Build call graphs; find common callers of multiple
+            functions; traverse call trees</TD>
+          </TR>
+          <TR>
+            <TD><B>Strings &amp; Symbols</B></TD>
+            <TD>Search and filter strings and symbols with pagination</TD>
+          </TR>
+          <TR>
+            <TD><B>Memory &amp; Data</B></TD>
+            <TD>Read memory, inspect data, apply data types, create
+            labels</TD>
+          </TR>
+          <TR>
+            <TD><B>Data Types</B></TD>
+            <TD>Browse type archives, define C structures from headers,
+            apply structures to addresses</TD>
+          </TR>
+          <TR>
+            <TD><B>Imports &amp; Exports</B></TD>
+            <TD>List imported/exported functions, find import references,
+            resolve thunks</TD>
+          </TR>
+          <TR>
+            <TD><B>C++ Analysis</B></TD>
+            <TD>Analyze vtables, find virtual method callers, search
+            for constants</TD>
+          </TR>
+          <TR>
+            <TD><B>Annotations</B></TD>
+            <TD>Set comments and bookmarks, search annotations</TD>
+          </TR>
+          <TR>
+            <TD><B>Project</B></TD>
+            <TD>Import binaries, run analysis, manage project files</TD>
+          </TR>
+        </TABLE>
+
+      </BLOCKQUOTE>
+
+      <H2><A name="Security"></A>Security</H2>
+
+      <BLOCKQUOTE>
+
+        <P>By default, the MCP server binds to <CODE>127.0.0.1</CODE> (localhost
+        only). Only processes on your machine can connect.</P>
+
+        <BLOCKQUOTE>
+          <P><IMG border="0" src="help/shared/warning.png" alt=""> If you change
+          the server host to <CODE>0.0.0.0</CODE> to accept remote connections,
+          <B>enable API key authentication</B> to prevent unauthorized access.
+          See <A href="ReVa_installation.html#Configuration">Configuration
+          Options</A>.</P>
+        </BLOCKQUOTE>
+
+        <P>All program modifications can be undone using Ghidra's standard
+        undo functionality.</P>
+
+      </BLOCKQUOTE>
+
+    </BLOCKQUOTE>
+
+    <P class="providedbyplugin">Provided by: <I>ReVa</I></P>
+
+    <P class="relatedtopic">Related Topics</P>
+
+    <UL>
+      <LI><A href="ReVa_installation.html">Installation and Setup</A></LI>
+      <LI><A href="ReVa_skills.html">Skills and Analysis Workflows</A></LI>
+    </UL>
+
+  </BODY>
+</HTML>

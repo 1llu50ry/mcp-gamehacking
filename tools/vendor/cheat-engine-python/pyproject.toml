@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cheat-engine-server-python"
+version = "0.1.0"
+description = "A Python MCP server for safe Cheat Engine functionality"
+authors = [
+    {name = "Anthropic", email = "support@anthropic.com"}
+]
+license = {text = "MIT"}
+classifiers = [
+    "Private :: Do Not Upload"  # Prevents accidental uploads to PyPI
+]
+dependencies = [
+    "mcp>=1.0.0",
+    "trio>=0.22.0", 
+    "psutil>=5.9.0",
+    "capstone>=5.0.0"
+]
+
+[tool.setuptools]
+packages = ["server"]
+
+[project.scripts]
+bundle-deps = "python:install_deps"
+
+# Custom scripts section for DXT development
+[tool.dxt]
+bundle = "pip install \"mcp[all]\" --target server/lib --upgrade --force-reinstall"
+test = "python server/main.py --debug"
+pack = "npx @anthropic-ai/dxt pack"

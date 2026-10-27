@@ -1,0 +1,27 @@
+._memory-admin-lock-wrap {
+  margin: 0 auto;
+  max-width: 1440px;
+}
+
+._memory-admin-lock-card .tea-card__body {
+  padding: 48px 24px;
+  text-align: center;
+}
+
+._memory-admin-lock-icon {
+  color: var(--tea-color-text-tertiary);
+}
+
+._memory-admin-lock-title {
+  margin-top: 12px;
+  font: var(--tea-typography-heading-6);
+  color: var(--tea-color-text-secondary);
+}
+
+._memory-admin-lock-desc {
+  margin: 8px auto 0;
+  max-width: 420px;
+  font: var(--tea-typography-body-sm);
+  color: var(--tea-color-text-tertiary);
+  line-height: 18px;
+}

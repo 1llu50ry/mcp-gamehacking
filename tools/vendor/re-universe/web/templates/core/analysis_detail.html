@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ analysis.name }} - Ghidra RE Platform{% endblock %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header flex flex-between flex-center">
+        <h2>{{ analysis.name }}</h2>
+        <span>
+            {% if analysis.status == 'completed' %}
+                <span class="text-set">✓ Completed</span>
+            {% elif analysis.status == 'running' %}
+                <span class="text-rare">⟳ Running ({{ analysis.progress }}%)</span>
+            {% elif analysis.status == 'failed' %}
+                <span style="color: var(--accent-red-light);">✗ Failed</span>
+            {% else %}
+                <span class="text-muted">⏸ Pending</span>
+            {% endif %}
+        </span>
+    </div>
+    <div class="panel-content">
+        <div class="flex gap-2">
+            <div style="flex: 1;">
+                <h3 style="color: var(--accent-gold); font-size: 0.85rem; margin-bottom: 0.5rem;">Binary Information</h3>
+                <table class="data-table">
+                    <tr><td style="color: var(--text-muted);">Name</td><td class="mono">{{ analysis.binary_name }}</td></tr>
+                    <tr><td style="color: var(--text-muted);">MD5</td><td class="mono text-magic">{{ analysis.binary_md5 }}</td></tr>
+                    <tr><td style="color: var(--text-muted);">Path</td><td class="mono text-muted">{{ analysis.binary_path|default:"-" }}</td></tr>
+                </table>
+            </div>
+            <div style="flex: 1;">
+                <h3 style="color: var(--accent-gold); font-size: 0.85rem; margin-bottom: 0.5rem;">Analysis Details</h3>
+                <table class="data-table">
+                    <tr><td style="color: var(--text-muted);">Functions</td><td class="mono text-unique">{{ analysis.function_count }}</td></tr>
+                    <tr><td style="color: var(--text-muted);">BSim Indexed</td><td>{% if analysis.bsim_indexed %}<span class="text-set">✓ Yes</span>{% else %}<span class="text-muted">No</span>{% endif %}</td></tr>
+                    <tr><td style="color: var(--text-muted);">Created</td><td>{{ analysis.created_at }}</td></tr>
+                    <tr><td style="color: var(--text-muted);">Completed</td><td>{{ analysis.completed_at|default:"-" }}</td></tr>
+                </table>
+            </div>
+        </div>
+
+        {% if analysis.description %}
+            <div class="mt-2">
+                <h3 style="color: var(--accent-gold); font-size: 0.85rem; margin-bottom: 0.5rem;">Description</h3>
+                <p style="color: var(--text-secondary);">{{ analysis.description }}</p>
+            </div>
+        {% endif %}
+
+        {% if analysis.error_message %}
+            <div class="mt-2 message message-error">
+                <strong>Error:</strong> {{ analysis.error_message }}
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-header flex flex-between flex-center">
+        <h2>Discussion</h2>
+        {% if can_comment %}
+            <button class="btn btn-primary" onclick="document.getElementById('comment-form').style.display = document.getElementById('comment-form').style.display === 'none' ? 'block' : 'none';">
+                + Add Comment
+            </button>
+        {% else %}
+            <a href="{% url 'account_login' %}" class="btn">Log in to comment</a>
+        {% endif %}
+    </div>
+    <div class="panel-content">
+        {% if can_comment %}
+            <div id="comment-form" style="display: none; margin-bottom: 1.5rem;">
+                <form action="{% url 'core:post_comment' %}" method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="entity_type" value="analysis">
+                    <input type="hidden" name="entity_id" value="{{ analysis.id }}">
+                    <input type="hidden" name="entity_name" value="{{ analysis.name }}">
+                    <div class="form-group">
+                        <textarea name="content" class="form-control" placeholder="Share your observations about this analysis..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Post Comment</button>
+                </form>
+            </div>
+        {% endif %}
+
+        {% if comments %}
+            {% for comment in comments %}
+                <div class="comment">
+                    <div class="comment-header">
+                        <div class="comment-avatar">{{ comment.user.username.0|upper }}</div>
+                        <span class="comment-author">{{ comment.user.username }}</span>
+                        <span class="comment-time">{{ comment.created_at|timesince }} ago</span>
+                    </div>
+                    <div class="comment-content">
+                        {{ comment.content_html|safe }}
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="text-center" style="color: var(--text-muted); padding: 2rem;">
+                No comments yet. Be the first to discuss this analysis!
+            </p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

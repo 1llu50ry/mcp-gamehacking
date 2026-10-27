@@ -1,0 +1,49 @@
+version: 2
+updates:
+  # npm — core server deps + devDeps.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 5
+    reviewers: ["1llu50ry"]
+    labels: ["dependencies", "javascript"]
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(dev-deps)"
+      include: "scope"
+    groups:
+      typescript:
+        patterns: ["typescript", "tsx", "@types/*"]
+      mcp:
+        patterns: ["@modelcontextprotocol/*"]
+
+  # GitHub Actions versions.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 5
+    reviewers: ["1llu50ry"]
+    labels: ["dependencies", "github-actions"]
+    commit-message:
+      prefix: "chore(ci)"
+
+  # Dockerfile base image.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    reviewers: ["1llu50ry"]
+    labels: ["dependencies", "docker"]
+    commit-message:
+      prefix: "chore(docker)"

@@ -1,0 +1,42 @@
+{
+  "name": "context-proxy",
+  "version": "0.1.0",
+  "description": "Lightweight LLM request forwarding proxy with JSONL logging and Opik tracing",
+  "type": "module",
+  "scripts": {
+    "start": "node --import tsx/esm src/index.ts",
+    "start:config": "node --import tsx/esm src/index.ts --config config.yaml",
+    "dev": "node --import tsx/esm --watch src/index.ts",
+    "dev:config": "node --import tsx/esm --watch src/index.ts --config config.yaml",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^11.5.0",
+    "cos-nodejs-sdk-v5": "^3.0.0"
+  },
+  "dependencies": {
+    "@clickhouse/client": "^1.22.0",
+    "@hono/node-server": "^1.13.7",
+    "@langfuse/otel": "^5.9.0",
+    "@langfuse/tracing": "^5.9.0",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/core": "^2.0.1",
+    "@opentelemetry/exporter-trace-otlp-http": ">=0.202.0 <1.0.0",
+    "@opentelemetry/sdk-node": "^0.219.0",
+    "@opentelemetry/sdk-trace-base": "^2.0.1",
+    "hono": "^4.7.10",
+    "ioredis": "^5.11.1",
+    "js-yaml": "^4.1.0",
+    "node-pty": "^1.1.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.15.29",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.2"
+  }
+}

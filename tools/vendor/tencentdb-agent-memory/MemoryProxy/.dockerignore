@@ -1,0 +1,49 @@
+# 依赖与构建产物
+node_modules
+dist
+
+# 不打进镜像的目录
+dashboard
+gateway
+docs
+logs
+
+# 运行期产物
+*.log
+*.jsonl
+nohup.out
+context-proxy.pid
+
+# 配置文件（运行时挂载 /data/config.yaml）
+config.yaml
+config-a.yaml
+config-example.yaml
+config.yaml.bak.*
+config.*.local.yaml
+**/.env
+**/.env.*
+
+# 版本控制与编辑器
+.git
+.gitignore
+.gitmodules
+.vscode
+.idea
+.codebuddy
+.claude
+
+# 内部 CI / 内部构建工具（若打进镜像会暴露内部拓扑）
+.coding-ci.yaml
+
+# E2E / verify / smoke scripts —— 不需要进运行镜像
+scripts/e2e-*
+scripts/verify-*
+scripts/warm-*
+scripts/inspect-*
+scripts/smoke-*
+scripts/mock-shark-*
+e2e/
+
+# 容器相关自身
+Dockerfile
+.dockerignore

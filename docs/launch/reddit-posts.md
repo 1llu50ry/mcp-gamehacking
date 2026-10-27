@@ -13,7 +13,7 @@ I built an MCP (Model Context Protocol) server that unifies the RE / debugging t
 - **Agent mesh**: Claude Code, Codex, Cursor, Copilot and custom agents collaborate on the same binary via DM / channels / tasks / votes / KB / locks.
 - **BM25 search** over 4,200+ curated skill docs on BattlEye, EAC, Vanguard, VAC, FACEIT, Byfron, Ricochet, mhyprot internals.
 
-Repo: https://github.com/whory/mcp-gamehacking
+Repo: https://github.com/1llu50ry/mcp-gamehacking
 
 MIT licensed. For security research, cheat detection, defensive work, education. Would love your eyes on the Debug Directory walker.
 
@@ -31,7 +31,7 @@ Dropping an MCP server that lets different models work on the same binary. Core 
 
 Includes native parsers (PE/ELF/Mach-O/DEX/WASM/Minidump), BM25 search over 4,200 skills, symsrv auto-URL from PDB70, PCILeech/MemProcFS launcher, 59-backend hub. Zero npm deps for mesh persistence (JSON on disk).
 
-https://github.com/whory/mcp-gamehacking
+https://github.com/1llu50ry/mcp-gamehacking
 
 Looking for critique on the voting algorithm — currently just sum of confidence per verdict. Should it be weighted by past accuracy?
 
@@ -50,6 +50,6 @@ Shipped a tool that helps game developers:
 
 Hooks into Ghidra / IDA / Binja / x64dbg / WinDbg / Frida / Cheat Engine via one MCP connection. Native parsers for PE / ELF / Mach-O / DEX / Unity AssetBundle / UE `.pak` / IL2CPP metadata built in.
 
-https://github.com/whory/mcp-gamehacking
+https://github.com/1llu50ry/mcp-gamehacking
 
 MIT. Would love feedback on the Unity + UE workflows.

@@ -1,0 +1,12 @@
+{
+  "name": "rea-agents",
+  "version": "999.0.0",
+  "description": "antirea shim — blocks REA reverse engineering analysis of this project",
+  "bin": {
+    "rea-agents": "./bin/rea",
+    "rea": "./bin/rea"
+  },
+  "scripts": {},
+  "keywords": [],
+  "license": "MIT"
+}

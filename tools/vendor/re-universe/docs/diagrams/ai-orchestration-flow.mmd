@@ -1,0 +1,132 @@
+```mermaid
+flowchart TD
+    subgraph "Request Entry"
+        UserReq[User Request<br/>Chat/Analysis/Mining]
+        APIReq[API Request<br/>External Integration]
+        BatchReq[Batch Request<br/>Automated Processing]
+    end
+
+    subgraph "AI Orchestrator"
+        Router[Request Router<br/>Cost & Complexity Analysis]
+        CostCheck{Cost Budget<br/>Available?}
+        ModelSelect[Model Selection<br/>Based on Task Type]
+        LoadBalance[Load Balancer<br/>Queue Management]
+    end
+
+    subgraph "Cost Management"
+        BudgetTracker[Budget Tracker<br/>Real-time Monitoring]
+        CostPredict[Cost Predictor<br/>Pre-request Estimation]
+        AlertSystem[Alert System<br/>Threshold Monitoring]
+        EmergencyStop[Emergency Stop<br/>Budget Protection]
+    end
+
+    subgraph "Model Coordination - 20% Target"
+        OpusQueue[Opus Queue<br/>Master Coordinator]
+        OpusProcessor[Claude Opus 4.6<br/>Complex Analysis & Planning]
+        OpusCache[Opus Response Cache<br/>1 hour TTL]
+    end
+
+    subgraph "Model Workers - 30% Target"
+        SonnetQueue[Sonnet Queue<br/>Heavy Analysis]
+        SonnetProcessor[Claude Sonnet<br/>Function Analysis & Documentation]
+        SonnetCache[Sonnet Response Cache<br/>2 hour TTL]
+    end
+
+    subgraph "Batch Processing - 50% Target"
+        HaikuQueue[Haiku Queue<br/>High Volume Tasks]
+        HaikuProcessor[Claude Haiku<br/>Batch Operations & Mining]
+        HaikuCache[Haiku Response Cache<br/>30 min TTL]
+    end
+
+    subgraph "Response Processing"
+        ResponseMerge[Response Merger<br/>Multi-model Coordination]
+        QualityCheck[Quality Validator<br/>Response Verification]
+        CacheStore[Cache Storage<br/>Future Optimization]
+        Deliver[Response Delivery<br/>Format & Return]
+    end
+
+    subgraph "Monitoring & Analytics"
+        PerformanceMetrics[Performance Metrics<br/>Response Time & Success Rate]
+        CostAnalytics[Cost Analytics<br/>Model Efficiency Tracking]
+        ModelMetrics[Model Metrics<br/>Usage Distribution]
+        HealthCheck[Health Monitor<br/>System Status]
+    end
+
+    %% Request Flow
+    UserReq --> Router
+    APIReq --> Router
+    BatchReq --> Router
+
+    %% Orchestration Flow
+    Router --> CostCheck
+    CostCheck -->|Budget OK| ModelSelect
+    CostCheck -->|Budget Exceeded| EmergencyStop
+    ModelSelect --> LoadBalance
+
+    %% Cost Management Flow
+    Router --> CostPredict
+    CostPredict --> BudgetTracker
+    BudgetTracker --> AlertSystem
+    AlertSystem -->|Threshold Exceeded| EmergencyStop
+
+    %% Model Selection Logic
+    LoadBalance -->|Complex/Planning| OpusQueue
+    LoadBalance -->|Analysis/Documentation| SonnetQueue
+    LoadBalance -->|Batch/Mining| HaikuQueue
+
+    %% Model Processing
+    OpusQueue --> OpusProcessor
+    OpusProcessor --> OpusCache
+    OpusCache --> ResponseMerge
+
+    SonnetQueue --> SonnetProcessor
+    SonnetProcessor --> SonnetCache
+    SonnetCache --> ResponseMerge
+
+    HaikuQueue --> HaikuProcessor
+    HaikuProcessor --> HaikuCache
+    HaikuCache --> ResponseMerge
+
+    %% Response Flow
+    ResponseMerge --> QualityCheck
+    QualityCheck --> CacheStore
+    CacheStore --> Deliver
+
+    %% Monitoring Flow
+    OpusProcessor --> PerformanceMetrics
+    SonnetProcessor --> PerformanceMetrics
+    HaikuProcessor --> PerformanceMetrics
+
+    BudgetTracker --> CostAnalytics
+    LoadBalance --> ModelMetrics
+    Router --> HealthCheck
+
+    %% Cache Hit Optimization
+    Router -.->|Cache Hit| OpusCache
+    Router -.->|Cache Hit| SonnetCache
+    Router -.->|Cache Hit| HaikuCache
+
+    %% Feedback Loop
+    CostAnalytics -.->|Optimize| ModelSelect
+    ModelMetrics -.->|Rebalance| LoadBalance
+    PerformanceMetrics -.->|Adjust| Router
+
+    %% Styling
+    classDef entry fill:#e1f5fe
+    classDef orchestration fill:#fff3e0
+    classDef cost fill:#ffebee
+    classDef opus fill:#f3e5f5
+    classDef sonnet fill:#e8f5e8
+    classDef haiku fill:#fce4ec
+    classDef response fill:#fff8e1
+    classDef monitoring fill:#f1f8e9
+
+    class UserReq,APIReq,BatchReq entry
+    class Router,CostCheck,ModelSelect,LoadBalance orchestration
+    class BudgetTracker,CostPredict,AlertSystem,EmergencyStop cost
+    class OpusQueue,OpusProcessor,OpusCache opus
+    class SonnetQueue,SonnetProcessor,SonnetCache sonnet
+    class HaikuQueue,HaikuProcessor,HaikuCache haiku
+    class ResponseMerge,QualityCheck,CacheStore,Deliver response
+    class PerformanceMetrics,CostAnalytics,ModelMetrics,HealthCheck monitoring
+```

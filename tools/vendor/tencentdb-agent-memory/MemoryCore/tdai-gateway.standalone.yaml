@@ -1,0 +1,154 @@
+# ============================================================
+# TDAI Gateway — Standalone 单机版配置
+# ============================================================
+# 适用场景: 本地开发 / Hermes sidecar / 单 Agent 单机部署
+# 特点: 零外部依赖 (不需要 Redis/Shark), 进程内状态管理
+# ============================================================
+
+deployMode: standalone
+stateBackend: "local"
+
+server:
+  port: 8420
+  host: "127.0.0.1"
+
+data:
+  baseDir: "~/.memory-tencentdb/memory-tdai"
+
+# ── LLM (必填) ──
+llm:
+  baseUrl: "https://api.openai.com/v1"
+  apiKey: "${TDAI_LLM_API_KEY}"    # 通过环境变量注入
+  model: "gpt-4o"
+  maxTokens: 4096
+  timeoutMs: 120000
+
+# ── v2 InstanceUpstream:supported-agents ──
+# 事实源在 Proxy `MemoryProxy/src/supported-agents.ts`;此处为 Core 侧副本,
+# 用于 §6.A supported-agents 接口 + seed default 组的 agents 全集。
+# 详见 docs/design/2026-08-25-instance-upstream-config.md §6.A。
+#
+# 缺失/空数组 → Core 侧 seed 逻辑不触发 → Panel 打开是空表列 → Proxy 走 "零行 fallback"
+# (行为等同 v1,全走全局 upstream + alias),保证配置漏配不阻塞业务。
+upstream:
+  supportedAgents:
+    - agent_source: claude-code
+      protocol: anthropic
+      display_name: Claude Code
+    - agent_source: codebuddy
+      protocol: openai-chat
+      display_name: CodeBuddy
+    - agent_source: codex
+      protocol: openai-responses
+      display_name: Codex
+    - agent_source: workbuddy
+      protocol: openai-responses
+      display_name: WorkBuddy
+    - agent_source: dsh
+      protocol: openai-chat
+      display_name: DeepSeek Harness
+    - agent_source: opencode
+      protocol: openai-chat
+      display_name: OpenCode
+    - agent_source: pi
+      protocol: openai-chat
+      display_name: Pi
+    # ── header-only 客户端(hermes / openclaw):走 anthropic /v1/messages,
+    #    通过 x-team-id / x-agent-id / x-task-id 请求头预选身份 ──
+    - agent_source: hermes
+      protocol: anthropic
+      display_name: Hermes
+    - agent_source: openclaw
+      protocol: anthropic
+      display_name: OpenClaw
+
+# ── Memory 引擎配置 ──
+memory:
+
+  capture:
+    enabled: true
+
+  extraction:
+    enabled: true
+    enableDedup: true
+    maxMemoriesPerSession: 20
+
+  persona:
+    triggerEveryN: 50
+    maxScenes: 15
+    triggerMode: current          # current: 累计 scene 数触发；jev: L2 更新后即时判断是否更新 L3
+    # JEV 即时更新门（可选）。启用时把上一行改为 jev，再取消下面整段注释。
+    # 以下与 MemoryProxy/config.example.yaml 一致，使用 TokenHub 作为示例；
+    # 原生 TypeSafe 可把 endpoint 改为 https://api.typesafe.ai/v1/systemone，
+    # 并填写该服务支持的模型名。endpoint、model 与 key 必须属于同一服务。
+    # jev:
+    #   provider: jev             # decision provider 类型；内置实现为 jev
+    #   endpoint: "https://tokenhub.tencentmaas.com/v1/systemone"
+    #   # 解析优先级：TYPESAFE_API_KEY 环境变量 > 此处（支持 ${VAR}）> 空。
+    #   # 启用 JEV 时 key 不能为空；不要在配置文件中写入真实密钥。
+    #   apiKey: "${TYPESAFE_API_KEY}"
+    #   model: "ep-YOUR-SERVICE-ID" # TokenHub 模型/服务 ID；此处仅为占位符
+    #   timeoutMs: 3000             # 在线路径单次调用超时，单位 ms；允许范围 100~60000
+    #   diagnostics:
+    #     # off: 关闭；metadata: 仅记录关联标识、计时、截断和判定元数据；
+    #     # full: 另记录 persona、scene、state 与原始响应，仅限短时诊断并保护日志访问。
+    #     mode: "off"
+
+  pipeline:
+    everyNConversations: 5
+    enableWarmup: true
+    l1IdleTimeoutSeconds: 600
+    l2DelayAfterL1Seconds: 90
+    l2MinIntervalSeconds: 900
+    l2MaxIntervalSeconds: 3600
+
+  recall:
+    enabled: true
+    maxResults: 5
+    scoreThreshold: 0.3
+    strategy: "hybrid"
+    timeoutMs: 5000
+
+  # ── 存储后端 ──
+  # sqlite: 本地 SQLite (默认, 零配置)
+  # tcvdb:  腾讯云向量数据库 (需填 tcvdb 配置)
+  storeBackend: "sqlite"
+
+  # 如需使用 TCVDB, 取消注释并填写:
+  # storeBackend: "tcvdb"
+  # tcvdb:
+  #   url: "http://10.0.1.1:80"
+  #   username: "root"
+  #   apiKey: ""
+  #   database: ""
+  #   embeddingModel: "bge-large-zh"
+  #   timeout: 10000
+
+  embedding:
+    provider: "none"               # 默认关闭向量搜索, 仅用 BM25
+    # 开启向量搜索示例:
+    # provider: "openai"
+    # baseUrl: "https://api.openai.com/v1"
+    # apiKey: "${TDAI_LLM_API_KEY}"
+    # model: "text-embedding-3-small"
+    # dimensions: 1536
+
+  bm25:
+    enabled: true
+    language: "zh"
+
+# ── Skill 模块（可选，默认关闭）──
+# Skill 是额外能力的加入，不影响上面的 Memory 引擎。
+# 启用后 skill 数据存储在 {baseDir}/skills/ 目录下。
+# 也可通过环境变量 TDAI_SKILL_ENABLED=true 启用。
+# skill:
+#   enabled: true
+#   routing:
+#     mode: "bm25"
+#     searchTopK: 20        # listing 接口最多注入多少条 skill（name+description）
+#   extraction:
+#     enabled: true         # 需要 llm 配置有效
+#     maxIterations: 16
+#   resources:
+#     maxResourceSizeBytes: 5000000
+#     allowExecutable: false

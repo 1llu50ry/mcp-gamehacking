@@ -38,7 +38,11 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
-          queries: security-extended
+          # Explicit config scopes CodeQL to our own source and skips the
+          # vendored upstream trees under tools/vendor/**. Those projects
+          # are tracked for integration, not authored here; their alerts
+          # belong to their upstream maintainers.
+          config-file: .github/codeql/codeql-config.yml
 
       - name: Build (tsc)
         run: npx tsc

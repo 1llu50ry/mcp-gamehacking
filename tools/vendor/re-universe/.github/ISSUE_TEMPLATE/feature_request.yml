@@ -1,0 +1,58 @@
+name: Feature Request
+description: Suggest an idea for this project
+title: "[Feature]: "
+labels: ["enhancement"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature!
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: Is your feature request related to a problem? Please describe.
+      placeholder: I'm always frustrated when...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you'd like
+      placeholder: I would like to see...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Describe any alternative solutions or features you've considered
+      placeholder: I've also considered...
+
+  - type: dropdown
+    id: platform-impact
+    attributes:
+      label: Platform Impact
+      description: Which platforms would this feature affect?
+      multiple: true
+      options:
+        - Windows (PowerShell)
+        - Linux (Bash)
+        - macOS (Bash)
+        - Docker configuration
+        - Cross-platform (all)
+
+  - type: checkboxes
+    id: implementation
+    attributes:
+      label: Implementation Willingness
+      description: Are you willing to help implement this feature?
+      options:
+        - label: I'm willing to implement this feature
+        - label: I can help with testing
+        - label: I can help with documentation

@@ -1,0 +1,203 @@
+@startuml database-schema
+!define LIGHTYELLOW #FFFFCC
+!define LIGHTBLUE #E6F3FF
+!define LIGHTGREEN #E6FFE6
+!define LIGHTPINK #FFE6F3
+!define LIGHTGRAY #F5F5F5
+
+title D2Docs Enhanced Database Schema\nPostgreSQL + pgvector Extensions
+
+package "Existing BSim Core" LIGHTYELLOW {
+  entity "executableTable" {
+    * md5 : VARCHAR(32) <<PK>>
+    --
+    name : TEXT
+    architecture : TEXT
+    compileDate : DATE
+    path : TEXT
+  }
+
+  entity "functionTable" {
+    * id : BIGINT <<PK>>
+    * executable_id : VARCHAR(32) <<FK>>
+    --
+    name : TEXT
+    address : BIGINT
+    size : INTEGER
+    signature : TEXT
+    featureVector : BYTEA
+  }
+
+  entity "keyvaluetable" {
+    * key : VARCHAR(255) <<PK>>
+    --
+    value : TEXT
+  }
+}
+
+package "Vector Search Extensions" LIGHTBLUE {
+  entity "function_embeddings" {
+    * function_id : BIGINT <<PK,FK>>
+    --
+    embedding : VECTOR(1536)
+    model_version : VARCHAR(50)
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+  }
+
+  entity "semantic_search_cache" {
+    * query_hash : VARCHAR(64) <<PK>>
+    --
+    query_text : TEXT
+    results : JSONB
+    similarity_threshold : FLOAT
+    created_at : TIMESTAMP
+    expires_at : TIMESTAMP
+  }
+}
+
+package "System Hierarchy" LIGHTGREEN {
+  entity "d2_systems" {
+    * id : SERIAL <<PK>>
+    --
+    name : VARCHAR(100)
+    display_name : TEXT
+    description : TEXT
+    category : VARCHAR(50)
+    priority : INTEGER
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+  }
+
+  entity "d2_subsystems" {
+    * id : SERIAL <<PK>>
+    * system_id : INTEGER <<FK>>
+    --
+    name : VARCHAR(100)
+    display_name : TEXT
+    description : TEXT
+    version_introduced : VARCHAR(10)
+    complexity_score : FLOAT
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+  }
+
+  entity "d2_modules" {
+    * id : SERIAL <<PK>>
+    * subsystem_id : INTEGER <<FK>>
+    --
+    name : VARCHAR(100)
+    display_name : TEXT
+    description : TEXT
+    file_pattern : TEXT
+    responsibility : TEXT
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+  }
+
+  entity "d2_function_hierarchy" {
+    * function_id : BIGINT <<PK,FK>>
+    * module_id : INTEGER <<FK>>
+    --
+    classification_confidence : FLOAT
+    auto_classified : BOOLEAN
+    verified_by_human : BOOLEAN
+    classification_notes : TEXT
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+  }
+}
+
+package "Community Knowledge" LIGHTPINK {
+  entity "knowledge_sources" {
+    * id : SERIAL <<PK>>
+    --
+    name : TEXT
+    url : TEXT
+    source_type : knowledge_source_type
+    trust_score : FLOAT
+    quality_score : FLOAT
+    last_scanned : TIMESTAMP
+    scan_frequency : INTEGER
+    metadata : JSONB
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+  }
+
+  entity "community_insights" {
+    * id : SERIAL <<PK>>
+    * source_id : INTEGER <<FK>>
+    * function_id : BIGINT <<FK>>
+    --
+    insight_type : insight_type
+    content : TEXT
+    confidence_score : FLOAT
+    validation_status : validation_status
+    cross_references : JSONB
+    embedding : VECTOR(1536)
+    created_at : TIMESTAMP
+    validated_at : TIMESTAMP
+  }
+
+  entity "insight_validations" {
+    * id : SERIAL <<PK>>
+    * insight_id : INTEGER <<FK>>
+    --
+    validation_method : validation_method
+    validator_source : TEXT
+    validation_score : FLOAT
+    validation_notes : TEXT
+    created_at : TIMESTAMP
+  }
+}
+
+package "AI Orchestration" LIGHTGRAY {
+  entity "ai_requests" {
+    * id : SERIAL <<PK>>
+    --
+    request_hash : VARCHAR(64)
+    model_used : TEXT
+    cost_estimate : DECIMAL(10,4)
+    actual_cost : DECIMAL(10,4)
+    response_time : INTEGER
+    success : BOOLEAN
+    cached : BOOLEAN
+    created_at : TIMESTAMP
+  }
+
+  entity "cost_tracking" {
+    * id : SERIAL <<PK>>
+    --
+    date : DATE
+    model : TEXT
+    total_requests : INTEGER
+    total_cost : DECIMAL(10,4)
+    budget_remaining : DECIMAL(10,4)
+    alert_triggered : BOOLEAN
+  }
+}
+
+' Existing BSim relationships
+executableTable ||--o{ functionTable : "contains"
+
+' Vector search relationships
+functionTable ||--|| function_embeddings : "has embedding"
+
+' Hierarchy relationships
+d2_systems ||--o{ d2_subsystems : "contains"
+d2_subsystems ||--o{ d2_modules : "contains"
+d2_modules ||--o{ d2_function_hierarchy : "classifies"
+functionTable ||--o| d2_function_hierarchy : "belongs to"
+
+' Community knowledge relationships
+knowledge_sources ||--o{ community_insights : "provides"
+functionTable ||--o{ community_insights : "about"
+community_insights ||--o{ insight_validations : "validated by"
+
+' Indexes for performance
+note top of function_embeddings : "Index: embedding using ivfflat"
+note top of semantic_search_cache : "Index: query_hash, expires_at"
+note top of community_insights : "Index: embedding using ivfflat\nIndex: function_id, confidence_score"
+note top of d2_function_hierarchy : "Index: module_id, classification_confidence"
+
+@enduml

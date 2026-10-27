@@ -1,0 +1,21 @@
+# Monitoring Dashboard Service Dependencies
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+pydantic==2.10.3
+pydantic-settings==2.6.1
+
+# Database
+asyncpg==0.30.0
+redis==5.2.1
+
+# Templates and static files
+jinja2==3.1.4
+
+# HTTP client
+httpx==0.28.1
+
+# Scheduling
+apscheduler==3.10.4
+
+# Logging
+structlog==24.4.0

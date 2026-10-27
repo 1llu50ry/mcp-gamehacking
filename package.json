@@ -27,18 +27,18 @@
     "injection",
     "hooking"
   ],
-  "author": "whory",
+  "author": "1llu50ry",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/whory/mcp-gamehacking.git"
+    "url": "https://github.com/1llu50ry/mcp-gamehacking.git"
   },
-  "homepage": "https://github.com/whory/mcp-gamehacking#readme",
+  "homepage": "https://github.com/1llu50ry/mcp-gamehacking#readme",
   "bugs": {
-    "url": "https://github.com/whory/mcp-gamehacking/issues"
+    "url": "https://github.com/1llu50ry/mcp-gamehacking/issues"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1"

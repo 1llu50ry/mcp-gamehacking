@@ -1,0 +1,449 @@
+-- D2Docs Database Health Monitoring
+-- Creates monitoring views, functions, and performance tracking
+-- For comprehensive database performance insights and troubleshooting
+--
+-- Last Updated: February 20, 2026
+
+\echo '========================================='
+\echo 'D2Docs Database Health Monitoring'
+\echo 'Creating monitoring views and functions'
+\echo '========================================='
+\echo ''
+
+-- Set search path
+SET search_path TO public;
+
+-- =========================================================================
+-- HEALTH MONITORING VIEWS
+-- =========================================================================
+
+\echo 'Creating health monitoring views...'
+
+-- Database size and growth tracking
+CREATE VIEW db_health_overview AS
+SELECT
+    'database_size' as metric,
+    pg_size_pretty(pg_database_size(current_database())) as value,
+    pg_database_size(current_database()) as raw_bytes,
+    NOW() as measured_at
+UNION ALL
+SELECT
+    'total_connections' as metric,
+    (SELECT count(*) FROM pg_stat_activity)::text as value,
+    (SELECT count(*) FROM pg_stat_activity) as raw_bytes,
+    NOW() as measured_at
+UNION ALL
+SELECT
+    'active_connections' as metric,
+    (SELECT count(*) FROM pg_stat_activity WHERE state = 'active')::text as value,
+    (SELECT count(*) FROM pg_stat_activity WHERE state = 'active') as raw_bytes,
+    NOW() as measured_at;
+
+-- Table size and performance metrics
+CREATE VIEW table_health_metrics AS
+SELECT
+    schemaname,
+    relname,
+    pg_size_pretty(pg_total_relation_size(schemaname||'.'||relname)) as total_size,
+    pg_size_pretty(pg_relation_size(schemaname||'.'||relname)) as table_size,
+    pg_size_pretty(pg_total_relation_size(schemaname||'.'||relname) - pg_relation_size(schemaname||'.'||relname)) as index_size,
+    n_tup_ins as inserts,
+    n_tup_upd as updates,
+    n_tup_del as deletes,
+    n_live_tup as live_rows,
+    n_dead_tup as dead_rows,
+    last_vacuum,
+    last_autovacuum,
+    last_analyze,
+    last_autoanalyze,
+    CASE
+        WHEN n_live_tup > 0 THEN ROUND(((n_dead_tup::numeric / n_live_tup::numeric) * 100)::numeric, 2)
+        ELSE 0
+    END as dead_row_percentage
+FROM pg_stat_user_tables
+ORDER BY pg_total_relation_size(schemaname||'.'||relname) DESC;
+
+-- Index usage and efficiency
+CREATE VIEW index_health_metrics AS
+SELECT
+    schemaname,
+    relname,
+    indexrelname,
+    idx_scan as times_used,
+    idx_tup_read as tuples_read,
+    idx_tup_fetch as tuples_fetched,
+    pg_size_pretty(pg_relation_size(indexrelid)) as index_size,
+    CASE
+        WHEN idx_scan = 0 THEN 'NEVER USED'
+        WHEN idx_scan < 100 THEN 'LOW USAGE'
+        ELSE 'ACTIVE'
+    END as usage_status
+FROM pg_stat_user_indexes
+ORDER BY idx_scan DESC, pg_relation_size(indexrelid) DESC;
+
+-- Query performance insights
+CREATE VIEW slow_queries AS
+SELECT
+    query,
+    calls,
+    total_exec_time,
+    ROUND(total_exec_time / calls, 2) as avg_exec_time_ms,
+    ROUND((100.0 * total_exec_time / sum(total_exec_time) OVER()), 2) AS percentage_of_total_time,
+    rows,
+    ROUND(100.0 * shared_blks_hit / nullif(shared_blks_hit + shared_blks_read, 0), 2) AS hit_percent
+FROM pg_stat_statements
+WHERE calls > 10
+ORDER BY total_exec_time DESC
+LIMIT 20;
+
+-- BSim specific health metrics
+CREATE VIEW bsim_health_metrics AS
+SELECT
+    'total_executables' as metric,
+    count(*)::text as value,
+    count(*) as raw_value
+FROM exetable
+UNION ALL
+SELECT
+    'total_functions' as metric,
+    count(*)::text as value,
+    count(*) as raw_value
+FROM desctable
+UNION ALL
+SELECT
+    'functions_with_embeddings' as metric,
+    count(*)::text as value,
+    count(*) as raw_value
+FROM function_embeddings
+UNION ALL
+SELECT
+    'community_insights' as metric,
+    count(*)::text as value,
+    count(*) as raw_value
+FROM community_insights
+UNION ALL
+SELECT
+    'classified_functions' as metric,
+    count(*)::text as value,
+    count(*) as raw_value
+FROM d2_function_hierarchy;
+
+-- Extension health check
+CREATE VIEW extension_health AS
+SELECT
+    extname as extension_name,
+    extversion as version,
+    CASE
+        WHEN extname = 'lshvector' THEN 'BSim Similarity Search'
+        WHEN extname = 'vector' THEN 'pgvector Semantic Search'
+        WHEN extname = 'pg_stat_statements' THEN 'Query Performance Tracking'
+        ELSE 'Other Extension'
+    END as description,
+    CASE
+        WHEN extname IN ('lshvector', 'vector') THEN 'CRITICAL'
+        ELSE 'OPTIONAL'
+    END as importance
+FROM pg_extension
+ORDER BY importance, extname;
+
+-- =========================================================================
+-- HEALTH MONITORING FUNCTIONS
+-- =========================================================================
+
+\echo 'Creating health monitoring functions...'
+
+-- Function to get database health summary
+CREATE OR REPLACE FUNCTION get_database_health_summary()
+RETURNS TABLE(
+    category text,
+    status text,
+    details text,
+    recommendation text
+) AS $$
+BEGIN
+    -- Check database size
+    RETURN QUERY
+    SELECT
+        'Database Size'::text as category,
+        CASE
+            WHEN pg_database_size(current_database()) < 1073741824 THEN 'HEALTHY'  -- < 1GB
+            WHEN pg_database_size(current_database()) < 10737418240 THEN 'MONITOR' -- < 10GB
+            ELSE 'ATTENTION'
+        END as status,
+        pg_size_pretty(pg_database_size(current_database())) as details,
+        CASE
+            WHEN pg_database_size(current_database()) > 10737418240 THEN 'Consider archiving old data'
+            ELSE 'Database size is within normal range'
+        END as recommendation;
+
+    -- Check connection count
+    RETURN QUERY
+    SELECT
+        'Connections'::text as category,
+        CASE
+            WHEN (SELECT count(*) FROM pg_stat_activity) < 50 THEN 'HEALTHY'
+            WHEN (SELECT count(*) FROM pg_stat_activity) < 100 THEN 'MONITOR'
+            ELSE 'ATTENTION'
+        END as status,
+        (SELECT count(*) FROM pg_stat_activity)::text || ' active connections' as details,
+        CASE
+            WHEN (SELECT count(*) FROM pg_stat_activity) > 100 THEN 'Check for connection pooling'
+            ELSE 'Connection count is normal'
+        END as recommendation;
+
+    -- Check dead row percentage
+    RETURN QUERY
+    SELECT
+        'Table Maintenance'::text as category,
+        CASE
+            WHEN (SELECT AVG(CASE WHEN n_live_tup > 0 THEN (n_dead_tup::float / n_live_tup::float) * 100 ELSE 0 END) FROM pg_stat_user_tables) < 10 THEN 'HEALTHY'
+            WHEN (SELECT AVG(CASE WHEN n_live_tup > 0 THEN (n_dead_tup::float / n_live_tup::float) * 100 ELSE 0 END) FROM pg_stat_user_tables) < 20 THEN 'MONITOR'
+            ELSE 'ATTENTION'
+        END as status,
+        ROUND((SELECT AVG(CASE WHEN n_live_tup > 0 THEN (n_dead_tup::float / n_live_tup::float) * 100 ELSE 0 END) FROM pg_stat_user_tables), 2)::text || '% dead rows average' as details,
+        CASE
+            WHEN (SELECT AVG(CASE WHEN n_live_tup > 0 THEN (n_dead_tup::float / n_live_tup::float) * 100 ELSE 0 END) FROM pg_stat_user_tables) > 20 THEN 'Run VACUUM on affected tables'
+            ELSE 'Table maintenance is up to date'
+        END as recommendation;
+
+    -- Check extensions
+    RETURN QUERY
+    SELECT
+        'Extensions'::text as category,
+        CASE
+            WHEN EXISTS (SELECT 1 FROM pg_extension WHERE extname IN ('lshvector', 'vector')) THEN 'HEALTHY'
+            ELSE 'CRITICAL'
+        END as status,
+        (SELECT string_agg(extname || ' (' || extversion || ')', ', ') FROM pg_extension WHERE extname IN ('lshvector', 'vector', 'pg_stat_statements')) as details,
+        CASE
+            WHEN NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'lshvector') THEN 'Install lshvector extension for BSim'
+            WHEN NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector') THEN 'Install pgvector extension for semantic search'
+            ELSE 'All required extensions are installed'
+        END as recommendation;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to optimize database performance
+CREATE OR REPLACE FUNCTION optimize_database_performance()
+RETURNS TABLE(
+    action text,
+    target text,
+    status text,
+    details text
+) AS $$
+BEGIN
+    -- Update table statistics
+    RETURN QUERY
+    SELECT
+        'ANALYZE'::text as action,
+        'All Tables'::text as target,
+        'COMPLETED'::text as status,
+        'Updated table statistics for query optimizer'::text as details;
+
+    ANALYZE;
+
+    -- Suggest vacuum for tables with high dead row percentage
+    RETURN QUERY
+    SELECT
+        'VACUUM RECOMMENDED'::text as action,
+        relname::text as target,
+        'PENDING'::text as status,
+        'Dead rows: ' || ROUND(CASE WHEN n_live_tup > 0 THEN (n_dead_tup::float / n_live_tup::float) * 100 ELSE 0 END, 2)::text || '%' as details
+    FROM pg_stat_user_tables
+    WHERE n_live_tup > 0
+        AND (n_dead_tup::float / n_live_tup::float) * 100 > 10
+    ORDER BY (n_dead_tup::float / n_live_tup::float) DESC;
+
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to check vector search readiness
+CREATE OR REPLACE FUNCTION check_vector_search_readiness()
+RETURNS TABLE(
+    component text,
+    status text,
+    count_or_size text,
+    recommendation text
+) AS $$
+BEGIN
+    -- Check pgvector extension
+    RETURN QUERY
+    SELECT
+        'pgvector Extension'::text as component,
+        CASE
+            WHEN EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector') THEN 'INSTALLED'
+            ELSE 'MISSING'
+        END as status,
+        COALESCE((SELECT extversion FROM pg_extension WHERE extname = 'vector'), 'N/A')::text as count_or_size,
+        CASE
+            WHEN NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector') THEN 'Install pgvector extension'
+            ELSE 'Ready for vector operations'
+        END as recommendation;
+
+    -- Check function embeddings
+    RETURN QUERY
+    SELECT
+        'Function Embeddings'::text as component,
+        CASE
+            WHEN (SELECT count(*) FROM function_embeddings) > 0 THEN 'POPULATED'
+            WHEN EXISTS (SELECT 1 FROM function_embeddings) THEN 'EMPTY'
+            ELSE 'TABLE_MISSING'
+        END as status,
+        (SELECT count(*) FROM function_embeddings)::text || ' embeddings' as count_or_size,
+        CASE
+            WHEN (SELECT count(*) FROM function_embeddings) = 0 THEN 'Generate embeddings for functions'
+            ELSE 'Embeddings available for semantic search'
+        END as recommendation;
+
+    -- Check vector indexes
+    RETURN QUERY
+    SELECT
+        'Vector Indexes'::text as component,
+        CASE
+            WHEN EXISTS (
+                SELECT 1 FROM pg_indexes
+                WHERE relname = 'function_embeddings'
+                AND indexrelname LIKE '%vector%'
+            ) THEN 'CREATED'
+            ELSE 'MISSING'
+        END as status,
+        (
+            SELECT count(*)::text
+            FROM pg_indexes
+            WHERE relname IN ('function_embeddings', 'community_insights')
+            AND indexrelname LIKE '%vector%'
+        ) || ' vector indexes' as count_or_size,
+        CASE
+            WHEN NOT EXISTS (
+                SELECT 1 FROM pg_indexes
+                WHERE relname = 'function_embeddings'
+                AND indexrelname LIKE '%vector%'
+            ) THEN 'Vector indexes will be created automatically'
+            ELSE 'Vector indexes optimized for similarity search'
+        END as recommendation;
+END;
+$$ LANGUAGE plpgsql;
+
+-- =========================================================================
+-- PERFORMANCE BASELINE FUNCTIONS
+-- =========================================================================
+
+\echo 'Creating performance baseline functions...'
+
+-- Create performance baseline table
+CREATE TABLE IF NOT EXISTS performance_baselines (
+    id SERIAL PRIMARY KEY,
+    metric_name VARCHAR(100) NOT NULL,
+    metric_value NUMERIC NOT NULL,
+    metric_unit VARCHAR(50),
+    baseline_type VARCHAR(50) NOT NULL, -- 'daily', 'weekly', 'monthly'
+    recorded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Function to record performance baseline
+CREATE OR REPLACE FUNCTION record_performance_baseline(baseline_type_param text DEFAULT 'daily')
+RETURNS void AS $$
+BEGIN
+    -- Clear old baselines of the same type
+    DELETE FROM performance_baselines
+    WHERE baseline_type = baseline_type_param
+    AND recorded_at < NOW() - INTERVAL '7 days';
+
+    -- Record current metrics
+    INSERT INTO performance_baselines (metric_name, metric_value, metric_unit, baseline_type) VALUES
+        ('database_size_mb', pg_database_size(current_database()) / 1024.0 / 1024.0, 'MB', baseline_type_param),
+        ('total_connections', (SELECT count(*) FROM pg_stat_activity), 'connections', baseline_type_param),
+        ('total_executables', (SELECT count(*) FROM exetable), 'count', baseline_type_param),
+        ('total_functions', (SELECT count(*) FROM desctable), 'count', baseline_type_param),
+        ('functions_with_embeddings', (SELECT count(*) FROM function_embeddings), 'count', baseline_type_param),
+        ('community_insights', (SELECT count(*) FROM community_insights), 'count', baseline_type_param),
+        ('avg_query_time', COALESCE((SELECT AVG(total_exec_time / calls) FROM pg_stat_statements WHERE calls > 0), 0), 'ms', baseline_type_param);
+
+    RAISE NOTICE 'Performance baseline recorded for: %', baseline_type_param;
+END;
+$$ LANGUAGE plpgsql;
+
+-- =========================================================================
+-- AUTOMATED HEALTH CHECKS
+-- =========================================================================
+
+\echo 'Setting up automated health checks...'
+
+-- Create health check log table
+CREATE TABLE IF NOT EXISTS health_check_log (
+    id SERIAL PRIMARY KEY,
+    check_type VARCHAR(50) NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    details TEXT,
+    recommendations TEXT,
+    checked_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Function to run comprehensive health check
+CREATE OR REPLACE FUNCTION run_health_check()
+RETURNS void AS $$
+DECLARE
+    health_record RECORD;
+    readiness_record RECORD;
+BEGIN
+    -- Clear old health check logs (keep last 30 days)
+    DELETE FROM health_check_log WHERE checked_at < NOW() - INTERVAL '30 days';
+
+    -- Run database health summary
+    FOR health_record IN SELECT * FROM get_database_health_summary() LOOP
+        INSERT INTO health_check_log (check_type, status, details, recommendations)
+        VALUES (health_record.category, health_record.status, health_record.details, health_record.recommendation);
+    END LOOP;
+
+    -- Run vector search readiness check
+    FOR readiness_record IN SELECT * FROM check_vector_search_readiness() LOOP
+        INSERT INTO health_check_log (check_type, status, details, recommendations)
+        VALUES ('Vector Search: ' || readiness_record.component, readiness_record.status, readiness_record.count_or_size, readiness_record.recommendation);
+    END LOOP;
+
+    -- Record performance baseline
+    PERFORM record_performance_baseline('daily');
+
+    RAISE NOTICE 'Comprehensive health check completed';
+END;
+$$ LANGUAGE plpgsql;
+
+-- =========================================================================
+-- INITIAL SETUP AND TESTING
+-- =========================================================================
+
+\echo 'Running initial health check and baseline recording...'
+
+-- Record initial performance baseline
+SELECT record_performance_baseline('initial');
+
+-- Run initial health check
+SELECT run_health_check();
+
+-- =========================================================================
+-- COMPLETION
+-- =========================================================================
+
+\echo ''
+\echo 'Database health monitoring system created successfully!'
+\echo ''
+\echo 'Available Health Monitoring Features:'
+\echo '  ✓ db_health_overview - Overall database metrics'
+\echo '  ✓ table_health_metrics - Table size and performance'
+\echo '  ✓ index_health_metrics - Index usage analysis'
+\echo '  ✓ slow_queries - Query performance insights'
+\echo '  ✓ bsim_health_metrics - BSim specific metrics'
+\echo '  ✓ extension_health - Extension status check'
+\echo ''
+\echo 'Available Health Functions:'
+\echo '  ✓ get_database_health_summary() - Comprehensive health report'
+\echo '  ✓ optimize_database_performance() - Performance optimization'
+\echo '  ✓ check_vector_search_readiness() - Vector search status'
+\echo '  ✓ run_health_check() - Automated health monitoring'
+\echo '  ✓ record_performance_baseline() - Performance baseline tracking'
+\echo ''
+\echo 'Usage Examples:'
+\echo '  SELECT * FROM get_database_health_summary();'
+\echo '  SELECT * FROM check_vector_search_readiness();'
+\echo '  SELECT run_health_check();'
+\echo ''

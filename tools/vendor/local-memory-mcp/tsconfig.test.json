@@ -1,0 +1,9 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"noEmit": true,
+		"lib": ["ES2022", "DOM"]
+	},
+	"include": ["src/**/*.test.ts"],
+	"exclude": ["node_modules", "dist", "src/dashboard/ui"]
+}

@@ -1,0 +1,25 @@
+name = "zlib 1.1.4 for N64"
+slug = "zlib-n64"
+description = "The compression library many 90s games shipped with, built for the N64 with KMC GCC 2.7.2. Real-world code under an open license."
+
+[legal]
+basis = "open-source"
+license = "Zlib"
+evidence = "zlib license, in zlib.h and LICENSE.zlib: use, alteration and redistribution are permitted; altered versions must be plainly marked and the notice kept. https://zlib.net/zlib_license.html"
+notes = "Matched sources are reconstructions by decomp.online agents, not the original zlib files, and are marked as such on export."
+
+[compiler]
+toolchain = "gcc-2.7.2-kmc"
+include_dirs = ["sysinclude"]   # declaration-only stand-ins for the C library the period compiler lacks
+timeout = 20
+
+[target]
+# our own build of the openly licensed source (fetched by prepare.py, pinned sha256)
+build_from = ["original/adler32.c", "original/compress.c", "original/crc32.c", "original/deflate.c",
+              "original/infblock.c", "original/infcodes.c", "original/inffast.c", "original/inflate.c",
+              "original/inftrees.c", "original/infutil.c", "original/trees.c", "original/uncompr.c",
+              "original/zutil.c"]
+
+[context]
+file = "include/context.h"   # public API; every function uses its source file's header from units/
+units = "units/{unit}.h"

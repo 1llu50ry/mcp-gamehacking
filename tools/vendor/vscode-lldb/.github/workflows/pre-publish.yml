@@ -1,0 +1,62 @@
+# This workflow publishes a pre-release version of the extension to the VSCode marketplace
+name: Publish pre-release
+
+on:
+  # Run the workflow every day at 10m PST.
+  schedule:
+    - cron:  '0 17 * * *'
+
+  # Allows for running this workflow manually from the Actions tab.
+  workflow_dispatch:
+
+jobs:
+  publish-pre:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        ref: main
+
+    - name: Get the package version
+      id: get_version
+      run: |
+        PACKAGE_VERSION=$(jq -r '.version' package.json)
+        MAJOR_VERSION=$(echo "$PACKAGE_VERSION" | cut -d'.' -f1)
+        MINOR_VERSION=$(echo "$PACKAGE_VERSION" | cut -d'.' -f2)
+        echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
+        echo "MAJOR_VERSION=$MAJOR_VERSION" >> "$GITHUB_OUTPUT"
+        echo "MINOR_VERSION=$MINOR_VERSION" >> "$GITHUB_OUTPUT"
+
+    - name: Detect invalid version
+      id: version_check
+      run: |
+        MINOR_VERSION=${{ steps.get_version.outputs.MINOR_VERSION }}
+        if (( MINOR_VERSION % 2 != 0 )); then
+          exit 1
+        fi
+
+    - name: Install dependencies
+      id: install_deps
+      run: npm install
+
+    - name: Set the pre-release version number
+      id: update_version
+      run: |
+        MAJOR_VERSION=${{ steps.get_version.outputs.MAJOR_VERSION }}
+        MINOR_VERSION=${{ steps.get_version.outputs.MINOR_VERSION }}
+        NIGHTLY_VERSION=$(echo "$MAJOR_VERSION.$((MINOR_VERSION + 1)).$(date +%Y%m%d)")
+        echo "Updating version to: $NIGHTLY_VERSION"
+        npm version --no-git-tag-version "$NIGHTLY_VERSION"
+
+    - name: Package
+      id: package
+      run: npm run package -- --pre-release
+
+    - name: Publish to the Visual Studio Code Marketplace
+      id: publish
+      run: npm run publish -- --pre-release -p "${{ secrets.VSCODE_MARKETPLACE_TOKEN }}"
+
+    - name: Publish to the Open VSX Registry
+      id: publish_ovsx
+      run: npm run publish-ovsx -- --pre-release -p "${{ secrets.OPENVSX_REGISTRY_TOKEN }}"

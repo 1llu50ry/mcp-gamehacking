@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block title %}Analyses - Ghidra RE Platform{% endblock %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header flex flex-between flex-center">
+        <h2>Binary Analyses</h2>
+        <div class="flex gap-1">
+            <a href="?status=" class="btn {% if not current_status %}btn-primary{% endif %}">All</a>
+            <a href="?status=completed" class="btn {% if current_status == 'completed' %}btn-primary{% endif %}">Completed</a>
+            <a href="?status=running" class="btn {% if current_status == 'running' %}btn-primary{% endif %}">Running</a>
+            <a href="?status=pending" class="btn {% if current_status == 'pending' %}btn-primary{% endif %}">Pending</a>
+        </div>
+    </div>
+    <div class="panel-content">
+        {% if analyses %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Binary</th>
+                        <th>MD5</th>
+                        <th>Status</th>
+                        <th>Functions</th>
+                        <th>BSim</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for analysis in analyses %}
+                    <tr>
+                        <td><a href="{% url 'core:analysis_detail' analysis.id %}" class="text-magic">{{ analysis.name }}</a></td>
+                        <td class="mono">{{ analysis.binary_name }}</td>
+                        <td class="mono text-muted">{{ analysis.binary_md5|slice:":8" }}...</td>
+                        <td>
+                            {% if analysis.status == 'completed' %}
+                                <span class="text-set">✓ Completed</span>
+                            {% elif analysis.status == 'running' %}
+                                <span class="text-rare">⟳ Running ({{ analysis.progress }}%)</span>
+                            {% elif analysis.status == 'failed' %}
+                                <span style="color: var(--accent-red-light);">✗ Failed</span>
+                            {% else %}
+                                <span class="text-muted">⏸ Pending</span>
+                            {% endif %}
+                        </td>
+                        <td class="mono text-unique">{{ analysis.function_count }}</td>
+                        <td>
+                            {% if analysis.bsim_indexed %}
+                                <span class="text-set">✓</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted">{{ analysis.created_at|timesince }} ago</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            {% if analyses.has_other_pages %}
+                <div class="pagination">
+                    {% if analyses.has_previous %}
+                        <a href="?page={{ analyses.previous_page_number }}{% if current_status %}&status={{ current_status }}{% endif %}">&laquo; Prev</a>
+                    {% endif %}
+                    
+                    {% for num in analyses.paginator.page_range %}
+                        {% if analyses.number == num %}
+                            <span class="current">{{ num }}</span>
+                        {% else %}
+                            <a href="?page={{ num }}{% if current_status %}&status={{ current_status }}{% endif %}">{{ num }}</a>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if analyses.has_next %}
+                        <a href="?page={{ analyses.next_page_number }}{% if current_status %}&status={{ current_status }}{% endif %}">Next &raquo;</a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        {% else %}
+            <p class="text-center" style="color: var(--text-muted); padding: 3rem;">
+                No analyses found. Submit binaries for analysis to populate this list.
+            </p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

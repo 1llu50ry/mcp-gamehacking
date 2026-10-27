@@ -1,0 +1,19 @@
+name = "Demo Quest 2"
+slug = "demo-ps2"
+description = "The demo game built for the PS2 with EE-GCC 2.96: little-endian MIPS for the Emotion Engine."
+
+[legal]
+basis = "own-code"
+license = "CC0-1.0"
+notes = "Demo Quest was written for DecompNet; its full source is in original/."
+
+[compiler]
+toolchain = "ee-gcc-2.96"
+timeout = 15
+
+[target]
+objects = ["target/game.o"]
+build_from = "original/game.c"   # own code: build the target with the same sandboxed toolchain
+
+[context]
+file = "include/context.h"

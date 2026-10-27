@@ -1,0 +1,3 @@
+# shell scripts and the Dockerfile run on Linux: LF even in a checkout made by Git for Windows
+*.sh text eol=lf
+install/Dockerfile text eol=lf

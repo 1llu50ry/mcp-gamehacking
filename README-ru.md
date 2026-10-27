@@ -28,7 +28,7 @@
 ## Быстрый старт
 
 ```bash
-git clone https://github.com/whory/mcp-gamehacking
+git clone https://github.com/1llu50ry/mcp-gamehacking
 cd mcp-gamehacking
 npm install && npx tsc
 npm test            # 20/20 должны пройти

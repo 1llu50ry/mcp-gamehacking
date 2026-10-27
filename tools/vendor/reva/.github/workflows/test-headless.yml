@@ -1,0 +1,140 @@
+name: Test Headless Mode 🤖
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:  # Allow manual trigger
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+
+jobs:
+  test-headless:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        ghidra-version:
+          - "12.0"
+          - "12.1"
+          - "12.1.4"
+          - "12.2"
+          - "latest"
+        # macOS hosted runners are ~4x slower per e2e test and far scarcer
+        # (7 concurrent macOS jobs queued for hours). Linux carries full
+        # version coverage; macOS validates the platform itself (native
+        # decompiler build, arm64) on the oldest and newest Ghidra only.
+        exclude:
+          - os: macos-latest
+            ghidra-version: "12.1"
+          - os: macos-latest
+            ghidra-version: "12.2"  # covered by "latest" until 12.3 ships
+      fail-fast: false  # Continue other tests if one fails
+
+    name: Test on ${{ matrix.os }} / Ghidra ${{ matrix.ghidra-version }}
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v7
+      with:
+        lfs: true
+
+    - name: Set up Java 25
+      uses: actions/setup-java@v6
+      with:
+        java-version: "25"
+        distribution: "microsoft"
+
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v7
+      with:
+        python-version: "3.10"
+
+    - name: Install Ghidra ${{ matrix.ghidra-version }}
+      uses: antoniovazquezblanco/setup-ghidra@v2.2.1
+      with:
+        version: ${{ matrix.ghidra-version }}
+        auth_token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v6.4.0
+      with:
+        gradle-version: "9.8.1"
+
+    # Ghidra releases ship prebuilt decompiler natives for Linux and Windows but
+    # NOT macOS. Without this, decompilation silently returns nothing on macOS
+    # runners and any decompiler-dependent headless test fails. Ghidra searches
+    # build/os/<platform> (where this task writes) before os/<platform>, so the
+    # installed PyGhidra runtime picks these up. Linux runners already have
+    # prebuilt natives, so the step is macOS-only.
+    - name: Build Ghidra natives (macOS only)
+      if: runner.os == 'macOS'
+      run: gradle -p "$GHIDRA_INSTALL_DIR/support/gradle" buildNatives
+
+    - name: Build ReVa Extension
+      run: gradle clean buildExtension --no-build-cache
+
+    - name: Install ReVa Extension to Ghidra
+      run: |
+        EXTENSION_ZIP=$(ls -1 dist/*.zip | head -n 1)
+        echo "Installing extension: $EXTENSION_ZIP"
+        unzip -q "$EXTENSION_ZIP" -d "$GHIDRA_INSTALL_DIR/Ghidra/Extensions/"
+        ls -la "$GHIDRA_INSTALL_DIR/Ghidra/Extensions/"
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        enable-cache: true
+
+    - name: Install Python dependencies
+      run: uv sync --prerelease=allow
+
+    - name: Install PyGhidra from local Ghidra
+      run: |
+        echo "GHIDRA_INSTALL_DIR: $GHIDRA_INSTALL_DIR"
+        uv pip install "${GHIDRA_INSTALL_DIR}/Ghidra/Features/PyGhidra/pypkg"
+
+    - name: Verify PyGhidra Installation
+      run: |
+        uv run python -c "import pyghidra; print(f'PyGhidra version: {pyghidra.__version__}')"
+        echo "PyGhidra installed successfully"
+
+    - name: Run Headless Integration Tests
+      id: headless_test
+      run: |
+        echo "::group::Running headless integration tests"
+        uv run pytest tests/ -v --timeout=180 --tb=short --junitxml=test-results.xml ${PYTEST_EXTRA_ARGS}
+        echo "::endgroup::"
+      # The e2e suite shares one mcp-reva server per pytest session (per
+      # xdist worker), so the dominant historical cost — a full JVM/PyGhidra
+      # boot per test (~40s on macOS, ~10s on Linux) — is paid once per
+      # worker instead of ~110 times. macOS additionally runs 2 xdist
+      # workers. If this times out again, suspect a server hang or a new
+      # per-test boot, not a slow suite.
+      timeout-minutes: 30
+      env:
+        GHIDRA_INSTALL_DIR: ${{ env.GHIDRA_INSTALL_DIR }}
+        PYTEST_EXTRA_ARGS: ${{ runner.os == 'macOS' && '-n 2' || '' }}
+
+    - name: Upload test artifacts
+      uses: actions/upload-artifact@v7
+      if: always()
+      with:
+        name: headless-test-results-${{ matrix.os }}-ghidra-${{ matrix.ghidra-version }}
+        path: |
+          test-results.xml
+          *.log
+          .pytest_cache/
+          ~/.ghidra/**/application.log
+        if-no-files-found: ignore
+
+    - name: Test Summary
+      uses: test-summary/action@v2
+      with:
+        show: "fail, skip"
+        paths: test-results.xml
+      if: always()

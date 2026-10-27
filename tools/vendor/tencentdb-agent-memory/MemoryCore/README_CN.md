@@ -1,0 +1,331 @@
+# MemoryCore
+
+MemoryCore 是 TencentDB Agent Memory 的**记忆与元数据核心**，统一存储并提供三类数据能力：
+
+- **Memory**：L0 对话、L1 原子记忆、L2 场景记忆和 L3 核心画像。
+- **Knowledge 元信息**：Wiki、Code Graph 等知识源的标识、类型、状态、关联关系和服务地址。
+- **资产管理元信息**：User、Team、Agent、Task、Skill、Knowledge Asset，以及成员、归属和访问关系。
+
+MemoryCore 独立运行，通过 HTTP Gateway 对外提供这些能力。OpenClaw、Hermes 和自定义应用通过轻量 Adapter 或 SDK 接入。Agent 是调用方，也可以作为一种被管理的元数据实体；MemoryCore 不负责托管、调度或运行 Agent 本身。
+
+> MemoryCore 保存 Knowledge 元信息，不保存或处理 Knowledge 内容。Wiki 解析、代码图谱构建、索引和内容检索由 `MemoryKnowledge/` 提供。
+
+## 核心能力
+
+- **Memory 存储与处理**：记录 L0 对话，并维护 L1 原子记忆、L2 场景记忆和 L3 核心画像。
+- **Memory 召回**：支持关键词、Embedding 与混合检索；没有 Embedding Provider 时仍可使用 BM25。
+- **Knowledge 元信息登记**：登记知识源并维护其标识、类型、状态、关联关系和服务地址。
+- **资产元信息管理**：管理 User、Team、Agent、Task、Skill、Knowledge Asset，以及成员、归属和访问关系。
+- **Skill Memory**：支持 Skill 创建、版本、资源、搜索、路由和对话抽取。
+- **自定义 Memory Prompt**：支持 L1/L2/L3 Prompt CRUD 和 Agent、Team、Instance 绑定，按 `Agent > Team > Instance > 系统内置` 解析生效策略；自定义内容只能调整记忆关注点和归纳策略，不能修改固定输出协议。
+- **生成溯源**：记录 L1/L2/L3 实际使用的 Prompt ID、版本、来源、内容哈希以及输入输出引用，支持按 Memory ID 精确定位生成日志；不保存 Prompt 正文快照。
+- **统一访问接口**：通过 HTTP API 和 TypeScript/Python SDK 为 Adapter 与应用提供能力。
+
+## 架构
+
+```text
+OpenClaw / Hermes / 自定义应用
+                │
+                │ HTTP API / SDK
+                ▼
+        MemoryCore Gateway :8420
+        ├─ Memory
+        │  └─ L0 / L1 / L2 / L3
+        ├─ Knowledge 元信息
+        ├─ 资产管理元信息
+        └─ SQLite + 本地文件
+
+MemoryKnowledge
+      └─ Knowledge 解析 / 索引 / 检索
+```
+
+## 运行方式
+
+MemoryCore 以 Standalone Runtime 形式开源，适合本地开发、单机部署和 Agent sidecar：
+
+- 默认监听 `127.0.0.1:8420`。
+- 使用 SQLite、本地文件和进程内状态。
+- 除 LLM API 外没有必需的外部服务。
+- 默认关闭远程 Embedding，使用 BM25 召回。
+- 数据默认写入 `~/.memory-tencentdb/memory-tdai`。
+
+## 环境要求
+
+- Node.js `>= 22.16.0`
+- npm
+- 一个 OpenAI-compatible LLM API；只读查询可以不触发 LLM，但记忆抽取和归纳需要有效凭证
+- **SQLite FTS5 模块**（BM25 关键词 / 混合召回需要）。官方 Node 二进制不保证包含 FTS5（如 v22.13.1 缺失、v22.23.2 有）。FTS5 缺失时关键词搜索静默返回空，召回降级为仅 embedding——可通过 `GET /health` 的 `stores.ftsAvailable` 查看
+
+## 快速开始
+
+### 1. 安装与构建
+
+```bash
+cd MemoryCore
+npm install
+npm run build
+```
+
+### 2. 启动 Standalone Gateway
+
+```bash
+export TDAI_GATEWAY_CONFIG="$PWD/tdai-gateway.standalone.yaml"
+export TDAI_LLM_API_KEY="your-api-key"
+export TDAI_LLM_BASE_URL="https://api.openai.com/v1"
+export TDAI_LLM_MODEL="gpt-4o-mini"
+
+node --import tsx src/gateway/server.ts
+```
+
+Gateway 启动后访问：
+
+```bash
+curl http://127.0.0.1:8420/health
+```
+
+如需从其他机器或容器访问，必须同时设置监听地址和鉴权：
+
+```bash
+export TDAI_GATEWAY_HOST="0.0.0.0"
+export TDAI_GATEWAY_API_KEY="replace-with-a-strong-random-token"
+```
+
+除 `/health` 和 CORS 预检外，启用鉴权后所有接口均需携带：
+
+```text
+Authorization: Bearer <TDAI_GATEWAY_API_KEY>
+x-tdai-service-id: <memory-instance-id>
+```
+
+## 从旧版升级
+
+如果从 v1.x或v0.x（数据格式 v2）升级到 v2.0.0+（数据格式 v3），**启动新版 Gateway 前**需要先运行数据迁移脚本。
+
+> ⚠️ 迁移前请务必备份整个数据目录。
+
+```bash
+# dry-run 检查
+python scripts/migrate-v2-to-v3/v2-to-v3-migrate.py ~/.memory-tencentdb/memory-tdai --dry-run
+
+# 执行迁移
+python scripts/migrate-v2-to-v3/v2-to-v3-migrate.py ~/.memory-tencentdb/memory-tdai
+```
+
+详见 [迁移脚本说明](scripts/migrate-v2-to-v3/README_CN.md)。
+
+## Docker
+
+在 `MemoryCore/` 目录构建：
+
+```bash
+docker build -t memory-core:local .
+```
+
+启动 Standalone 容器：
+
+```bash
+docker run --rm \
+  -p 8420:8420 \
+  -e TDAI_LLM_API_KEY="your-api-key" \
+  -e TDAI_GATEWAY_API_KEY="replace-with-a-strong-random-token" \
+  -v "$PWD/tdai-gateway.standalone.yaml:/data/config/tdai-gateway.yaml:ro" \
+  -v memory-core-data:/data/tdai-memory \
+  memory-core:local
+```
+
+通过环境变量或 Secret Manager 注入凭证，不要把 API Key 或其他凭证写入镜像和配置仓库。
+
+## Agent 接入
+
+### OpenClaw
+
+推荐使用 `openclaw-plugin/` 中的轻量客户端 Adapter。它连接已运行的 MemoryCore Gateway，不在 OpenClaw 进程内重复运行记忆管线。
+
+从仓库根目录执行：
+
+```bash
+bash MemoryCore/scripts/install-openclaw-plugin.sh
+```
+
+常用连接参数：
+
+```text
+TDAI_MEMORY_ENDPOINT=http://127.0.0.1:8420
+TDAI_MEMORY_API_KEY=<与 Gateway 相同的 API Key>
+TDAI_MEMORY_INSTANCE_ID=default
+```
+
+### Hermes
+
+`hermes-plugin/` 提供 Hermes Memory Provider。它遵循同样的 Adapter 模式，通过 Gateway 完成对话写入与记忆召回。
+
+### 自定义 Agent
+
+自定义 Runtime 可以直接使用仓库中的 SDK：
+
+- `../sdk/memory-core/typescript/`
+- `../sdk/memory-core/python/`
+
+一个 Adapter 通常只需要完成三件事：
+
+1. 会话结束或每轮完成后写入 L0。
+2. 构造 Prompt 前召回 L1/L2/L3。
+3. 将召回结果以有边界、可识别的上下文注入 Agent。
+
+## API 范围
+
+| API | 用途 | 状态 |
+| --- | --- | --- |
+| `/capture`、`/recall`、`/search/*` | 早期 Gateway 兼容接口 | 兼容保留 |
+| `/v2/conversation/*` | L0 写入、查询、搜索、删除和计数 | 稳定 |
+| `/v2/atomic/*` | L1 查询、搜索、更新、删除和计数 | 稳定 |
+| `/v2/scenario/*`、`/v2/core/*` | L2/L3 读写 | 稳定 |
+| `/v3/conversation/*`、`/v3/atomic/*`、`/v3/scenario/*`、`/v3/core/*` | 强隔离的 L0–L3 数据面 | 推荐新接入使用 |
+| `/v3/skill/*` | Skill 管理、检索、版本、资源和抽取 | 稳定 |
+| `/v3/meta/*` | User、Team、Agent、Task、Asset 和权限关系 | 管理面 |
+| `/v3/knowledge/*` | 知识资产元数据登记 | 管理面 |
+| `/v3/memory-prompt/*` | 自定义 Prompt CRUD、绑定、生效查询和设置日志 | 管理面 |
+| `/v3/memory-generation-log/list`、`/get` | L1-L3 生成日志列表、详情和按 Memory ID 溯源 | 管理面 |
+| `/health` | 健康检查 | 公共 |
+
+v3 记忆数据面要求 `team_id`、`agent_id`、`user_id`，可以通过请求体或对应的 `x-tdai-*` Header 传入；`session_id` 可选，用于限定会话范围。
+
+## 自定义 Prompt 与生成溯源
+
+每个 Memory Instance 最多创建 500 个自定义 Prompt，单个 Prompt 内容最长 10,000 个 Unicode 字符。Prompt 本体和目标绑定分开存储，更新时保持 `memory_prompt_id` 不变并执行 `version += 1`，已有绑定的新生成任务会使用最新版本。
+
+目标优先级：
+
+```text
+Agent > Team > Instance > 系统内置
+```
+
+- Agent 由 `team_id + agent_id` 唯一确定。
+- 未命中自定义 Prompt 时，L1/L2/L3 完全使用当前系统默认 Prompt。
+- 命中时只追加客户记忆策略；L1 JSON、L2 Scene Markdown 和 L3 Persona/Doctrine 的固定输出协议不可修改。
+- 删除 Prompt 会清理相关绑定，运行时自动回退到下一级。
+
+主要接口：
+
+```text
+POST /v3/memory-prompt/create
+GET  /v3/memory-prompt/get
+POST /v3/memory-prompt/update
+POST /v3/memory-prompt/delete
+POST /v3/memory-prompt/set
+GET  /v3/memory-prompt/log
+GET  /v3/memory-generation-log/list
+GET  /v3/memory-generation-log/get
+```
+
+创建 Prompt 示例：
+
+```bash
+curl -sS -X POST http://127.0.0.1:8420/v3/memory-prompt/create \
+  -H "Authorization: Bearer ${TDAI_GATEWAY_API_KEY}" \
+  -H "x-tdai-service-id: local-memory" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "architecture-decisions",
+    "layer": "l1",
+    "prompt": "重点提取架构决策、兼容性约束、风险和可复用方法。"
+  }'
+```
+
+本地未配置 `TDAI_GATEWAY_API_KEY` 且只监听回环地址时，可以省略 `Authorization`；`x-tdai-service-id` 始终必填。
+
+生成日志不保存自定义 Prompt 正文，只记录 Prompt ID、版本、来源和 SHA-256。按 Memory ID 查询：
+
+```bash
+curl -sS -G http://127.0.0.1:8420/v3/memory-generation-log/get \
+  -H "Authorization: Bearer ${TDAI_GATEWAY_API_KEY}" \
+  -H "x-tdai-service-id: local-memory" \
+  --data-urlencode "memory_id=<memory-id>" \
+  --data-urlencode "layer=l1"
+```
+
+TypeScript SDK 导出 `MemoryPromptClient`、`MemoryGenerationLogClient`；Python SDK同时提供同步和异步客户端。
+
+真实 VDB、COS 和 OpenAI-compatible 模型的分层生成 E2E：
+
+```bash
+npm run e2e:memory-prompt:vdb-cos
+```
+
+该测试验证 Agent L1、Team L2、Instance L3 Prompt 的实际模型请求、Memory/Profile 持久化、Generation Ref 和 COS 日志，并使用唯一测试 ID 清理本次数据。
+
+## 配置
+
+Gateway 按以下优先级加载配置：
+
+1. `TDAI_GATEWAY_CONFIG` 指定的 YAML 或 JSON。
+2. 当前目录下的 `tdai-gateway.yaml` 或 `tdai-gateway.json`。
+3. 数据目录下的 `tdai-gateway.yaml` 或 `tdai-gateway.json`。
+4. 环境变量和内置默认值。
+
+环境变量覆盖配置文件。常用配置：
+
+| 环境变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `TDAI_GATEWAY_CONFIG` | 自动发现 | 配置文件路径 |
+| `TDAI_GATEWAY_HOST` | `127.0.0.1` | Gateway 监听地址 |
+| `TDAI_GATEWAY_PORT` | `8420` | Gateway 端口 |
+| `TDAI_GATEWAY_API_KEY` | 未设置 | HTTP Bearer 鉴权；非回环监听必须设置 |
+| `TDAI_CORS_ORIGINS` | 空 | 允许的 Origin，逗号分隔 |
+| `TDAI_DATA_DIR` | `~/.memory-tencentdb/memory-tdai` | 本地数据目录 |
+| `TDAI_LLM_API_KEY` | 空 | LLM API Key |
+| `TDAI_LLM_BASE_URL` | `https://api.openai.com/v1` | OpenAI-compatible API 地址 |
+| `TDAI_LLM_MODEL` | `gpt-4o` | LLM 模型 |
+| `TDAI_SKILL_ENABLED` | 配置文件值 | 强制启用 Skill 模块 |
+
+配置模板：
+
+- `tdai-gateway.standalone.yaml`：最小单机 Memory 配置。
+- `tdai-gateway.yaml`：Standalone + Skill 默认配置。
+- `tdai-gateway.proxy.yaml`：通过 OpenAI-compatible Proxy 调用模型。
+
+## 存储与隔离
+
+- Memory 和 Metadata 使用 SQLite 存储。
+- 文件与大对象保存在本地数据目录。
+- Pipeline State 由当前进程维护。
+- BM25 无需外部 Embedding 服务；需要时可配置 OpenAI-compatible Embedding API。
+
+所有业务调用都应明确 `x-tdai-service-id`。新 Adapter 建议使用 v3 数据面，并始终提供 Team、Agent、User 隔离维度。
+
+## 目录结构
+
+```text
+MemoryCore/
+├── src/core/              L0–L3 Memory、Skill、Store 和 Storage 抽象
+├── src/gateway/           HTTP Gateway 与 v2/v3 Router
+├── src/services/          Pipeline Scanner、Worker 和调度服务
+├── openclaw-plugin/       OpenClaw 轻量客户端 Adapter
+├── hermes-plugin/         Hermes Memory Provider
+├── scripts/               安装、构建、迁移和运维工具
+│   ├── install-hermes-plugin.sh         Hermes provider 安装脚本
+│   ├── install-openclaw-plugin-v2.sh    OpenClaw 插件安装脚本
+│   └── migrate-v2-to-v3/                数据迁移工具（v2 → v3）
+├── Dockerfile             MemoryCore Gateway 镜像
+├── tdai-gateway*.yaml     Gateway 配置模板
+└── package.json           Node.js 包与构建命令
+```
+
+## 本地数据工具
+
+```bash
+npm run read-local-memory
+npm run seed-v2
+```
+
+## 安全建议
+
+- 非回环地址监听时必须配置 `TDAI_GATEWAY_API_KEY`。
+- CORS 默认关闭；只允许明确可信的 Origin，不要在生产环境使用 `*`。
+- 所有 Secret 通过环境变量或 Secret Manager 注入。
+- 不要提交 `.env`、数据库文件、日志、导出数据或真实服务配置。
+- 每个请求都应校验实例和 Team/User/Agent 归属，避免跨租户访问。
+
+## License
+
+MIT

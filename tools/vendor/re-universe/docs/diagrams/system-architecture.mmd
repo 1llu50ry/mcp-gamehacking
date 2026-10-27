@@ -1,0 +1,84 @@
+```mermaid
+graph TB
+    subgraph "User Interface Layer"
+        UI[d2docs.xebyte.com<br/>Django Web Interface]
+        Chat[AI Chat Interface<br/>Context-Aware Assistant]
+        Explorer[Knowledge Explorer<br/>Hierarchy Browser]
+    end
+
+    subgraph "AI Orchestration Layer"
+        Orchestrator[AI Orchestrator<br/>Task Router & Cost Manager]
+        Opus[Claude Opus 4.6<br/>Master Coordinator<br/>20% of requests]
+        Sonnet[Claude Sonnet<br/>Heavy Analysis<br/>30% of requests]
+        Haiku[Claude Haiku<br/>Batch Processing<br/>50% of requests]
+    end
+
+    subgraph "Knowledge Layer"
+        VectorDB[(PostgreSQL + pgvector<br/>Semantic Search)]
+        BSim[(BSim Database<br/>Function Analysis)]
+        Community[(Community Knowledge<br/>Trust-Scored Sources)]
+        Hierarchy[(System Hierarchy<br/>D2 Architecture)]
+    end
+
+    subgraph "Analysis Layer"
+        GhidraMCP[Ghidra-MCP<br/>110 Static Analysis Tools]
+        LiveAnalysis[Live Analysis<br/>Windows Container + Detours]
+        Mining[Community Miner<br/>GitHub + Web Scanner]
+        Integration[Integration Engine<br/>Workflow Orchestrator]
+    end
+
+    subgraph "Infrastructure Layer"
+        Redis[(Redis Cache<br/>Response Caching)]
+        Monitoring[Monitoring Dashboard<br/>Health & Performance]
+        Security[Security Layer<br/>Content Validation]
+    end
+
+    %% User Interface Connections
+    UI --> Orchestrator
+    Chat --> Orchestrator
+    Explorer --> VectorDB
+
+    %% AI Orchestration Connections
+    Orchestrator --> Opus
+    Orchestrator --> Sonnet
+    Orchestrator --> Haiku
+
+    %% Analysis Layer Connections
+    Sonnet --> GhidraMCP
+    Sonnet --> Integration
+    Haiku --> Mining
+    Haiku --> VectorDB
+    Opus --> Integration
+
+    %% Knowledge Layer Connections
+    GhidraMCP --> BSim
+    Mining --> Community
+    Community --> VectorDB
+    LiveAnalysis --> VectorDB
+    Integration --> Hierarchy
+
+    %% Infrastructure Connections
+    VectorDB --> Redis
+    BSim --> Redis
+    Orchestrator --> Monitoring
+    Mining --> Security
+    Community --> Security
+
+    %% Data Flow Connections
+    BSim --> VectorDB
+    Hierarchy --> VectorDB
+    VectorDB --> UI
+
+    %% Styling
+    classDef userLayer fill:#e1f5fe
+    classDef aiLayer fill:#fff3e0
+    classDef knowledgeLayer fill:#e8f5e8
+    classDef analysisLayer fill:#fce4ec
+    classDef infraLayer fill:#f3e5f5
+
+    class UI,Chat,Explorer userLayer
+    class Orchestrator,Opus,Sonnet,Haiku aiLayer
+    class VectorDB,BSim,Community,Hierarchy knowledgeLayer
+    class GhidraMCP,LiveAnalysis,Mining,Integration analysisLayer
+    class Redis,Monitoring,Security infraLayer
+```

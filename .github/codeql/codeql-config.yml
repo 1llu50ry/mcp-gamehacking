@@ -1,0 +1,25 @@
+name: "mcp-gamehacking CodeQL"
+
+# Only scan our own TypeScript. The vendored upstream repos under
+# tools/vendor/** are OSS projects we track for integration, not code
+# we author. Their alerts belong to their maintainers.
+paths:
+  - "src/**"
+  - "bin/**"
+  - "tests/**"
+
+paths-ignore:
+  - "tools/vendor/**"
+  - "better-options/**"
+  - "dist/**"
+  - "node_modules/**"
+  - "skills/**"
+  - "agents/**"
+  - "subagents/**"
+  - "plugins/**"
+  - "prompts/**"
+  - "docs/**"
+
+# Keep security-extended for depth on the paths we do scan.
+queries:
+  - uses: security-extended

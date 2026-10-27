@@ -1,0 +1,86 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "yaraflux_mcp_server"
+version = "1.0.17"
+description = "Model Context Protocol (MCP) server for YARA scanning"
+readme = "README.md"
+authors = [
+    {name = "ThreatFlux", email = "wyatt@threatflux.ai"},
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13"
+]
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "pydantic>=2.6.0",
+    "pydantic-settings>=2.1.0",
+    "yara-python>=4.5.0",
+    "httpx>=0.27.0",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "python-multipart>=0.0.7",
+    "python-dotenv>=1.0.0",
+    # <2: mcp 2.x renamed FastMCP to MCPServer and moved it out of
+    # mcp.server.fastmcp, which every import in src/ still uses. Porting to the
+    # 2.x API is its own change; until then an unbounded floor silently
+    # resolves to 2.x and the package cannot be imported at all.
+    "mcp>=1.3.0,<2",
+    "click>=8.1.7",
+    "minio>=7.2.15",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "black>=24.1.0",
+    "isort>=5.13.0",
+    "pylint>=3.0.0",
+    "mypy>=1.8.0",
+    "bandit>=1.7.0",
+    "coverage>=7.6.12",
+    "pre-commit>=3.6.0",
+    "wheel>=0.45.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/ThreatFlux/YaraFlux"
+"Bug Tracker" = "https://github.com/ThreatFlux/YaraFlux/issues"
+
+[project.scripts]
+yaraflux-mcp-server = "yaraflux_mcp_server.__main__:cli"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["yaraflux_mcp_server", "yaraflux_mcp_server.routers"]
+
+[tool.black]
+line-length = 120
+target-version = ["py313"]
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+line_length = 120
+
+[tool.mypy]
+python_version = "3.13"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*"

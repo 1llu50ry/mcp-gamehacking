@@ -1,0 +1,61 @@
+COMPLETE ADDRESS LIST FROM DIABLO II.CT
+================================================================================
+Generated from: Diablo II.CT
+Total entries: 48
+================================================================================
+
+#    ADDRESS      TYPE            ENABLED  DESCRIPTION
+--------------------------------------------------------------------------------
+1    0x4          4 Bytes         No       Address from binary table
+2    0x8          4 Bytes         No       Address from binary table
+3    0xC          4 Bytes         No       Address from binary table
+4    0x10         4 Bytes         No       Address from binary table
+5    0x14         4 Bytes         No       Address from binary table
+6    0x18         4 Bytes         No       Address from binary table
+7    0x1C         4 Bytes         No       Address from binary table
+8    0x20         4 Bytes         No       Address from binary table
+9    0x28         4 Bytes         No       Address from binary table
+10   0x2C         4 Bytes         No       Address from binary table
+11   0x30         4 Bytes         No       Address from binary table
+12   0x44         4 Bytes         No       Address from binary table
+13   0x48         4 Bytes         No       Address from binary table
+14   0x4C         4 Bytes         No       Address from binary table
+15   0x4E         4 Bytes         No       Address from binary table
+16   0x50         4 Bytes         No       Address from binary table
+17   0x54         4 Bytes         No       Address from binary table
+18   0x58         4 Bytes         No       Address from binary table
+19   0x5C         4 Bytes         No       Address from binary table
+20   0x60         4 Bytes         No       Address from binary table
+21   0x64         4 Bytes         No       Address from binary table
+22   0x68         4 Bytes         No       Address from binary table
+23   0x8C         4 Bytes         No       Address from binary table
+24   0x8E         4 Bytes         No       Address from binary table
+25   0x90         4 Bytes         No       Address from binary table
+26   0x94         4 Bytes         No       Address from binary table
+27   0x98         4 Bytes         No       Address from binary table
+28   0x9C         4 Bytes         No       Address from binary table
+29   0xA4         4 Bytes         No       Address from binary table
+30   0xA8         4 Bytes         No       Address from binary table
+31   0xAC         4 Bytes         No       Address from binary table
+32   0xC4         4 Bytes         No       Address from binary table
+33   0xC8         4 Bytes         No       Address from binary table
+34   0xCC         4 Bytes         No       Address from binary table
+35   0xE0         4 Bytes         No       Address from binary table
+36   0xE4         4 Bytes         No       Address from binary table
+37   0xE8         4 Bytes         No       Address from binary table
+38   0xEC         4 Bytes         No       Address from binary table
+39   0x4          4 Bytes         No       Address from binary table
+40   0x10         4 Bytes         No       Address from binary table
+41   0x14         4 Bytes         No       Address from binary table
+42   0x20         4 Bytes         No       Address from binary table
+43   0x24         4 Bytes         No       Address from binary table
+44   0x28         4 Bytes         No       Address from binary table
+45   0x4C         4 Bytes         No       Address from binary table
+46   0x50         4 Bytes         No       Address from binary table
+47   0x54         4 Bytes         No       Address from binary table
+48   0x58         4 Bytes         No       Address from binary table
+
+================================================================================
+UNIQUE ADDRESSES
+================================================================================
+0x4, 0x8, 0xC, 0x10, 0x14, 0x18, 0x1C, 0x20, 0x24, 0x28, 0x2C, 0x30, 0x44, 0x48, 0x4C, 0x4E, 0x50, 0x54, 0x58, 0x5C, 0x60, 0x64, 0x68, 0x8C, 0x8E, 0x90, 0x94, 0x98, 0x9C, 0xA4, 0xA8, 0xAC, 0xC4, 0xC8, 0xCC, 0xE0, 0xE4, 0xE8, 0xEC

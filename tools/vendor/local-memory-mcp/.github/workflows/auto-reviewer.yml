@@ -1,0 +1,109 @@
+# Auto-Reviewer (TASK-001): request a review from @vheins on every PR.
+#
+# Behavior:
+# - Fires on pull_request: opened, reopened, ready_for_review, synchronize.
+# - Requests a review from the user "vheins" (never a team) via the GitHub REST
+#   API (gh api) using the ambient GITHUB_TOKEN — no PAT, no third-party action.
+#
+# Why `pull_request` and not `pull_request_target`:
+# - This workflow never checks out or executes PR-controlled code — it only
+#   calls the REST API — so the extra trust of pull_request_target is not
+#   needed and is deliberately avoided (it can leak secrets to untrusted
+#   workflows if misused).
+# - Caveat: under `pull_request`, fork PRs run with a READ-ONLY token and the
+#   review-request call would fail with 403. Fork PRs are therefore skipped
+#   explicitly (see step guard). Same-repo branch PRs (the normal case here)
+#   run with `pull-requests: write` and are handled normally.
+#
+# Draft PRs:
+# - The API rejects requesting reviews on draft PRs (422), so drafts are
+#   skipped. When the PR transitions to ready_for_review this workflow fires
+#   again and requests the review at that point.
+#
+# Idempotency:
+# - synchronize re-fires on every push to the PR branch. Before POSTing we
+#   check both the requested-reviewers list AND the reviews list — GitHub moves
+#   a reviewer out of "requested" once they submit a review, so checking only
+#   one source would cause duplicate/noisy requests. If vheins is already a
+#   requested reviewer or has already reviewed, the step exits 0 without
+#   calling the API. A per-PR concurrency group serializes racing events so the
+#   check-then-POST cannot interleave.
+#
+# Self-authored PRs:
+# - The API rejects requesting a review from the PR author, and in this repo the
+#   maintainer often authors the PRs. Those are skipped with a log note.
+#
+# Permissions: `pull-requests: write` is the only scope needed (request +
+# read reviewers/reviews). No contents access — no checkout step.
+
+name: Auto-Reviewer
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize]
+
+concurrency:
+  # Serialize runs per PR so the idempotency check + POST cannot race.
+  group: auto-reviewer-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  request-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Request review from vheins (idempotent)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          repo="${{ github.repository }}"
+          pr="${{ github.event.pull_request.number }}"
+          author="${{ github.event.pull_request.user.login }}"
+          draft="${{ github.event.pull_request.draft }}"
+          fork="${{ github.event.pull_request.head.repo.fork }}"
+          reviewer="vheins"
+
+          # Draft PRs: the API returns 422 for review requests on drafts.
+          # ready_for_review re-fires this workflow when the PR is opened up.
+          if [ "$draft" = "true" ]; then
+            echo "PR #$pr is a draft — GitHub does not allow requesting reviews on draft PRs. Skipping (will run again on ready_for_review)."
+            exit 0
+          fi
+
+          # Fork PRs run with a read-only GITHUB_TOKEN under `pull_request`,
+          # so requesting a reviewer would 403. Skip explicitly instead of
+          # failing. (Review requests for forks would need pull_request_target,
+          # which is intentionally avoided — see header comment.)
+          if [ "$fork" = "true" ]; then
+            echo "PR #$pr is from a fork — the pull_request trigger runs fork workflows with a read-only token, so reviewers cannot be requested. Skipping."
+            exit 0
+          fi
+
+          # The API rejects requesting a review from the PR author.
+          if [ "$author" = "$reviewer" ]; then
+            echo "PR #$pr was authored by $reviewer — skipping self-review request."
+            exit 0
+          fi
+
+          # Idempotency: skip when vheins is already a requested reviewer OR
+          # has already submitted a review (once they review, GitHub removes
+          # them from the requested list, so both lists must be checked).
+          existing="$(
+            {
+              gh api "repos/$repo/pulls/$pr/requested_reviewers" --jq '.users[].login'
+              gh api "repos/$repo/pulls/$pr/reviews" --jq '.[].user.login'
+            } | sort -u
+          )"
+          if printf '%s\n' "$existing" | grep -qx "$reviewer"; then
+            echo "Review already requested from / provided by $reviewer on PR #$pr — nothing to do."
+            exit 0
+          fi
+
+          printf '{"reviewers":["%s"]}' "$reviewer" | gh api --method POST \
+            "repos/$repo/pulls/$pr/requested_reviewers" \
+            --input - >/dev/null
+          echo "Requested review from $reviewer on PR #$pr."

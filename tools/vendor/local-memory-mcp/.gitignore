@@ -1,0 +1,71 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-error.log*
+yarn-debug.log*
+pnpm-lock.yaml
+
+# Build output
+dist/
+build/
+out/
+package/
+*.tgz
+
+# Root-level tree-sitter build artifacts (grammars are built into dist/grammars from node_modules/.cache)
+/tree-sitter
+/*.wasm
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Temp
+.tmp/
+.cache/
+
+# Test coverage
+coverage/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database
+storage/*.db
+storage/*.db-*
+.kiro
+.playwright-mcp/:memory:
+.playwright-mcp/
+:memory:
+
+# Audit screenshots
+audit-screenshots/
+
+# Agent tool-output artifacts (browser verification screenshots/results)
+tool-output/
+
+# Sibling screenshots
+dashboard-codebase-screenshot.png
+dashboard-memories-screenshot.png
+tasks-view-check.png
+
+# Agent workspace binaries (markdown docs under .agents/documents/ stay tracked)
+.agents/**/*.png
+.agents/**/*.jpg
+.agents/**/*.jpeg
+.agents/**/*.gif
+.agents/**/*.wasm
+.agents/**/*.bin
+
+# Agent MCP-fallback task tracking (local only; canonical source = local-memory-mcp MCP)
+.agents/documents/_tasks/

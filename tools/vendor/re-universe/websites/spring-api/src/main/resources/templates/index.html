@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::title}, ~{::main})}">
+<head>
+    <title>Dashboard</title>
+</head>
+<body>
+<main th:fragment="main">
+    <div class="card">
+        <h2>🏰 Ghidra Analysis Dashboard</h2>
+
+        <div th:if="${error}" class="error">
+            <strong>⚠️ Warning:</strong> <span th:text="${error}"></span>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" th:text="${projectCount ?: 0}">0</div>
+                <div class="stat-label">Active Projects</div>
+            </div>
+
+            <div class="stat-card" th:if="${bsimStats}">
+                <div class="stat-value" th:text="${#numbers.formatInteger(bsimStats.functionCount ?: 0, 3, 'COMMA')}">0</div>
+                <div class="stat-label">Functions in BSim</div>
+            </div>
+
+            <div class="stat-card" th:if="${bsimStats}">
+                <div class="stat-value" th:text="${bsimStats.executableCount ?: 0}">0</div>
+                <div class="stat-label">Executables Analyzed</div>
+            </div>
+
+            <div class="stat-card" th:if="${bsimStats}">
+                <div class="stat-value" th:text="${bsimStats.connected ? '✓' : '✗'}">✗</div>
+                <div class="stat-label">BSim Connection</div>
+            </div>
+        </div>
+
+        <div th:if="${bsimStats}" class="card">
+            <h2>📊 BSim Database Information</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem;">
+                <div>
+                    <strong>Name:</strong> <span th:text="${bsimStats.name ?: 'Unknown'}"></span><br>
+                    <strong>Description:</strong> <span th:text="${bsimStats.description ?: 'N/A'}"></span><br>
+                    <strong>Architecture:</strong> <span th:text="${bsimStats.architecture ?: 'N/A'}"></span><br>
+                </div>
+                <div>
+                    <strong>LSH K:</strong> <span th:text="${bsimStats.lsh_k ?: 'N/A'}"></span><br>
+                    <strong>LSH L:</strong> <span th:text="${bsimStats.lsh_L ?: 'N/A'}"></span><br>
+                    <strong>Capacity:</strong> <span th:text="${bsimStats.capacity ?: 'N/A'}"></span><br>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🚀 Quick Actions</h2>
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                <a th:href="@{/upload}" class="btn">📁 Upload New Binary</a>
+                <a th:href="@{/projects}" class="btn btn-secondary">📂 Browse Projects</a>
+                <a th:href="@{/bsim}" class="btn btn-secondary">🔍 BSim Query</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>ℹ️ About This API</h2>
+            <p>This Spring Boot application provides a REST API and web interface for Ghidra binary analysis and BSim similarity matching.
+            It integrates with the Ghidra server to provide automated analysis capabilities for reverse engineering workflows.</p>
+
+            <h3 style="color: var(--d2-gold); margin-top: 1.5rem;">🔗 API Endpoints</h3>
+            <ul style="margin-left: 2rem; line-height: 1.6;">
+                <li><code>POST /api/analysis/upload</code> - Upload and analyze binary files</li>
+                <li><code>GET /api/analysis/projects</code> - List all Ghidra projects</li>
+                <li><code>POST /api/analysis/bsim/query</code> - Perform BSim similarity queries</li>
+                <li><code>GET /api/analysis/bsim/stats</code> - Get BSim database statistics</li>
+                <li><code>POST /api/analysis/decompile</code> - Decompile specific functions</li>
+            </ul>
+        </div>
+    </div>
+</main>
+</body>
+</html>
