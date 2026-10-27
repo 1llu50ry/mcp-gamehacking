@@ -2,8 +2,8 @@
 title: "I built an MCP server where Claude, Codex and Cursor reverse-engineer binaries together"
 published: false
 tags: ai, reverseengineering, mcp, security
-cover_image: https://raw.githubusercontent.com/whory/mcp-gamehacking/main/docs/launch/cover.png
-canonical_url: https://github.com/whory/mcp-gamehacking
+cover_image: https://raw.githubusercontent.com/1llu50ry/mcp-gamehacking/main/docs/launch/cover.png
+canonical_url: https://github.com/1llu50ry/mcp-gamehacking
 ---
 
 # The problem
@@ -18,7 +18,7 @@ AI coding assistants (Claude Code, Codex, Cursor) are great at the thinking part
 
 # What I shipped
 
-[mcp-gamehacking](https://github.com/whory/mcp-gamehacking) — an MCP server that:
+[mcp-gamehacking](https://github.com/1llu50ry/mcp-gamehacking) — an MCP server that:
 
 1. **Unifies 59 external RE/debug MCP backends** behind one connection. `smart_decompile 0x401000` fails over through IDA → Ghidra → Binja → RetDec. `hub_consensus_call matcher=decompile` fans out across all three and reports disagreement.
 2. **Ships 111 native MCP tools** so most answers never leave the server — zero-dep TypeScript parsers for PE, ELF, Mach-O, DEX, WASM, Minidump, ZIP/APK, .NET metadata, Unity AssetBundle, UE `.pak`, IL2CPP, Switch NSO. AoB scan, Shannon entropy, crypto-constant ID, PDB70 → MS symsrv URL.
@@ -107,7 +107,7 @@ Zero deps. 10-minute TTL inverted index. ~1 second cold build on the full archiv
 # Try it
 
 ```bash
-git clone https://github.com/whory/mcp-gamehacking
+git clone https://github.com/1llu50ry/mcp-gamehacking
 cd mcp-gamehacking
 npm install && npx tsc && npm test
 ./bin/mcp-gamehacking.mjs tools      # list every registered tool
@@ -117,6 +117,6 @@ Point your MCP client at it. ⭐ if it saves you an hour today.
 
 # What's next
 
-Public [roadmap](https://github.com/whory/mcp-gamehacking/blob/main/ROADMAP.md). Next up: persistent BM25 index on disk, OpenTelemetry traces, DWARF v5 line program parser, local embedding model for semantic skill search.
+Public [roadmap](https://github.com/1llu50ry/mcp-gamehacking/blob/main/ROADMAP.md). Next up: persistent BM25 index on disk, OpenTelemetry traces, DWARF v5 line program parser, local embedding model for semantic skill search.
 
 Would love to hear what tool you'd add. Open an issue, I read everything.

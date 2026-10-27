@@ -85,7 +85,16 @@ export type ReBackendId =
   | "pwndbg-mcp"
   | "retdec-mcp"
   | "snowman-mcp"
-  | "fakepdb";
+  | "fakepdb"
+  | "yaraflux"
+  | "antirea"
+  | "cheat-engine-python"
+  | "decomp-anything"
+  | "local-memory-mcp"
+  | "re-universe"
+  | "reva"
+  | "rzweb"
+  | "lldb-dap";
 
 export interface ReBackend {
   id: ReBackendId;
@@ -1177,6 +1186,145 @@ const BACKENDS: Record<ReBackendId, ReBackend> = {
     },
     tags: ["fakepdb", "ida", "pdb", "symbols", "static", "windows"],
     notes: "Vendored under tools/vendor/fakepdb (Apache-2.0, mixaill). Generates a Microsoft PDB from an IDA database.",
+  },
+  "yaraflux": {
+    id: "yaraflux",
+    name: "YaraFlux MCP (ThreatFlux)",
+    kind: "static",
+    os: ["windows", "linux", "macos"],
+    requires: "Python 3.11+, yara-python >= 4.5, yaraflux >= 1.x.",
+    install: [
+      "git clone https://github.com/ThreatFlux/YaraFlux",
+      "cd YaraFlux && pip install -e .",
+    ],
+    launch: { cmd: "yaraflux-mcp", args: [], http: { port: 48672 } },
+    mcpConfig: { "yaraflux": { command: "yaraflux-mcp", args: [] } },
+    tags: ["yaraflux", "yara", "threatflux", "static", "detection", "classification"],
+    notes: "Full YARA rule management (upload, delete, test), scanning on URL/file, result retrieval. Alternative to yara-mcp with richer rule management.",
+  },
+  "antirea": {
+    id: "antirea",
+    name: "antirea (multi-stack RE)",
+    kind: "both",
+    os: ["windows", "linux", "macos"],
+    requires: "Node 18+. For native targets: Hopper / Ghidra / IDA install.",
+    install: [
+      "npx antirea setup",
+      "npm install -g antirea",
+    ],
+    launch: { cmd: "antirea", args: ["mcp"] },
+    mcpConfig: { "antirea": { command: "npx", args: ["-y", "antirea", "mcp"] } },
+    tags: ["antirea", "cross-tool", "electron", "js", "dotnet", "native", "both"],
+    notes: "REA-style cross-stack RE across binaries, apps, JS/Electron, .NET. Alias target for the broader scope rebrand.",
+  },
+  "cheat-engine-python": {
+    id: "cheat-engine-python",
+    name: "MCP Cheat Engine Server (Python)",
+    kind: "dynamic",
+    os: ["windows"],
+    requires: "Python 3.10+, Cheat Engine 7.5+, Windows.",
+    install: [
+      "git clone https://github.com/kennethreitz/mcp-cheat-engine-server",
+      "pip install -r mcp-cheat-engine-server/requirements.txt",
+    ],
+    launch: { cmd: "python", args: ["-m", "mcp_cheat_engine_server"], http: { port: 48673 } },
+    mcpConfig: { "cheat-engine-python": { command: "python", args: ["-m", "mcp_cheat_engine_server"] } },
+    tags: ["cheat-engine", "python", "dynamic", "aob", "pointer-scan", "memory-rw"],
+    notes: "Python-first alternative to cheat-engine-mcp (Lua bridge). Easier scripting for pointer scans + value watching.",
+  },
+  "decomp-anything": {
+    id: "decomp-anything",
+    name: "decomp.anything (matching-decompilation workbench)",
+    kind: "static",
+    os: ["windows", "linux", "macos"],
+    requires: "Python 3.11+. The original compiler toolchain for the target (MSVC / GCC / clang).",
+    install: [
+      "git clone https://github.com/matching-decompilation/decomp.anything",
+      "cd decomp.anything && pip install -e .",
+    ],
+    launch: { cmd: "decomp-anything", args: ["serve"], http: { port: 48674 } },
+    mcpConfig: { "decomp-anything": { command: "decomp-anything", args: ["serve"] } },
+    tags: ["matching-decompilation", "static", "games", "windows", "linux", "firmware"],
+    notes: "Agent writes C/C++ against the real binary; original compiler builds it; result checked byte-for-byte. Primary matching-decomp workbench for game-RE scene.",
+  },
+  "local-memory-mcp": {
+    id: "local-memory-mcp",
+    name: "local-memory-mcp (persistent agent memory)",
+    kind: "static",
+    os: ["windows", "linux", "macos"],
+    requires: "Node 18+.",
+    install: [
+      "npm install -g @vheins/local-memory-mcp",
+    ],
+    launch: { cmd: "npx", args: ["-y", "@vheins/local-memory-mcp"] },
+    mcpConfig: { "local-memory-mcp": { command: "npx", args: ["-y", "@vheins/local-memory-mcp"] } },
+    tags: ["memory", "persistence", "agent", "kv", "note"],
+    notes: "Durable KV + notes memory for an agent across sessions. Pair with agent-mesh for cross-model shared memory that survives restart.",
+  },
+  "re-universe": {
+    id: "re-universe",
+    name: "Ghidra BSim PostgreSQL (RE-Universe)",
+    kind: "static",
+    os: ["windows", "linux", "macos"],
+    requires: "Docker; Ghidra 11+; PostgreSQL 15. BSim database must be seeded with reference binaries.",
+    install: [
+      "git clone https://github.com/re-universe/re-universe",
+      "docker compose up -d",
+    ],
+    launch: { cmd: "docker", args: ["compose", "up"], http: { port: 5432 } },
+    mcpConfig: { "re-universe": { url: "postgresql://127.0.0.1:5432/bsim" } },
+    tags: ["bsim", "ghidra", "similarity", "postgres", "static", "function-matching"],
+    notes: "Ghidra BSim backed by PostgreSQL for cross-binary function similarity. Great for identifying statically-linked libs + known malware families + leaked SDK symbols in game binaries.",
+  },
+  "reva": {
+    id: "reva",
+    name: "ReVa (Reverse Engineering Assistant for Ghidra)",
+    kind: "static",
+    os: ["windows", "linux", "macos"],
+    requires: "Ghidra 11.3+. Ships as a Ghidra extension (ZIP).",
+    install: [
+      "download the ReVa extension ZIP from https://github.com/cyberkaida/reverse-engineering-assistant/releases",
+      "Ghidra -> File -> Install Extensions... -> + -> pick the ZIP -> restart",
+      "enable the ReVa MCP server tool in CodeBrowser",
+    ],
+    launch: {
+      cmd: "echo",
+      args: ["ReVa runs inside Ghidra -- enable the MCP server tool after installing"],
+      http: { port: 8080 },
+    },
+    mcpConfig: { "reva": { url: "http://127.0.0.1:8080/mcp" } },
+    tags: ["ghidra", "reva", "mcp", "static", "ai-assisted", "cyberkaida"],
+    notes: "Modern alternative to GhidraMCP; actively developed by cyberkaida. Rich tool surface including decompiler + xrefs + comments + function + data type management.",
+  },
+  "rzweb": {
+    id: "rzweb",
+    name: "RzWeb (rizin web UI + MCP)",
+    kind: "both",
+    os: ["windows", "linux", "macos"],
+    requires: "rizin >= 0.7, Node 18+ for the web shell, pip install rzweb-mcp.",
+    install: [
+      "pip install rizin rzweb-mcp",
+      "or build from source: https://github.com/rizinorg/rzweb",
+    ],
+    launch: { cmd: "rzweb-mcp", args: [], http: { port: 48675 } },
+    mcpConfig: { "rzweb": { command: "rzweb-mcp", args: [] } },
+    tags: ["rizin", "radare2-fork", "web-ui", "static", "dynamic"],
+    notes: "rizin is the maintained radare2 fork. RzWeb is a web UI; the MCP bridge exposes `rz` commands over MCP similarly to radare2-mcp.",
+  },
+  "lldb-dap": {
+    id: "lldb-dap",
+    name: "LLDB DAP (Debug Adapter Protocol)",
+    kind: "dynamic",
+    os: ["linux", "macos", "windows"],
+    requires: "LLVM 18+ with `lldb-dap` binary; the VSCode LLDB extension or any DAP client.",
+    install: [
+      "install llvm with brew / apt / winget, lldb-dap ships with LLVM 18+",
+      "pip install lldb-dap-mcp  # community bridge",
+    ],
+    launch: { cmd: "lldb-dap-mcp", args: [], http: { port: 48676 } },
+    mcpConfig: { "lldb-dap": { command: "lldb-dap-mcp", args: [] } },
+    tags: ["lldb", "dap", "dynamic", "cross-platform", "ios", "macos", "linux"],
+    notes: "Standard DAP-wrapped LLDB. Alternative to lldb-mcp; preferred when integrating with VSCode / Neovim / Emacs DAP clients.",
   },
 };
 

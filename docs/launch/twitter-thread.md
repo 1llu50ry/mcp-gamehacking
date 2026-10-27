@@ -42,7 +42,7 @@
 
 **Tweet 7 (link + CTA):**
 > ⭐ MIT, free, open to contrib
-> → https://github.com/whory/mcp-gamehacking
+> → https://github.com/1llu50ry/mcp-gamehacking
 >
 > If you've reversed a game binary this year — this is for you.
 >

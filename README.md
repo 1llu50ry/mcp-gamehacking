@@ -33,7 +33,7 @@ If you're on security-research, cheat-detection, defensive-engineering, or game-
 
 ```bash
 # clone + build
-git clone https://github.com/whory/mcp-gamehacking && cd mcp-gamehacking
+git clone https://github.com/1llu50ry/mcp-gamehacking && cd mcp-gamehacking
 npm install && npx tsc
 npm test            # 20/20 should pass
 
