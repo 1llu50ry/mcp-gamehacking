@@ -94,7 +94,8 @@ export type ReBackendId =
   | "re-universe"
   | "reva"
   | "rzweb"
-  | "lldb-dap";
+  | "lldb-dap"
+  | "tencentdb-agent-memory";
 
 export interface ReBackend {
   id: ReBackendId;
@@ -1325,6 +1326,33 @@ const BACKENDS: Record<ReBackendId, ReBackend> = {
     mcpConfig: { "lldb-dap": { command: "lldb-dap-mcp", args: [] } },
     tags: ["lldb", "dap", "dynamic", "cross-platform", "ios", "macos", "linux"],
     notes: "Standard DAP-wrapped LLDB. Alternative to lldb-mcp; preferred when integrating with VSCode / Neovim / Emacs DAP clients.",
+  },
+  "tencentdb-agent-memory": {
+    id: "tencentdb-agent-memory",
+    name: "TencentDB Agent Memory (team-shared memory)",
+    kind: "static",
+    os: ["windows", "linux", "macos"],
+    requires: "Node >= 22.16, Docker (for memory-core + memory-hub + proxy), two LLM endpoints (memory + proxy groups), optional MongoDB.",
+    install: [
+      "git clone https://github.com/TencentCloud/TencentDB-Agent-Memory",
+      "cd TencentDB-Agent-Memory/deploy/global-images && cp .env.example .env",
+      "fill in .env with the memory-group + proxy-group LLM parameters",
+      "./start-all.sh  # brings up memory-core + memory-hub + proxy, prints a one-liner for the client config",
+    ],
+    launch: {
+      cmd: "echo",
+      args: ["Start the three services via deploy/global-images/start-all.sh; the server runs under Docker"],
+      http: { port: 8125 },
+    },
+    mcpConfig: {
+      "tencentdb-agent-memory": {
+        // Zero-code integration: point the agent's BASE URL at the proxy
+        // (OpenAI-compatible). No plugin or MCP server needed on the client.
+        url: "http://127.0.0.1:8125",
+      },
+    },
+    tags: ["memory", "team", "shared", "proxy", "tencent", "openclaw", "hermes"],
+    notes: "Shared memory server where every agent (Claude, Codex, Cursor, …) sees the same memory. Pairs with our built-in agent-mesh: use the mesh for coordination (DM/tasks/votes) and TencentDB-Agent-Memory for durable long-term team memory across sessions.",
   },
 };
 
