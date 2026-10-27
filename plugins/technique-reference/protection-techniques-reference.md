@@ -27,6 +27,9 @@ Cross-reference for every protection / anti-RE technique the library documents i
 | Forensics evasion | Prefetch minifilter | [[prefetch-kernel-hook-filter]] |
 | Licensing | TPM EK binding | [[tpm-license-checker]] |
 | Licensing | Anti-skid canary / watermark | [[anti-skid-techniques]] |
+| Unpacker (attack side) | VMProtect dumper (end-to-end) | [[vmprotect-dumper-c]] |
+| Unpacker (attack side) | OEP capture + Memory Harvester | [[oep-capture-memory-harvester]] |
+| Unpacker (attack side) | IAT reconstruction post-unpack | [[iat-reconstruction-postunpack]] |
 
 ## Choosing a technique
 
