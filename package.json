@@ -1,6 +1,6 @@
 {
   "name": "mcp-gamehacking",
-  "version": "4.6.0",
+  "version": "5.0.0",
   "bin": {
     "mcp-gamehacking": "bin/mcp-gamehacking.mjs"
   },
@@ -12,8 +12,21 @@
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "inspect": "npx @modelcontextprotocol/inspector node dist/index.js",
-    "test": "tsc && node --test tests/*.test.mjs"
+    "test": "tsc && node --test tests/*.test.mjs",
+    "prepublishOnly": "npm run build",
+    "pack:dry": "npm pack --dry-run"
   },
+  "files": [
+    "dist/",
+    "bin/",
+    "signatures/",
+    "plugins-side/",
+    "examples/",
+    "deploy/",
+    "docs/",
+    "README.md",
+    "LICENSE"
+  ],
   "keywords": [
     "mcp",
     "game-hacking",

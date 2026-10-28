@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <OutputType>Library</OutputType>
+    <AssemblyName>ReClassNET-MCP</AssemblyName>
+    <RootNamespace>ReClassNET.MCP</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <!--
+      Point RECLASS_DIR at your ReClass.NET install so the references resolve.
+      Example:
+        dotnet build /p:RECLASS_DIR="C:\Program Files\ReClass.NET"
+    -->
+    <RECLASS_DIR Condition="'$(RECLASS_DIR)' == ''">C:\Program Files\ReClass.NET</RECLASS_DIR>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="ReClass.NET">
+      <HintPath>$(RECLASS_DIR)\ReClass.NET.exe</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="ReClass.NET.Core">
+      <HintPath>$(RECLASS_DIR)\ReClass.NET.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="System.Net" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml.Linq" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="MCPBridgePlugin.cs" />
+  </ItemGroup>
+
+</Project>

@@ -1,9 +1,0 @@
-Project Path: arc_h4sh5_DumpIt-mirror_kcmqfu_z
-
-Source Tree:
-
-```txt
-arc_h4sh5_DumpIt-mirror_kcmqfu_z
-└── DumpIt.exe
-
-```

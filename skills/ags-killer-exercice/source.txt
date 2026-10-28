@@ -1,9 +1,0 @@
-Project Path: arc_gmh5225_Killer-Exercice_ys5t7dbe
-
-Source Tree:
-
-```txt
-arc_gmh5225_Killer-Exercice_ys5t7dbe
-└── 8e92cc393a7f6acda90fff42925c42d2082dad593740ae2698d597dca5d1e7fc.SYS
-
-```

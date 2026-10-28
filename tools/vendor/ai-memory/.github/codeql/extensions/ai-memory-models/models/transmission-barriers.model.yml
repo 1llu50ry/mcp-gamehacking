@@ -1,0 +1,18 @@
+# The same name heuristic that drove the log barriers treats the result of
+# `session_id_query_suffix` as account information, so every hook POST that
+# carries it raised a `rust/cleartext-transmission` alert. The suffix is a
+# hook-generated routing id for agents whose payloads omit one (Devin,
+# ZCode), not a credential. It travels to the operator-configured server
+# beside the bearer token, which is the secret that actually needs TLS
+# (delegated to a proxy for non-loopback binds, docs/https-via-proxy.md).
+#
+# The barrier sits on this one function's return value, so a token or key
+# sent anywhere else is still reported. The CLI test
+# `codeql_model_targets_exist` fails if the modeled function is renamed or
+# moved.
+extensions:
+  - addsTo:
+      pack: codeql/rust-all
+      extensible: barrierModel
+    data:
+      - ["ai_memory_cli::commands::hook::session_id_query_suffix", "ReturnValue", "transmission", "manual"]

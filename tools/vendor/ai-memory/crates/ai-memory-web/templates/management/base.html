@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Management — ai-memory</title><link rel="icon" href="{{ root }}/static/logo.png"><link rel="stylesheet" href="{{ root }}/static/tailwind.css">
+<script>{{ script|safe }}</script></head>
+<body class="management min-h-screen"><header class="management-header border-b"><div class="max-w-6xl mx-auto px-6 py-5 flex flex-wrap justify-between items-center gap-4">
+<a class="management-brand flex items-center gap-3" href="{{ root }}/sessions"><img src="{{ root }}/static/logo.png" class="h-10 w-10" alt=""><strong>ai-memory</strong><span class="management-muted text-sm">Management</span></a>
+<div class="flex flex-wrap items-center gap-4"><div role="group" aria-label="Color theme" class="management-themes"><button type="button" data-theme="system">System</button><button type="button" data-theme="light">Light</button><button type="button" data-theme="dark">Dark</button></div>
+{% if !username.is_empty() %}<span>{{ username }} · {% if admin %}Admin{% else %}User{% endif %}</span><form action="{{ root }}/action" method="post"><input type="hidden" name="action" value="logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Sign out</button></form>{% endif %}
+</div></div></header>
+<main class="max-w-6xl mx-auto px-6 py-8" id="main-content">
+{% if !username.is_empty() %}<nav aria-label="Management" class="flex flex-wrap gap-3 mb-8"><a href="{{ root }}/sessions">Sessions</a>{% if admin %}<a href="{{ root }}/users">Users</a>{% endif %}<a href="{{ root }}/keys">MCP connection</a><a href="{{ root }}/password">Password</a></nav>{% endif %}
+{% block content %}{% endblock %}</main></body></html>

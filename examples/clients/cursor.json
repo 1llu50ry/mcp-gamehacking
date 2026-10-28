@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "mcp-gamehacking": {
+      "command": "npx",
+      "args": ["-y", "mcp-gamehacking"],
+      "env": {
+        "MCP_FS_ALLOW": "${workspaceFolder}"
+      }
+    }
+  }
+}

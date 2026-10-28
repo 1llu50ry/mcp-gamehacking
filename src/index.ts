@@ -22,6 +22,25 @@ import { registerBm25Search } from "./bm25-search.js";
 import { registerAuditAndRate } from "./audit-rate.js";
 import { registerDynamicResources } from "./dynamic-resources.js";
 import { registerNativeDisasm } from "./native-disasm.js";
+import { registerNativeMemory } from "./native-memory.js";
+import { registerNativeYara } from "./native-yara.js";
+import { registerNativeReclass } from "./native-reclass.js";
+import { registerCeserverClient } from "./native-ceserver.js";
+import { registerPluginClients } from "./native-tool-clients.js";
+import { registerEmulator } from "./native-emulator.js";
+import { registerNativeDwarf } from "./native-dwarf.js";
+import { registerNativePdb } from "./native-pdb.js";
+import { registerSignatureDb } from "./signature-db.js";
+import { attachObservabilityRoutes, metrics } from "./observability.js";
+import { registerArm64 } from "./native-arm64.js";
+import { registerCacheTools, getCache } from "./decompile-cache.js";
+import { registerChunkTools } from "./chunking.js";
+import { runRequestMiddleware } from "./http-middleware.js";
+import { registerNativeDiff } from "./native-diff.js";
+import { registerRop } from "./native-rop.js";
+import { registerGameEngine } from "./native-gameengine.js";
+import { registerSampling } from "./native-sampling.js";
+import { registerViz } from "./native-viz.js";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const DIRS = {
@@ -181,7 +200,18 @@ async function safeRead(path: string): Promise<string | null> {
   try {
     return await readFile(path, "utf-8");
   } catch {
-    return null;
+    // Transparent fallback: if `path` is missing but `path.gz` is next
+    // to it on disk, decompress and return. This keeps every tool that
+    // was coded against the uncompressed layout working after we
+    // gzipped the big source.txt files to shrink the repo from 18 GiB
+    // to ~3 GiB. gunzip is in node's zlib — no external deps.
+    try {
+      const { gunzipSync } = await import("node:zlib");
+      const buf = await readFile(path + ".gz");
+      return gunzipSync(buf).toString("utf-8");
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -190,7 +220,9 @@ async function fileExists(path: string): Promise<boolean> {
     await stat(path);
     return true;
   } catch {
-    return false;
+    // Mirror safeRead's gzip fallback: `path` is considered to exist if
+    // `path.gz` is next to it on disk.
+    try { await stat(path + ".gz"); return true; } catch { return false; }
   }
 }
 
@@ -260,14 +292,31 @@ function notFound(kind: string, name: string) {
 // ============================================================
 
 async function grepFile(filePath: string, pattern: RegExp, maxMatches: number, contextLines: number): Promise<{ line: number; text: string }[]> {
-  return new Promise((resolve) => {
+  return new Promise(async (resolve) => {
     const matches: { line: number; text: string }[] = [];
     let lineNum = 0;
     const buffer: string[] = [];
 
     try {
+      // Resolve the live path: prefer the uncompressed source.txt when
+      // it exists; otherwise stream through gunzip from source.txt.gz
+      // transparently so the greps work in both layouts.
+      let readable: NodeJS.ReadableStream;
+      if (await fileExists(filePath) && !filePath.endsWith(".gz")) {
+        // check if uncompressed exists at the exact path
+        try {
+          await stat(filePath);
+          readable = createReadStream(filePath, { encoding: "utf-8", highWaterMark: 64 * 1024 });
+        } catch {
+          const { createGunzip } = await import("node:zlib");
+          readable = createReadStream(filePath + ".gz", { highWaterMark: 64 * 1024 }).pipe(createGunzip()).setEncoding("utf-8");
+        }
+      } else {
+        const { createGunzip } = await import("node:zlib");
+        readable = createReadStream(filePath + ".gz", { highWaterMark: 64 * 1024 }).pipe(createGunzip()).setEncoding("utf-8");
+      }
       const rl = createInterface({
-        input: createReadStream(filePath, { encoding: "utf-8", highWaterMark: 64 * 1024 }),
+        input: readable,
         crlfDelay: Infinity,
       });
 
@@ -367,6 +416,23 @@ const PKG_VERSION = JSON.parse(
 const server = new McpServer({
   name: "mcp-gamehacking",
   version: PKG_VERSION,
+  title: "mcp-gamehacking: reverse-engineering mega-brain",
+}, {
+  // Capabilities we actively support. The MCP SDK derives these from
+  // registered primitives too, but declaring them explicitly makes the
+  // handshake self-descriptive for clients that key feature detection
+  // off capabilities rather than trial-and-error.
+  // Sampling is a client capability (we consume it via createMessage in
+  // decompile_summarize / struct_name_suggest / explain_at_level), so
+  // it's not declared here on the server side.
+  capabilities: {
+    tools:     { listChanged: true },
+    resources: { subscribe: false, listChanged: true },
+    prompts:   { listChanged: true },
+    logging:   {},
+  },
+  instructions:
+    "mcp-gamehacking exposes 180+ tools for binary RE: Ghidra/IDA/Binja/CE/ReClass/dnSpy/x64dbg bridges, Frida dynamic instrumentation, native PE/ELF/Mach-O/DEX/.NET/Unity/UE/IL2CPP parsers, YARA, FLIRT-light signatures, native x86-64 + ARM64 emulators, agent-mesh (multi-model chat), MCP hub (smart decompile fail-over), content-addressable decompile cache. Prefer the `smart_*` composite tools when uncertain which backend to use. Use `cache_stats` + `chunk_fetch` for large results.",
 });
 
 // ============================================================
@@ -1655,6 +1721,62 @@ registerDynamicResources(server, ROOT);
 // Native x86-64 mini-disassembler (prologue/epilogue coverage).
 registerNativeDisasm(server);
 
+// Native "mega-brain" absorption of previously-hub-only backends:
+//   memory_put/get/search/list/delete/prune/export/stats
+//     — replaces local-memory-mcp + ai-memory + TencentDB-Agent-Memory
+//       client role; shared JSON persistence under <project>/.memory/
+//   yara_scan / yara_parse — in-process YARA-light engine
+//   reclass_parse / reclass_to_cpp — ReClass.NET project → C++ header
+//   ce_attach / ce_aob_scan / ce_pointer_scan / ce_read_memory /
+//     ce_write_memory / ce_lua / ce_status — ceserver HTTP client
+await registerNativeMemory(server, ROOT);
+registerNativeYara(server);
+registerNativeReclass(server);
+registerCeserverClient(server);
+
+// Clients for the host-side plugins under plugins-side/ (Ghidra, IDA,
+// ReClass.NET, dnSpy, ILSpy, x64dbg, Binary Ninja). Each plugin runs
+// inside its host tool and exposes a small HTTP MCP surface; the
+// clients registered here (ghidra_* / ida_* / reclass_*_live / dnspy_*
+// / ilspy_* / x64dbg_* / binja_* / bridge_health_all) call it over
+// localhost. See plugins-side/README.md for install instructions.
+registerPluginClients(server);
+
+// Wave 2 (dynamic analysis + symbols + observability):
+//   emu_run / emu_decrypt_xor — tiny built-in x86-64 emulator for
+//     string-decrypt loops and small decrypt stubs (no external deps)
+//   dwarf_parse — native DWARF v4/v5 compile-unit + subprogram walker
+//   pdb_info    — native MSF/PDB superblock + Info + DBI module list
+//   sig_list / sig_match / sig_make — FLIRT-light signature db
+//     (signatures/common.json ships with the project; extend via sig_make)
+registerEmulator(server);
+registerNativeDwarf(server);
+registerNativePdb(server);
+registerSignatureDb(server, ROOT);
+
+// Wave 3 (platform + distribution):
+//   emu_arm64_run   — native AArch64 emulator for iOS/Android loops
+//   cache_stats / cache_clear — content-addressable decompile cache
+//   chunk_fetch / chunk_list — paging through large tool results
+registerArm64(server);
+registerCacheTools(server, ROOT);
+registerChunkTools(server, ROOT);
+// Warm the cache singleton so .stats() in telemetry works even before
+// the first wrap() call.
+getCache(ROOT);
+
+// Wave 4 (RE-ops upgrades):
+//   bindiff — function-level fingerprint diff with equal/shifted/modified
+//   rop_find / rop_chain — gadget search + packed-chain builder (x86-64 & aarch64)
+//   unity_il2cpp_metadata / unreal_fnames / godot_pck — engine metadata
+//   decompile_summarize / struct_name_suggest / explain_at_level — MCP sampling
+//   viz_call_graph / viz_cfg — SVG graph rendering
+registerNativeDiff(server);
+registerRop(server);
+registerGameEngine(server);
+registerSampling(server);
+registerViz(server);
+
 // ============================================================
 // MAIN
 // ============================================================
@@ -1685,14 +1807,28 @@ async function main() {
     };
     const transports = new Map<string, StreamableHTTPServerTransport>();
     const httpServer = createServer(async (req, res) => {
+      // Per-request middleware: trace-id (X-Trace-Id), optional per-user
+      // rate limit (MCP_RATE_LIMIT_PER_USER=1), structured access log.
+      // The middleware already writes a 429 response when it rejects, so
+      // we stop here on `rejected`.
+      const mw = runRequestMiddleware(req, res);
+      if (mw.rejected) return;
+      // Normalise the request URL once so query strings, fragments, and
+      // trailing slashes can't bypass the route-equality checks that gate
+      // the auth call (CodeQL js/user-controlled-bypass-of-security-check).
+      // Equality comparisons downstream use `pathname` only.
+      const pathname = (() => {
+        try { return new URL(req.url ?? "/", "http://localhost").pathname.replace(/\/+$/, "") || "/"; }
+        catch { return "/"; }
+      })();
       // /healthz: readiness probe — always open
-      if (req.method === "GET" && req.url === "/healthz") {
+      if (req.method === "GET" && pathname === "/healthz") {
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({ status: "ok", pid: process.pid, uptime: process.uptime(), version: PKG_VERSION, auth: authRequired ? "on" : "off" }));
         return;
       }
       // /metrics: Prometheus-style — gated when auth is on
-      if (req.method === "GET" && req.url === "/metrics") {
+      if (req.method === "GET" && pathname === "/metrics") {
         if (!checkAuth(req)) {
           res.writeHead(401, { "content-type": "text/plain; charset=utf-8", "www-authenticate": "Bearer" });
           res.end("unauthorized");
@@ -1718,7 +1854,9 @@ async function main() {
         return;
       }
       // MCP endpoint: use streamable HTTP transport. Gated when auth is on.
-      if (req.url === "/mcp" || req.url?.startsWith("/mcp?") || req.url?.startsWith("/mcp/")) {
+      // Uses the normalised `pathname` (strips query / fragment / trailing /)
+      // so no `/mcp?x=` or `/mcp/` form can bypass the auth gate.
+      if (pathname === "/mcp") {
         if (!checkAuth(req)) {
           res.writeHead(401, { "content-type": "text/plain; charset=utf-8", "www-authenticate": "Bearer" });
           res.end("unauthorized");
@@ -1750,8 +1888,9 @@ async function main() {
       res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
       res.end("not found. endpoints: /mcp, /healthz, /metrics");
     });
+    attachObservabilityRoutes(httpServer);
     httpServer.listen(port, host, () => {
-      console.error(`[mcp-gamehacking] HTTP transport on http://${host}:${port}/mcp (health: /healthz, metrics: /metrics)`);
+      console.error(`[mcp-gamehacking] HTTP transport on http://${host}:${port}/mcp (health: /healthz, metrics: /metrics, dashboard: /dashboard)`);
     });
   } else {
     const transport = new StdioServerTransport();

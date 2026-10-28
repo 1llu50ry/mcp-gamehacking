@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "ai-memory": {
+      "command": "${user_config.ai_memory_bin}",
+      "args": [
+        "mcp-bridge",
+        "--server-url",
+        "${user_config.server_url}"
+      ]
+    }
+  }
+}

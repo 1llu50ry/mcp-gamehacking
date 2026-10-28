@@ -1,0 +1,1882 @@
+//! JSON routes for third-party read-only frontends.
+
+use std::sync::Arc;
+
+use ai_memory_core::{ObservationKind, PagePath, ProjectId, SessionId, WorkspaceId};
+use ai_memory_store::{
+    BriefingSnapshot, HealthPage, ObservationOrder, ObservationPage, ObservationRecord, PageHit,
+    RelatedPage, ScopeName, ScopeResolutionError, SessionSummary, lookup_existing_scope_guarded,
+    resolve_many_existing_scopes_guarded,
+};
+use axum::extract::{Path, Query, RawQuery, State};
+use axum::http::{HeaderValue, StatusCode, header};
+use axum::response::{IntoResponse, Response};
+use axum::{Json, Router};
+use base64::Engine as _;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+
+use crate::state::WebState;
+
+/// Cache TTL for page-list, workspace, search, and summary endpoints.
+const LIST_CACHE_MAX_AGE: u32 = 30;
+/// Cache TTL for project page-list endpoint.
+const PAGES_LIST_CACHE_MAX_AGE: u32 = 60;
+/// Cache TTL (and ETag max-age) for single-page reads.
+const PAGE_CACHE_MAX_AGE: u32 = 300;
+
+/// Build the `/api/v1` router from a shared [`WebState`].
+pub(crate) fn build(state: Arc<WebState>) -> Router {
+    Router::new()
+        .route("/workspaces", axum::routing::get(workspaces_handler))
+        .route("/projects", axum::routing::get(projects_handler))
+        .route(
+            "/workspaces/{workspace}/projects/{project}/pages",
+            axum::routing::get(pages_handler),
+        )
+        .route(
+            "/workspaces/{workspace}/projects/{project}/pages/{*path}",
+            axum::routing::get(page_handler),
+        )
+        .route(
+            "/search",
+            axum::routing::get(search_handler).post(search_post_handler),
+        )
+        .route(
+            "/workspaces/{workspace}/projects/{project}/history/{*path}",
+            axum::routing::get(history_handler),
+        )
+        .route(
+            "/workspaces/{workspace}/projects/{project}/recent",
+            axum::routing::get(recent_handler),
+        )
+        .route(
+            "/workspaces/{workspace}/projects/{project}/briefing",
+            axum::routing::get(briefing_handler),
+        )
+        .route(
+            "/workspaces/{workspace}/overview",
+            axum::routing::get(overview_handler),
+        )
+        .route(
+            "/workspaces/{workspace}/projects/{project}/overview",
+            axum::routing::get(project_overview_handler),
+        )
+        .route(
+            "/workspaces/{workspace}/projects/{project}/handoffs",
+            axum::routing::get(handoffs_handler),
+        )
+        .route(
+            "/workspaces/{workspace}/projects/{project}/sessions",
+            axum::routing::get(sessions_handler),
+        )
+        .route(
+            "/workspaces/{workspace}/projects/{project}/sessions/{session_id}/observations",
+            axum::routing::get(session_observations_handler),
+        )
+        .route("/graph", axum::routing::get(graph_handler))
+        .route(
+            "/workspaces/{workspace}/projects/{project}/graph",
+            axum::routing::get(project_graph_handler),
+        )
+        .with_state(state)
+}
+
+/// Attach `Cache-Control: private, max-age=N` to a successful response.
+///
+/// Applied only to 2xx bodies — error paths return their responses
+/// directly without calling this, so error responses stay uncached.
+fn with_cache(resp: Response, max_age: u32) -> Response {
+    let mut resp = resp;
+    if let Ok(val) = HeaderValue::from_str(&format!("private, max-age={max_age}")) {
+        resp.headers_mut().insert(header::CACHE_CONTROL, val);
+    }
+    resp
+}
+
+/// Prevent browser reuse of a response whose body depends on request identity.
+///
+/// `private` alone still permits a browser cache to serve Alice's response
+/// after credentials at the same URL switch to Bob. These endpoints contain
+/// owner-scoped prompt text, so successful responses must be revalidated by
+/// executing the authorization/filtering path on every request.
+fn with_no_store(resp: Response) -> Response {
+    let mut resp = resp;
+    resp.headers_mut().insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("private, no-store"),
+    );
+    resp
+}
+
+async fn workspaces_handler(
+    State(state): State<Arc<WebState>>,
+    viewer: Option<axum::Extension<ai_memory_core::AuthorizedViewer>>,
+) -> Result<Response, Response> {
+    let workspaces = state
+        .reader
+        .list_workspaces_with_stats(viewer_of(viewer))
+        .await
+        .map_err(internal_error)?;
+    Ok(with_cache(
+        Json(workspaces).into_response(),
+        LIST_CACHE_MAX_AGE,
+    ))
+}
+
+/// Cross-project dependency graph: every resolved link whose endpoints are
+/// in different projects, each carrying both endpoints' workspace/project/
+/// path. The UI builds nodes from the endpoints (and may aggregate to a
+/// project-level dependency graph). Omit `workspace`/`project` for the
+/// whole graph; pass both to keep edges that touch that project. Partial
+/// scope is refused. With authorization on, only edges whose both ends
+/// the viewer may read (#708).
+async fn graph_handler(
+    State(state): State<Arc<WebState>>,
+    viewer: Option<axum::Extension<ai_memory_core::AuthorizedViewer>>,
+    Query(query): Query<GraphQuery>,
+) -> Result<Response, Response> {
+    let viewer = viewer_of(viewer);
+    let scope = match (
+        trimmed_opt(query.workspace.as_deref()),
+        trimmed_opt(query.project.as_deref()),
+    ) {
+        (None, None) => None,
+        (Some(workspace), Some(project)) => {
+            let (workspace_id, project_id) =
+                lookup_project(&state, workspace, project, viewer).await?;
+            Some((workspace_id, project_id))
+        }
+        _ => {
+            return Err(json_error(
+                StatusCode::BAD_REQUEST,
+                "workspace and project must be provided together",
+            ));
+        }
+    };
+    let edges = state
+        .reader
+        .cross_project_edges(scope, viewer)
+        .await
+        .map_err(internal_error)?;
+    Ok(with_cache(
+        Json(serde_json::json!({ "edges": edges })).into_response(),
+        LIST_CACHE_MAX_AGE,
+    ))
+}
+
+/// In-project link graph: latest unexpired pages and the resolved
+/// wikilinks among them. Same read grant as the project page list.
+async fn project_graph_handler(
+    State(state): State<Arc<WebState>>,
+    viewer: Option<axum::Extension<ai_memory_core::AuthorizedViewer>>,
+    Path((workspace, project)): Path<(String, String)>,
+) -> Result<Response, Response> {
+    let (workspace_id, project_id) =
+        lookup_project(&state, &workspace, &project, viewer_of(viewer)).await?;
+    let graph = state
+        .reader
+        .project_link_graph(workspace_id, project_id)
+        .await
+        .map_err(internal_error)?;
+    Ok(with_cache(
+        Json(serde_json::json!({
+            "workspace": workspace,
+            "project": project,
+            "truncated": graph.truncated,
+            "nodes": graph.nodes,
+            "edges": graph.edges,
+        }))
+        .into_response(),
+        LIST_CACHE_MAX_AGE,
+    ))
+}
+
+async fn projects_handler(
+    State(state): State<Arc<WebState>>,
+    viewer: Option<axum::Extension<ai_memory_core::AuthorizedViewer>>,
+    Query(query): Query<ProjectListQuery>,
+) -> Result<Response, Response> {
+    let viewer = viewer_of(viewer);
+    let workspace = query
+        .workspace
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    let projects = if let Some(workspace) = workspace {
+        state
+            .reader
+            .list_projects_with_stats_for_workspace(workspace.to_owned(), viewer)
+            .await
+    } else {
+        state.reader.list_projects_with_stats(viewer).await
+    }
+    .map_err(internal_error)?;
+    Ok(with_cache(
+        Json(projects).into_response(),
+        LIST_CACHE_MAX_AGE,
+    ))
+}
+
+async fn pages_handler(
+    State(state): State<Arc<WebState>>,
+    viewer: Option<axum::Extension<ai_memory_core::AuthorizedViewer>>,
+    Path((workspace, project)): Path<(String, String)>,
+) -> Result<Response, Response> {
+    let _ = lookup_project(&state, &workspace, &project, viewer_of(viewer)).await?;
+    let pages = state
+        .reader
+        .list_unexpired_pages(&workspace, &project)
+        .await
+        .map_err(internal_error)?;
+    Ok(with_cache(
+        Json(pages).into_response(),
+        PAGES_LIST_CACHE_MAX_AGE,
+    ))
+}
+
+async fn page_handler(
+    State(state): State<Arc<WebState>>,
+    viewer: Option<axum::Extension<ai_memory_core::AuthorizedViewer>>,
+    headers: axum::http::HeaderMap,
+    Path((workspace, project, path)): Path<(String, String, String)>,
+) -> Result<Response, Response> {
+    super::authorize_read(&state, viewer, &workspace, &project)
+        .await
+        .map_err(scope_error_response)?;
+    let meta = state
+        .reader
+        .page_meta(&workspace, &project, &path)
+        .await
+        .map_err(internal_error)?
+        .ok_or_else(|| not_found("page not found"))?;
+
+    let page_path = PagePath::new(&path)
+        .map_err(|e| json_error(StatusCode::BAD_REQUEST, format!("invalid path: {e}")))?;
+    let markdown = state
+        .wiki
+        .read_page(meta.workspace_id, meta.project_id, &page_path)
+        .map_err(|_| not_found("page file not found"))?;
+
+    let links = state
+        .reader
+        .page_links(
+            meta.workspace_id,
+            meta.project_id,
+            meta.path.clone(),
+            viewer_of(viewer),
+        )
+        .await
+        .map_err(internal_error)?;
+
+    let page = ApiPage {
+        id: meta.id.to_string(),
+        backlinks: links.backlinks,
+        body_markdown: markdown.body,
+        created_at: meta.created_at,
+        frontmatter: markdown.frontmatter,
+        kind: meta.kind,
+        links: links.links,
+        path: meta.path,
+        pinned: meta.pinned,
+        project: meta.project_name,
+        supersedes: meta.supersedes,
+        tier: meta.tier,
+        title: meta.title,
+        updated_at: meta.updated_at,
+        workspace: meta.workspace_name,
+        author: meta.author,
+    };
+    let json = serde_json::to_vec(&page).map_err(internal_error)?;
+
+    // The ETag is a SHA-256 of the JSON this route returns, so it changes
+    // whenever any of it does. It used to cover only the markdown body and
+    // the author (P1.7), but pinning a page, re-tiering or retitling it in
+    // frontmatter, and another page linking to it all change the response
+    // while the body stays byte-identical, and a client revalidating with
+    // the old tag was told 304 and kept the stale page.
+    let digest = Sha256::digest(&json);
+    let etag_hex = digest.iter().fold(String::with_capacity(64), |mut s, b| {
+        use std::fmt::Write as _;
+        let _ = write!(s, "{b:02x}");
+        s
+    });
+    let etag_value = format!("\"{etag_hex}\"");
+    let etag_header = HeaderValue::from_str(&etag_value).expect("sha256 hex is always valid ASCII");
+
+    // If-None-Match: if the client sends back the exact ETag we issued,
+    // return 304 with no body.
+    if let Some(inm) = headers
+        .get(header::IF_NONE_MATCH)
+        .and_then(|v| v.to_str().ok())
+        && inm == etag_value
+    {
+        let mut resp = axum::http::Response::builder()
+            .status(StatusCode::NOT_MODIFIED)
+            .body(axum::body::Body::empty())
+            .expect("static builder cannot fail");
+        resp.headers_mut().insert(header::ETAG, etag_header.clone());
+        if let Ok(cc) = HeaderValue::from_str(&format!("private, max-age={PAGE_CACHE_MAX_AGE}")) {
+            resp.headers_mut().insert(header::CACHE_CONTROL, cc);
+        }
+        return Ok(resp);
+    }
+
+    let mut resp = with_cache(
+        (
+            [(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/json"),
+            )],
+            json,
+        )
+            .into_response(),
+        PAGE_CACHE_MAX_AGE,
+    );
+    resp.headers_mut().insert(header::ETAG, etag_header);
+    Ok(resp)
+}
+
+/// A page's stored versions, newest first, and a unified diff between two of
+/// them (default: the newest against the version it replaced). See
+/// `routes/history.rs`; the HTML view renders the same data.
+async fn history_handler(
+    State(state): State<Arc<WebState>>,
+    viewer: Option<axum::Extension<ai_memory_core::AuthorizedViewer>>,
+    Path((workspace, project, path)): Path<(String, String, String)>,
+    Query(query): Query<super::history::HistoryQuery>,
+) -> Result<Response, Response> {
+    use super::history::HistoryError;
+    let history = super::history::load(
+        &state,
+        viewer_of(viewer),
+        &workspace,
+        &project,
+        &path,
+        &query,
+    )
+    .await
+    .map_err(|err| match err {
+        HistoryError::Scope(ScopeResolutionError::ProjectNotFoundInWorkspace {
+            project, ..
+        }) => not_found(format!("project '{project}' not found")),
+        HistoryError::Scope(other) => scope_error_response(other),
+        HistoryError::BadRequest(message) => json_error(StatusCode::BAD_REQUEST, message),
+        HistoryError::NotFound(message) => not_found(message),
+        HistoryError::Internal(error) => internal_error(error),
+    })?;
+    let side = |side: &super::history::DiffSide| ApiHistorySide {
+        id: side.id.to_string(),
+        title: side.title.clone(),
+        created_at: side.created_at.clone(),
+    };
+    let (status, reason, truncated, hunks) = match history.diff {
+        crate::diff::Diff::Same => ("same", None, false, Vec::new()),
+        crate::diff::Diff::TooLarge(why) => ("too_large", Some(why), false, Vec::new()),
+        crate::diff::Diff::Changed { hunks, truncated } => ("changed", None, truncated, hunks),
+    };
+    Ok(with_no_store(
+        Json(ApiHistory {
+            workspace,
+            project,
+            path,
+            total: history.total,
+            offset: history.offset,
+            limit: history.limit,
+            diff: ApiHistoryDiff {
+                from: history.from.as_ref().map(side),
+                to: side(&history.to),
+                status,
+                reason,
+                truncated,
+                hunks,
+            },
+            versions: history.versions,
+        })
+        .into_response(),
+    ))
+}
+
+async fn search_handler(
+    State(state): State<Arc<WebState>>,
+    viewer: Option<axum::Extension<ai_memory_core::AuthorizedViewer>>,
+    actor: Option<axum::Extension<ai_memory_core::ActorContext>>,
+    RawQuery(raw_query): RawQuery,
+) -> Result<Response, Response> {
+    let query = SearchQuery::from_raw(raw_query.as_deref()).map_err(ApiFailure::into_response)?;
+    let request = query
+        .try_into_request()
+        .map_err(ApiFailure::into_response)?;
+    search_with_request(&state, request, viewer_of(viewer), &owner_filter_for(actor)).await
+}
+
+async fn search_post_handler(
+    State(state): State<Arc<WebState>>,
+    viewer: Option<axum::Extension<ai_memory_core::AuthorizedViewer>>,
+    actor: Option<axum::Extension<ai_memory_core::ActorContext>>,
+    Json(request): Json<SearchRequest>,
+) -> Result<Response, Response> {
+    search_with_request(&state, request, viewer_of(viewer), &owner_filter_for(actor)).await
+}
+
+// A global search is FTS5 over every readable repository, as
+// `memory_query(global=true)` is. A scoped one (one project or `scopes`)
+// runs the hybrid ranker `memory_query` runs, with the server's embedder
+// and reranker (`crate::recall`), so the two surfaces agree on order.
+async fn search_with_request(
+    state: &WebState,
+    request: SearchRequest,
+    viewer: Option<ai_memory_core::UserId>,
+    owner: &ai_memory_core::OwnerFilter,
+) -> Result<Response, Response> {
+    let term = request.q.trim().to_owned();
+    if term.is_empty() {
+        return Ok(Json(Vec::<ApiSearchHit>::new()).into_response());
+    }
+
+    let limit = request.limit.unwrap_or_else(default_limit).clamp(1, 100);
+    if !request.scopes.is_empty()
+        && (request
+            .workspace
+            .as_deref()
+            .is_some_and(|s| !s.trim().is_empty())
+            || request
+                .project
+                .as_deref()
+                .is_some_and(|s| !s.trim().is_empty()))
+    {
+        return Err(json_error(
+            StatusCode::BAD_REQUEST,
+            "scopes cannot be combined with workspace/project",
+        ));
+    }
+    let hits = match scoped_search_mode(state, &request, viewer).await? {
+        SearchMode::Global => state.reader.search_pages(term, limit, viewer).await,
+        SearchMode::Scoped(scopes) => {
+            let scopes: Vec<(WorkspaceId, ProjectId)> = scopes
+                .iter()
+                .map(|scope| (scope.workspace_id, scope.project_id))
+                .collect();
+            let filter = ai_memory_store::PageFilter::default();
+            crate::recall::search_scopes(state, &scopes, &term, limit, false, owner, filter)
+                .await
+                .map(|result| result.hits.into_iter().map(|(hit, _)| hit).collect())
+        }
+    }
+    .map_err(internal_error)?;
+
+    // `owner` reaches the hybrid ranker, which attaches an observation excerpt
+    // only from a session that filter admits, so both the order and each hit's
+    // snippet depend on the caller's identity. `private` alone would let a
+    // browser cache replay one actor's hits at the same URL after the
+    // credentials switch, so the filtering path must run on every request.
+    Ok(with_no_store(
+        Json(enrich_hits(state, hits).await?).into_response(),
+    ))
+}
+
+async fn scoped_search_mode(
+    state: &WebState,
+    request: &SearchRequest,
+    viewer: Option<ai_memory_core::UserId>,
+) -> Result<SearchMode, Response> {
+    if !request.scopes.is_empty() {
+        if request.scopes.len() > MAX_SEARCH_SCOPES {
+            return Err(json_error(
+                StatusCode::BAD_REQUEST,
+                format!("at most {MAX_SEARCH_SCOPES} scopes are allowed"),
+            ));
+        }
+        let scopes = resolve_scopes(state, &request.scopes, viewer).await?;
+        return Ok(SearchMode::Scoped(scopes));
+    }
+
+    match (
+        trimmed_opt(request.workspace.as_deref()),
+        trimmed_opt(request.project.as_deref()),
+    ) {
+        (Some(workspace), Some(project)) => {
+            let (workspace_id, project_id) =
+                lookup_project(state, workspace, project, viewer).await?;
+            Ok(SearchMode::Scoped(vec![ResolvedSearchScope {
+                project_id,
+                workspace_id,
+            }]))
+        }
+        (Some(_), None) | (None, Some(_)) => Err(json_error(
+            StatusCode::BAD_REQUEST,
+            "workspace and project must be provided together",
+        )),
+        _ => Ok(SearchMode::Global),
+    }
+}
+
+async fn resolve_scopes(
+    state: &WebState,
+    scopes: &[ApiSearchScope],
+    viewer: Option<ai_memory_core::UserId>,
+) -> Result<Vec<ResolvedSearchScope>, Response> {
+    let names: Vec<_> = scopes
+        .iter()
+        .map(|scope| ScopeName::new(&scope.workspace, &scope.project))
+        .collect();
+    resolve_many_existing_scopes_guarded(
+        &state.reader,
+        &names,
+        MAX_SEARCH_SCOPES,
+        viewer,
+        ai_memory_store::ProjectAccess::Read,
+    )
+    .await
+    .map(|scopes| {
+        scopes
+            .into_iter()
+            .map(|scope| ResolvedSearchScope {
+                workspace_id: scope.workspace_id,
+                project_id: scope.project_id,
+            })
+            .collect()
+    })
+    .map_err(scope_error_response)
+}
+
+#[derive(Deserialize)]
+struct RecentQuery {
+    #[serde(default = "default_limit")]
+    limit: usize,
+    updated_since: Option<String>,
+    cursor: Option<String>,
+}
+
+// Versioned URL-safe base64 JSON is opaque to callers and bounded before decoding.
+// Scope ids are checked after normal authorization, never used to resolve scope.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RecentCursor {
+    v: u8,
+    workspace: WorkspaceId,
+    project: ProjectId,
+    since: String,
+    updated_at: String,
+    path: String,
+}
+
+fn recent_instant(value: &str) -> ApiParseResult<jiff::Timestamp> {
+    let bytes = value.as_bytes();
+    let invalid = || ApiFailure::bad_request("invalid RFC3339 timestamp");
+    if bytes.len() < 20
+        || bytes.len() > 64
+        || !value.is_ascii()
+        || bytes[4] != b'-'
+        || bytes[7] != b'-'
+        || !matches!(bytes[10], b'T' | b't')
+        || bytes[13] != b':'
+        || bytes[16] != b':'
+        || ![0..4, 5..7, 8..10, 11..13, 14..16, 17..19]
+            .into_iter()
+            .all(|range| bytes[range].iter().all(u8::is_ascii_digit))
+    {
+        return Err(invalid());
+    }
+    let mut rest = &value[19..];
+    if let Some(fraction) = rest.strip_prefix('.') {
+        let digits = fraction.bytes().take_while(u8::is_ascii_digit).count();
+        if digits == 0 || digits > 9 {
+            return Err(invalid());
+        }
+        rest = &fraction[digits..];
+    }
+    if rest != "Z" && rest != "z" {
+        let zone = rest.as_bytes();
+        if zone.len() != 6
+            || !matches!(zone[0], b'+' | b'-')
+            || zone[3] != b':'
+            || !zone[1..3].iter().chain(&zone[4..6]).all(u8::is_ascii_digit)
+        {
+            return Err(invalid());
+        }
+    }
+    value.parse::<jiff::Timestamp>().map_err(|_| invalid())
+}
+
+fn encode_recent_cursor(cursor: &RecentCursor) -> ApiParseResult<String> {
+    let bytes = serde_json::to_vec(cursor).map_err(|_| ApiFailure {
+        message: "internal server error".into(),
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+    })?;
+    let raw = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes);
+    decode_recent_cursor(&raw)?;
+    Ok(raw)
+}
+
+fn decode_recent_cursor(raw: &str) -> ApiParseResult<RecentCursor> {
+    if raw.len() > 8192 || raw.is_empty() {
+        return Err(ApiFailure::bad_request("invalid recent cursor"));
+    }
+    let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(raw)
+        .map_err(|_| ApiFailure::bad_request("invalid recent cursor"))?;
+    if bytes.len() > 6144 {
+        return Err(ApiFailure::bad_request("invalid recent cursor"));
+    }
+    let cursor: RecentCursor = serde_json::from_slice(&bytes)
+        .map_err(|_| ApiFailure::bad_request("invalid recent cursor"))?;
+    if cursor.v != 1 || cursor.path.len() > 2048 || PagePath::new(&cursor.path).is_err() {
+        return Err(ApiFailure::bad_request("invalid recent cursor"));
+    }
+    Ok(cursor)
+}
+
+async fn recent_handler(
+    State(state): State<Arc<WebState>>,
+    viewer: Option<axum::Extension<ai_memory_core::AuthorizedViewer>>,
+    Path((workspace, project)): Path<(String, String)>,
+    Query(query): Query<RecentQuery>,
+) -> Result<Response, Response> {
+    let (workspace_id, project_id) =
+        lookup_project(&state, &workspace, &project, viewer_of(viewer)).await?;
+    let limit = query.limit.clamp(1, 100);
+    if query.updated_since.is_none() && query.cursor.is_none() {
+        let mut pages = state
+            .reader
+            .list_unexpired_pages(&workspace, &project)
+            .await
+            .map_err(internal_error)?;
+        pages.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+        pages.truncate(limit);
+        return Ok(with_cache(Json(pages).into_response(), LIST_CACHE_MAX_AGE));
+    }
+    let cursor = query
+        .cursor
+        .as_deref()
+        .map(decode_recent_cursor)
+        .transpose()
+        .map_err(ApiFailure::into_response)?;
+    let (since, after) = if let Some(cursor) = cursor {
+        if cursor.workspace != workspace_id || cursor.project != project_id {
+            return Err(
+                ApiFailure::bad_request("recent cursor does not match scope").into_response(),
+            );
+        }
+        let since = recent_instant(&cursor.since).map_err(ApiFailure::into_response)?;
+        let after = recent_instant(&cursor.updated_at).map_err(ApiFailure::into_response)?;
+        if after <= since
+            || query
+                .updated_since
+                .as_deref()
+                .map(recent_instant)
+                .transpose()
+                .map_err(ApiFailure::into_response)?
+                .is_some_and(|bound| bound != since)
+        {
+            return Err(ApiFailure::bad_request("conflicting recent cursor bounds").into_response());
+        }
+        (since, Some((after.as_microsecond(), cursor.path)))
+    } else {
+        (
+            recent_instant(query.updated_since.as_deref().unwrap_or_default())
+                .map_err(ApiFailure::into_response)?,
+            None,
+        )
+    };
+    // SQL timestamps have microsecond precision. Flooring a submicrosecond
+    // cutoff retains exactly the rows strictly later than the supplied instant.
+    let mut pages = state
+        .reader
+        .incremental_pages(
+            workspace_id,
+            project_id,
+            i64::try_from(since.as_nanosecond().div_euclid(1000)).map_err(internal_error)?,
+            after,
+            limit,
+        )
+        .await
+        .map_err(internal_error)?;
+    let has_more = pages.len() > limit;
+    pages.truncate(limit);
+    let next_cursor = if has_more {
+        pages
+            .last()
+            .map(|page| {
+                encode_recent_cursor(&RecentCursor {
+                    v: 1,
+                    workspace: workspace_id,
+                    project: project_id,
+                    since: since.to_string(),
+                    updated_at: page.updated_at.clone(),
+                    path: page.path.clone(),
+                })
+            })
+            .transpose()
+            .map_err(ApiFailure::into_response)?
+    } else {
+        None
+    };
+    Ok(with_no_store(
+        Json(serde_json::json!({ "pages": pages, "next_cursor": next_cursor })).into_response(),
+    ))
+}
+
+async fn briefing_handler(
+    State(state): State<Arc<WebState>>,
+    viewer: Option<axum::Extension<ai_memory_core::AuthorizedViewer>>,
+    actor: Option<axum::Extension<ai_memory_core::ActorContext>>,
+    Path((workspace, project)): Path<(String, String)>,
+    Query(query): Query<LimitQuery>,
+) -> Result<Response, Response> {
+    let (workspace_id, project_id) =
+        lookup_project(&state, &workspace, &project, viewer_of(viewer)).await?;
+    let briefing = state
+        .reader
+        .briefing_for_project(
+            workspace_id,
+            project_id,
+            query.limit.clamp(1, 100),
+            owner_filter_for(actor),
+            false,
+        )
+        .await
+        .map_err(internal_error)?;
+    Ok(with_no_store(Json(briefing).into_response()))
+}
+
+async fn overview_handler(
+    State(state): State<Arc<WebState>>,
+    viewer: Option<axum::Extension<ai_memory_core::AuthorizedViewer>>,
+    actor: Option<axum::Extension<ai_memory_core::ActorContext>>,
+    Path(workspace): Path<String>,
+    Query(query): Query<LimitQuery>,
+) -> Result<Response, Response> {
+    let viewer = viewer_of(viewer);
+    let workspace_id = state
+        .reader
+        .find_workspace(workspace.clone())
+        .await
+        .map_err(internal_error)?
+        .ok_or_else(|| not_found(format!("workspace '{workspace}' not found")))?;
+
+    // Every aggregate below is narrowed to the repositories the viewer may
+    // read (#708). A workspace holding none of them is refused rather than
+    // answered with an overview of zeros: an empty result would read as
+    // "nothing is happening here", which is the one thing authorization must
+    // never look like. The name was typed by the caller, so saying it exists
+    // tells them nothing the project routes would not.
+    if viewer.is_some()
+        && state
+            .reader
+            .list_projects_with_stats_for_workspace(workspace.clone(), viewer)
+            .await
+            .map_err(internal_error)?
+            .is_empty()
+    {
+        return Err(scope_error_response(ScopeResolutionError::Forbidden(
+            format!(
+                "not authorized for {workspace}: no project in it is readable by this user. \
+                 This is an access problem, not an empty workspace."
+            ),
+        )));
+    }
+
+    // Scoped to the requesting actor, like the briefing below and like
+    // `project_overview_handler`: an identified caller sees their own baton plus
+    // the shared ones, a browser the server cannot attribute sees only the
+    // shared ones — so an owned handoff, and the raw prompt text inside it, is
+    // never rendered to someone it does not belong to. Pinning this to
+    // "unattributed" instead would make the card permanently empty on any server
+    // that stamps an owner, while `pending_handoff_count` in the briefing beside
+    // it — which does apply the actor's filter — kept counting the same row.
+    let owner_filter = owner_filter_for(actor);
+    let handoff = match state
+        .reader
+        .latest_open_handoff_for_workspace(workspace_id, owner_filter.clone(), viewer)
+        .await
+        .map_err(internal_error)?
+    {
+        Some(h) => {
+            let project = state
+                .reader
+                .project_name_by_id(workspace_id, h.scope.project_id)
+                .await
+                .map_err(internal_error)?
+                .unwrap_or_default();
+            Some(ApiHandoff {
+                agent: h.origin.from_agent.as_str().to_owned(),
+                at: h.lifecycle.created_at.to_string(),
+                project,
+                summary: h.content.summary,
+                open_questions: h.content.open_questions,
+                next_steps: h.content.next_steps,
+            })
+        }
+        None => None,
+    };
+
+    let briefing = state
+        .reader
+        .briefing_for_workspace(
+            workspace_id,
+            query.limit.clamp(1, 100),
+            owner_filter,
+            viewer,
+        )
+        .await
+        .map_err(internal_error)?;
+
+    let (stale, duplicates, orphans) = state
+        .reader
+        .memory_health_for_workspace(workspace_id, viewer)
+        .await
+        .map_err(internal_error)?;
+    let detail = state
+        .reader
+        .health_detail_for_workspace(workspace_id, query.limit.clamp(1, 100), viewer)
+        .await
+        .map_err(internal_error)?;
+    let health = ApiHealth {
+        stale,
+        duplicates,
+        contradictions: 0,
+        orphans,
+        audited_at: None,
+        stale_pages: detail.stale,
+        duplicate_pages: detail.duplicates,
+        orphan_pages: detail.orphans,
+    };
+
+    Ok(with_no_store(
+        Json(ApiOverview {
+            handoff,
+            briefing,
+            health,
+        })
+        .into_response(),
+    ))
+}
+
+/// Build the owner filter for a read-only API request.
+///
+/// A caller the server can name sees their own rows plus the shared ones; a
+/// caller it cannot sees only shared ones, so an owned handoff — and the
+/// prompt-derived text inside it — never reaches someone it does not belong to.
+///
+/// "Can name" is [`ai_memory_core::ActorContext::identity_key`], not
+/// `actor.user`: an ingress that forwards a complete OIDC issuer/subject pair
+/// may leave `user` empty, and reading `user` here would file that operator as
+/// unattributed while the auth layer calls them a user — hiding their own
+/// handoffs, and the bodies of the shared ones, from them in their own UI.
+pub(crate) fn owner_filter_for(
+    actor: Option<axum::Extension<ai_memory_core::ActorContext>>,
+) -> ai_memory_core::OwnerFilter {
+    ai_memory_core::OwnerFilter::for_actor_context(
+        &actor.map_or_else(ai_memory_core::ActorContext::anonymous, |ext| ext.0),
+    )
+}
+
+/// May this request read the prompt-derived body of a handoff?
+///
+/// Three ways to qualify: an authenticated caller resolved to an identity and
+/// is reading rows that are their own or shared; the caller holds root, which is
+/// the operator —
+/// they already read every page body through the wiki API, so redacting their
+/// own handoffs from their own UI costs them and protects nobody; or the server
+/// does not authenticate at all and the whole wiki is open by design.
+/// `require_bearer` stamps [`ai_memory_core::AuthLevel::Anonymous`] on every
+/// request of a server with no configured token; the extension is missing only
+/// when the API is mounted with no auth layer whatsoever, which is the same open
+/// posture. What is left — an auth-configured server, a caller it can neither
+/// name nor recognise as root — is the only case that redacts. See
+/// [`handoffs_handler`] for why the body is treated differently from the
+/// metadata beside it.
+///
+/// [`ai_memory_core::OwnerFilter::Any`] is the cross-owner recovery filter, so
+/// it is root-only here. The `all_owners` query switch produces it only after
+/// checking the request's resolved [`ai_memory_core::AuthLevel`]. Keeping the
+/// body check local as well prevents a future caller from constructing `Any`
+/// without the matching authorization gate.
+///
+/// # What actually reaches the `Unattributed` arm
+///
+/// Two live cases, both served, and one that redacts and has no producer today.
+/// `Unattributed` + [`ai_memory_core::AuthLevel::Anonymous`] is rung 0 — no
+/// `[auth].bearer_token`, the default — which stamps
+/// [`ai_memory_core::ActorContext::anonymous`] on **every** request; and
+/// `Unattributed` + [`ai_memory_core::AuthLevel::Root`] is an authenticating
+/// server with no `[auth].root_username`, where the root template names nobody.
+/// Both are open postures and the arm serves them.
+///
+/// What has no producer is `Unattributed` at a NAMED tier: the DB-user rung
+/// fills `user` from the row, and the proxy downgrade only reaches
+/// [`ai_memory_core::AuthLevel::User`] when it asserted a username or a
+/// complete issuer/subject pair. Both are resolved by
+/// [`ai_memory_core::ActorContext::identity_key`], so the filter is `User(_)`
+/// and the body is served by the arm above. That gap is the fail-safe: a future
+/// rung, or a mount that injects a tier without an actor, redacts by default
+/// instead of leaking. Weakening the arm because "nothing produces it" removes
+/// the fail-safe, not dead code.
+fn serves_handoff_body(
+    owner_filter: &ai_memory_core::OwnerFilter,
+    auth: Option<axum::Extension<ai_memory_core::AuthLevel>>,
+) -> bool {
+    let level = auth.map(|axum::Extension(level)| level);
+    let root = level == Some(ai_memory_core::AuthLevel::Root);
+    match owner_filter {
+        ai_memory_core::OwnerFilter::User(_) => {
+            matches!(
+                level,
+                Some(ai_memory_core::AuthLevel::User | ai_memory_core::AuthLevel::Root)
+            )
+        }
+        ai_memory_core::OwnerFilter::Any => root,
+        ai_memory_core::OwnerFilter::Unattributed => {
+            root || matches!(level, None | Some(ai_memory_core::AuthLevel::Anonymous))
+        }
+    }
+}
+
+/// One handoff in the listing. Richer than [`ApiHandoff`] (the single "pending"
+/// card): it carries the state and ownership needed to answer "where did my
+/// baton go".
+#[derive(Serialize)]
+struct ApiHandoffEntry {
+    id: String,
+    agent: String,
+    at: String,
+    state: String,
+    /// Prompt-derived text, withheld from a caller the server can neither name
+    /// nor recognise as root — see [`handoffs_handler`]. Absent together with
+    /// `open_questions` and `next_steps` whenever `redacted` is true.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    open_questions: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    next_steps: Option<Vec<String>>,
+    /// True when the three fields above were withheld, so a frontend can say
+    /// "sign in to read this" instead of rendering a blank card.
+    redacted: bool,
+    files_touched: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cwd: Option<String>,
+    /// Operator the handoff belongs to (qualified `oidc:`/`user:` storage key);
+    /// absent when shared with the project.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    owner: Option<String>,
+    /// Operator that consumed it, when it has been accepted.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    accepted_by: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    accepted_at: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct HandoffListQuery {
+    /// `open` | `accepted` | `expired`. Omit for every state — which is how an
+    /// operator finds a baton that was already consumed.
+    #[serde(default)]
+    state: Option<String>,
+    #[serde(default = "default_handoff_limit")]
+    limit: usize,
+    /// Root-only recovery view across every operator. Omitted/false keeps the
+    /// normal own-plus-shared ownership boundary.
+    #[serde(default)]
+    all_owners: bool,
+}
+
+const fn default_handoff_limit() -> usize {
+    50
+}
+
+/// List a project's handoffs.
+///
+/// Before this there was no way to enumerate handoffs anywhere in the system:
+/// readers only ever fetched the single pending one and consumed it, so a baton
+/// that went to the wrong place simply vanished. Scoped by owner, so this does
+/// not become a way to read other operators' context.
+///
+/// # The prompt-derived body needs a caller the server can vouch for
+///
+/// The metadata — state, timestamps, agent, cwd, touched files, ownership — is
+/// what makes the listing useful and is served to anyone who may call it.
+/// `summary`, `open_questions` and `next_steps` are not metadata: an automatic
+/// SessionEnd handoff synthesises them verbatim from the operator's prompts, and
+/// the listing returns the project's whole history rather than the single newest
+/// open row the overview card shows. A caller with no identity matches every
+/// *shared* handoff — which is all of them on a server that stamps no owner — so
+/// serving those three fields to one would hand the entire prompt trail to
+/// whoever can reach the endpoint.
+///
+/// [`serves_handoff_body`] therefore withholds them from exactly one caller: an
+/// auth-configured server's request that resolved to neither an identity nor
+/// root. Root is the operator — `[auth].root_username` is optional, so the
+/// ordinary single-operator deployment authenticates as root while stamping no
+/// owner on anything, and redacting there would blank out the operator's own
+/// handoffs in their own UI while the overview card beside it, which never
+/// gated the same three fields, kept rendering them.
+///
+/// A server with no auth configured is the other open case: it already serves
+/// every page body unauthenticated, so withholding here would narrow nothing
+/// while making the listing useless. The rule is about not widening what a
+/// server that *does* authenticate shows to a caller it cannot place.
+async fn handoffs_handler(
+    State(state): State<Arc<WebState>>,
+    viewer: Option<axum::Extension<ai_memory_core::AuthorizedViewer>>,
+    actor: Option<axum::Extension<ai_memory_core::ActorContext>>,
+    auth: Option<axum::Extension<ai_memory_core::AuthLevel>>,
+    Path((workspace, project)): Path<(String, String)>,
+    Query(query): Query<HandoffListQuery>,
+) -> Result<Response, Response> {
+    let (workspace_id, project_id) =
+        lookup_project(&state, &workspace, &project, viewer_of(viewer)).await?;
+    let handoff_state = match query.state.as_deref().map(str::trim) {
+        None | Some("") => None,
+        Some(raw) => Some(raw.parse::<ai_memory_core::HandoffState>().map_err(|_| {
+            json_error(
+                StatusCode::BAD_REQUEST,
+                format!("unknown handoff state: {raw}"),
+            )
+        })?),
+    };
+    let level = auth.as_ref().map(|axum::Extension(level)| *level);
+    let owner_filter = if query.all_owners {
+        if level != Some(ai_memory_core::AuthLevel::Root) {
+            return Err(json_error(
+                StatusCode::FORBIDDEN,
+                "all_owners requires root authorization",
+            ));
+        }
+        ai_memory_core::OwnerFilter::Any
+    } else {
+        owner_filter_for(actor)
+    };
+    let with_body = serves_handoff_body(&owner_filter, auth);
+    let handoffs = state
+        .reader
+        .list_handoffs(
+            workspace_id,
+            project_id,
+            handoff_state,
+            owner_filter,
+            query.limit.clamp(1, 200),
+        )
+        .await
+        .map_err(internal_error)?;
+    let entries: Vec<ApiHandoffEntry> = handoffs
+        .into_iter()
+        .map(|h| ApiHandoffEntry {
+            id: h.scope.id.to_string(),
+            agent: h.origin.from_agent.as_str().to_owned(),
+            at: h.lifecycle.created_at.to_string(),
+            state: h.lifecycle.state.as_str().to_owned(),
+            summary: with_body.then_some(h.content.summary),
+            open_questions: with_body.then_some(h.content.open_questions),
+            next_steps: with_body.then_some(h.content.next_steps),
+            redacted: !with_body,
+            files_touched: h.content.files_touched,
+            cwd: h.origin.cwd,
+            owner: h.origin.owner_user,
+            accepted_by: h.lifecycle.accepted_by_user,
+            accepted_at: h.lifecycle.accepted_at.map(|t| t.to_string()),
+        })
+        .collect();
+    Ok(with_no_store(
+        Json(serde_json::json!({ "handoffs": entries })).into_response(),
+    ))
+}
+
+async fn project_overview_handler(
+    State(state): State<Arc<WebState>>,
+    viewer: Option<axum::Extension<ai_memory_core::AuthorizedViewer>>,
+    actor: Option<axum::Extension<ai_memory_core::ActorContext>>,
+    Path((workspace, project)): Path<(String, String)>,
+    Query(query): Query<LimitQuery>,
+) -> Result<Response, Response> {
+    let (workspace_id, project_id) =
+        lookup_project(&state, &workspace, &project, viewer_of(viewer)).await?;
+    let limit = query.limit.clamp(1, 100);
+
+    // Same scoping as `overview_handler`; computed once and reused for the
+    // briefing below so both halves of the response agree on visibility.
+    let owner_filter = owner_filter_for(actor);
+    let handoff = state
+        .reader
+        .latest_open_handoff(workspace_id, project_id, None, owner_filter.clone())
+        .await
+        .map_err(internal_error)?
+        .map(|h| ApiHandoff {
+            agent: h.origin.from_agent.as_str().to_owned(),
+            at: h.lifecycle.created_at.to_string(),
+            project: project.clone(),
+            summary: h.content.summary,
+            open_questions: h.content.open_questions,
+            next_steps: h.content.next_steps,
+        });
+
+    let briefing = state
+        .reader
+        .briefing_for_project(workspace_id, project_id, limit, owner_filter, false)
+        .await
+        .map_err(internal_error)?;
+
+    let (stale, duplicates, orphans) = state
+        .reader
+        .memory_health_for_project(workspace_id, project_id)
+        .await
+        .map_err(internal_error)?;
+    let detail = state
+        .reader
+        .health_detail_for_project(workspace_id, project_id, limit)
+        .await
+        .map_err(internal_error)?;
+    let health = ApiHealth {
+        stale,
+        duplicates,
+        contradictions: 0,
+        orphans,
+        audited_at: None,
+        stale_pages: detail.stale,
+        duplicate_pages: detail.duplicates,
+        orphan_pages: detail.orphans,
+    };
+
+    Ok(with_no_store(
+        Json(ApiOverview {
+            handoff,
+            briefing,
+            health,
+        })
+        .into_response(),
+    ))
+}
+
+/// Bounds for the session routes. They mirror the MCP
+/// `memory_read_session_observations` tool so a frontend and an agent see
+/// the same page sizes and body caps.
+const SESSION_LIST_MAX_LIMIT: usize = 100;
+pub(crate) const SESSION_OBSERVATIONS_MAX_LIMIT: usize = 200;
+pub(crate) const SESSION_OBSERVATIONS_DEFAULT_BODY_CHARS: usize = 4_000;
+const SESSION_OBSERVATIONS_MIN_BODY_CHARS: usize = 200;
+const SESSION_OBSERVATIONS_MAX_BODY_CHARS: usize = 16_384;
+
+async fn sessions_handler(
+    State(state): State<Arc<WebState>>,
+    viewer: Option<axum::Extension<ai_memory_core::AuthorizedViewer>>,
+    actor: Option<axum::Extension<ai_memory_core::ActorContext>>,
+    Path((workspace, project)): Path<(String, String)>,
+    Query(query): Query<SessionListQuery>,
+) -> Result<Response, Response> {
+    let (workspace_id, project_id) =
+        lookup_project(&state, &workspace, &project, viewer_of(viewer)).await?;
+    let sessions = state
+        .reader
+        .sessions_for_scope(
+            workspace_id,
+            project_id,
+            owner_filter_for(actor),
+            query.include_open,
+            query.limit.clamp(1, SESSION_LIST_MAX_LIMIT),
+            query.offset,
+        )
+        .await
+        .map_err(internal_error)?;
+    Ok(with_no_store(
+        Json(ApiSessionList { sessions }).into_response(),
+    ))
+}
+
+async fn session_observations_handler(
+    State(state): State<Arc<WebState>>,
+    viewer: Option<axum::Extension<ai_memory_core::AuthorizedViewer>>,
+    actor: Option<axum::Extension<ai_memory_core::ActorContext>>,
+    Path((workspace, project, session_id)): Path<(String, String, String)>,
+    Query(query): Query<SessionObservationsQuery>,
+) -> Result<Response, Response> {
+    let (workspace_id, project_id) =
+        lookup_project(&state, &workspace, &project, viewer_of(viewer)).await?;
+    let session_id = session_id.parse::<SessionId>().map_err(|_| {
+        json_error(
+            StatusCode::BAD_REQUEST,
+            format!("invalid session id: {session_id}"),
+        )
+    })?;
+    let limit = query.limit.clamp(1, SESSION_OBSERVATIONS_MAX_LIMIT);
+    let body_max_chars = query
+        .body_max_chars
+        .unwrap_or(SESSION_OBSERVATIONS_DEFAULT_BODY_CHARS)
+        .clamp(
+            SESSION_OBSERVATIONS_MIN_BODY_CHARS,
+            SESSION_OBSERVATIONS_MAX_BODY_CHARS,
+        );
+    let order = match query.order.as_deref().map(str::trim) {
+        None | Some("") => ObservationOrder::Asc,
+        Some(raw) if raw.eq_ignore_ascii_case("asc") => ObservationOrder::Asc,
+        Some(raw) if raw.eq_ignore_ascii_case("desc") => ObservationOrder::Desc,
+        Some(raw) => {
+            return Err(json_error(
+                StatusCode::BAD_REQUEST,
+                format!("unknown order: {raw} (expected asc or desc)"),
+            ));
+        }
+    };
+    let mut kinds = Vec::new();
+    for kind in query
+        .kinds
+        .as_deref()
+        .unwrap_or_default()
+        .split(',')
+        .map(str::trim)
+        .filter(|kind| !kind.is_empty())
+    {
+        let Ok(parsed) = kind.parse::<ObservationKind>() else {
+            return Err(json_error(
+                StatusCode::BAD_REQUEST,
+                format!("unknown observation kind: {kind}"),
+            ));
+        };
+        kinds.push(parsed);
+    }
+    let kinds = (!kinds.is_empty()).then_some(kinds);
+
+    // Same visibility predicate as the MCP tool: the session must have its
+    // row or at least one observation in this scope and pass the owner
+    // filter, otherwise the id reads as not found so a known uuid cannot
+    // probe another project or operator.
+    let session = state
+        .reader
+        .session_summary_scoped(
+            workspace_id,
+            project_id,
+            session_id,
+            owner_filter_for(actor),
+        )
+        .await
+        .map_err(internal_error)?
+        .ok_or_else(|| not_found(format!("session '{session_id}' not found")))?;
+    let page = state
+        .reader
+        .session_observations_scoped(
+            workspace_id,
+            project_id,
+            session_id,
+            ObservationPage {
+                limit,
+                offset: query.offset,
+                order,
+                kinds,
+                query: query.q.clone(),
+            },
+        )
+        .await
+        .map_err(internal_error)?;
+    let observations = page
+        .records
+        .into_iter()
+        .map(|mut record| {
+            record.body = cap_body(&record.body, body_max_chars);
+            record
+        })
+        .collect();
+    Ok(with_no_store(
+        Json(ApiSessionObservations {
+            session,
+            observations,
+            total: page.total,
+            offset: query.offset,
+            limit,
+            order,
+            elided_other_scope: page.elided_other_scope,
+            body_max_chars,
+        })
+        .into_response(),
+    ))
+}
+
+/// Cap one observation body with a visible marker. Same shape as
+/// `ai_memory_consolidate::projection::cap_text_with_marker`, which the MCP
+/// tool uses; duplicated here because the web crate does not depend on the
+/// consolidation pipeline.
+pub(crate) fn cap_body(body: &str, max_chars: usize) -> String {
+    let total = body.chars().count();
+    if total <= max_chars {
+        return body.to_owned();
+    }
+    let mut out: String = body.chars().take(max_chars).collect();
+    out.push_str(&format!(
+        "\n[body truncated; {} chars omitted]",
+        total - max_chars
+    ));
+    out
+}
+
+/// The user whose grants apply to this request, if any do.
+///
+/// [`ai_memory_core::AuthorizedViewer`] is stamped only when an operator has
+/// switched per-repository authorization on, and never for root. `None`
+/// therefore covers every posture that authorizes identically — no auth, auth
+/// without authorization, and the operator — which is what keeps existing
+/// installs behaving exactly as they did before the guard existed.
+fn viewer_of(
+    viewer: Option<axum::Extension<ai_memory_core::AuthorizedViewer>>,
+) -> Option<ai_memory_core::UserId> {
+    viewer.map(|axum::Extension(viewer)| viewer.user())
+}
+
+/// Resolve a workspace/project pair the viewer is allowed to read.
+///
+/// Every `/api/v1` route is a GET, so the whole surface needs exactly
+/// [`ai_memory_store::ProjectAccess::Read`] and no caller has to choose a level.
+async fn lookup_project(
+    state: &WebState,
+    workspace: &str,
+    project: &str,
+    viewer: Option<ai_memory_core::UserId>,
+) -> Result<(WorkspaceId, ProjectId), Response> {
+    lookup_existing_scope_guarded(
+        &state.reader,
+        workspace,
+        project,
+        viewer,
+        ai_memory_store::ProjectAccess::Read,
+    )
+    .await
+    .map(ai_memory_store::ResolvedScope::as_tuple)
+    .map_err(|err| match err {
+        ScopeResolutionError::ProjectNotFoundInWorkspace { project, .. } => {
+            not_found(format!("project '{project}' not found"))
+        }
+        other => scope_error_response(other),
+    })
+}
+
+async fn enrich_hits(state: &WebState, hits: Vec<PageHit>) -> Result<Vec<ApiSearchHit>, Response> {
+    let mut out = Vec::with_capacity(hits.len());
+    for hit in hits {
+        if let Some(meta) = state
+            .reader
+            .page_meta_by_id(hit.id)
+            .await
+            .map_err(internal_error)?
+        {
+            out.push(ApiSearchHit {
+                kind: meta.kind,
+                path: meta.path,
+                project: meta.project_name,
+                rank: hit.rank,
+                snippet: ai_memory_store::highlighted_snippet_html(&hit.snippet),
+                title: hit.title,
+                workspace: meta.workspace_name,
+            });
+        }
+    }
+    Ok(out)
+}
+
+fn internal_error(e: impl std::fmt::Display) -> Response {
+    tracing::error!(error = %e, "web API internal error");
+    json_error(StatusCode::INTERNAL_SERVER_ERROR, "internal server error")
+}
+
+fn not_found(message: impl Into<String>) -> Response {
+    json_error(StatusCode::NOT_FOUND, message)
+}
+
+fn scope_error_response(err: ScopeResolutionError) -> Response {
+    if err.is_bad_request() {
+        json_error(StatusCode::BAD_REQUEST, err.to_string())
+    } else if err.is_forbidden() {
+        json_error(StatusCode::FORBIDDEN, err.to_string())
+    } else if err.is_not_found() {
+        json_error(StatusCode::NOT_FOUND, err.to_string())
+    } else {
+        internal_error(err)
+    }
+}
+
+fn json_error(status: StatusCode, message: impl Into<String>) -> Response {
+    (
+        status,
+        Json(ErrorResponse {
+            error: message.into(),
+        }),
+    )
+        .into_response()
+}
+
+fn default_limit() -> usize {
+    10
+}
+
+const MAX_SEARCH_SCOPES: usize = 25;
+
+#[derive(Debug, Deserialize)]
+struct ProjectListQuery {
+    #[serde(default)]
+    workspace: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GraphQuery {
+    #[serde(default)]
+    workspace: Option<String>,
+    #[serde(default)]
+    project: Option<String>,
+}
+
+#[derive(Debug)]
+struct SearchQuery {
+    q: String,
+    workspace: Option<String>,
+    project: Option<String>,
+    scope: Vec<String>,
+    limit: usize,
+}
+
+impl SearchQuery {
+    fn from_raw(raw_query: Option<&str>) -> ApiParseResult<Self> {
+        let mut query = Self {
+            limit: default_limit(),
+            project: None,
+            q: String::new(),
+            scope: Vec::new(),
+            workspace: None,
+        };
+        let Some(raw_query) = raw_query else {
+            return Ok(query);
+        };
+        for pair in raw_query.split('&').filter(|pair| !pair.is_empty()) {
+            let (raw_key, raw_value) = pair.split_once('=').unwrap_or((pair, ""));
+            let key = decode_query_component(raw_key)?;
+            let value = decode_query_component(raw_value)?;
+            match key.as_str() {
+                "limit" => {
+                    query.limit = value
+                        .parse::<usize>()
+                        .map_err(|_| ApiFailure::bad_request("limit must be an integer"))?;
+                }
+                "project" => query.project = Some(value),
+                "q" | "query" => query.q = value,
+                "scope" => query.scope.push(value),
+                "workspace" => query.workspace = Some(value),
+                _ => {}
+            }
+        }
+        Ok(query)
+    }
+
+    fn try_into_request(self) -> ApiParseResult<SearchRequest> {
+        let scopes = self
+            .scope
+            .iter()
+            .flat_map(|raw| raw.split(','))
+            .map(str::trim)
+            .filter(|scope| !scope.is_empty())
+            .map(parse_scope_param)
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(SearchRequest {
+            limit: Some(self.limit),
+            project: self.project,
+            q: self.q,
+            scopes,
+            workspace: self.workspace,
+        })
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct SearchRequest {
+    #[serde(default, alias = "query")]
+    q: String,
+    #[serde(default)]
+    workspace: Option<String>,
+    #[serde(default)]
+    project: Option<String>,
+    #[serde(default)]
+    scopes: Vec<ApiSearchScope>,
+    #[serde(default)]
+    limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ApiSearchScope {
+    workspace: String,
+    project: String,
+}
+
+#[derive(Debug)]
+struct ResolvedSearchScope {
+    workspace_id: WorkspaceId,
+    project_id: ProjectId,
+}
+
+#[derive(Debug)]
+enum SearchMode {
+    Global,
+    Scoped(Vec<ResolvedSearchScope>),
+}
+
+#[derive(Debug, Deserialize)]
+struct LimitQuery {
+    #[serde(default = "default_limit")]
+    limit: usize,
+}
+
+fn default_session_list_limit() -> usize {
+    20
+}
+
+fn default_session_observations_limit() -> usize {
+    50
+}
+
+#[derive(Debug, Deserialize)]
+struct SessionListQuery {
+    #[serde(default = "default_session_list_limit")]
+    limit: usize,
+    #[serde(default)]
+    offset: usize,
+    /// Also list sessions that have not ended yet. Default false.
+    #[serde(default)]
+    include_open: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct SessionObservationsQuery {
+    #[serde(default = "default_session_observations_limit")]
+    limit: usize,
+    #[serde(default)]
+    offset: usize,
+    /// `asc` (capture order, default) or `desc`.
+    #[serde(default)]
+    order: Option<String>,
+    /// Comma-separated observation kinds, e.g. `user-prompt,stop`.
+    #[serde(default)]
+    kinds: Option<String>,
+    /// Full-text query restricted to the session.
+    #[serde(default)]
+    q: Option<String>,
+    /// Per-body character cap; clamped to `200..=16384`, default `4000`.
+    #[serde(default)]
+    body_max_chars: Option<usize>,
+}
+
+#[derive(Debug, Serialize)]
+struct ApiHistory {
+    workspace: String,
+    project: String,
+    path: String,
+    total: u64,
+    offset: usize,
+    limit: usize,
+    versions: Vec<ai_memory_store::PageVersion>,
+    diff: ApiHistoryDiff,
+}
+
+#[derive(Debug, Serialize)]
+struct ApiHistoryDiff {
+    /// `None` when `to` replaced nothing at this path.
+    from: Option<ApiHistorySide>,
+    to: ApiHistorySide,
+    /// `same`, `changed` or `too_large`.
+    status: &'static str,
+    /// Why a `too_large` diff was refused.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reason: Option<&'static str>,
+    /// The output line cap cut `hunks` short.
+    truncated: bool,
+    hunks: Vec<crate::diff::Hunk>,
+}
+
+#[derive(Debug, Serialize)]
+struct ApiHistorySide {
+    id: String,
+    title: String,
+    created_at: String,
+}
+
+#[derive(Debug, Serialize)]
+struct ApiSessionList {
+    sessions: Vec<SessionSummary>,
+}
+
+#[derive(Debug, Serialize)]
+struct ApiSessionObservations {
+    session: SessionSummary,
+    observations: Vec<ObservationRecord>,
+    total: u64,
+    offset: usize,
+    limit: usize,
+    order: ObservationOrder,
+    elided_other_scope: u64,
+    body_max_chars: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct ApiPage {
+    /// Id of the latest version, the token a conditional MCP write or delete
+    /// passes back. It changes with every new version, so the ETag does too.
+    id: String,
+    workspace: String,
+    project: String,
+    path: String,
+    title: String,
+    kind: String,
+    tier: String,
+    pinned: bool,
+    created_at: String,
+    updated_at: String,
+    supersedes: Option<String>,
+    frontmatter: serde_json::Value,
+    body_markdown: String,
+    /// Latest pages this page references (resolved outgoing links).
+    links: Vec<RelatedPage>,
+    /// Latest pages that reference this page (incoming back-links).
+    backlinks: Vec<RelatedPage>,
+    /// Multi-user attribution (P1.7). `None` for pre-multi-user pages
+    /// and root / anonymous writes; `Some` when JOIN against the
+    /// `users` table resolved a row at read time. Omitted from the
+    /// serialised payload when `None` so the response shape stays
+    /// backward-compatible with consumers that pre-date v0.8.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    author: Option<ai_memory_store::PageAuthor>,
+}
+
+#[derive(Debug, Serialize)]
+struct ApiSearchHit {
+    workspace: String,
+    project: String,
+    path: String,
+    title: String,
+    kind: String,
+    snippet: String,
+    rank: f64,
+}
+
+#[derive(Debug, Serialize)]
+struct ApiOverview {
+    handoff: Option<ApiHandoff>,
+    briefing: BriefingSnapshot,
+    health: ApiHealth,
+}
+
+#[derive(Debug, Serialize)]
+struct ApiHandoff {
+    agent: String,
+    at: String,
+    project: String,
+    summary: String,
+    open_questions: Vec<String>,
+    next_steps: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct ApiHealth {
+    stale: u64,
+    duplicates: u64,
+    contradictions: u64,
+    orphans: u64,
+    audited_at: Option<String>,
+    /// Capped drill-down lists explaining each counter.
+    stale_pages: Vec<HealthPage>,
+    duplicate_pages: Vec<HealthPage>,
+    orphan_pages: Vec<HealthPage>,
+}
+
+#[derive(Debug, Serialize)]
+struct ErrorResponse {
+    error: String,
+}
+
+type ApiParseResult<T> = Result<T, ApiFailure>;
+
+#[derive(Debug)]
+struct ApiFailure {
+    message: String,
+    status: StatusCode,
+}
+
+impl ApiFailure {
+    fn bad_request(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            status: StatusCode::BAD_REQUEST,
+        }
+    }
+
+    fn into_response(self) -> Response {
+        json_error(self.status, self.message)
+    }
+}
+
+fn parse_scope_param(raw: &str) -> ApiParseResult<ApiSearchScope> {
+    let Some((workspace, project)) = raw.split_once('/') else {
+        return Err(ApiFailure::bad_request(
+            "scope must use the workspace/project format",
+        ));
+    };
+    let workspace = workspace.trim();
+    let project = project.trim();
+    if workspace.is_empty() || project.is_empty() || project.contains('/') {
+        return Err(ApiFailure::bad_request(
+            "scope must use the workspace/project format",
+        ));
+    }
+    Ok(ApiSearchScope {
+        project: project.to_owned(),
+        workspace: workspace.to_owned(),
+    })
+}
+
+fn trimmed_opt(value: Option<&str>) -> Option<&str> {
+    value.map(str::trim).filter(|s| !s.is_empty())
+}
+
+fn decode_query_component(raw: &str) -> ApiParseResult<String> {
+    let mut bytes = Vec::with_capacity(raw.len());
+    let raw_bytes = raw.as_bytes();
+    let mut i = 0;
+    while i < raw_bytes.len() {
+        match raw_bytes[i] {
+            b'+' => {
+                bytes.push(b' ');
+                i += 1;
+            }
+            b'%' => {
+                if i + 2 >= raw_bytes.len() {
+                    return Err(ApiFailure::bad_request("invalid percent-encoding in query"));
+                }
+                let hi = hex_value(raw_bytes[i + 1])
+                    .ok_or_else(|| ApiFailure::bad_request("invalid percent-encoding in query"))?;
+                let lo = hex_value(raw_bytes[i + 2])
+                    .ok_or_else(|| ApiFailure::bad_request("invalid percent-encoding in query"))?;
+                bytes.push((hi << 4) | lo);
+                i += 3;
+            }
+            byte => {
+                bytes.push(byte);
+                i += 1;
+            }
+        }
+    }
+    String::from_utf8(bytes).map_err(|_| ApiFailure::bad_request("query must be valid UTF-8"))
+}
+
+fn hex_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn recent_cursor_validates_rfc3339_and_bounded_payload() {
+        for value in [
+            "2026-09-30T10:00:00Z",
+            "2026-09-30T10:00:00.123456789-03:00",
+            "1969-12-31T23:59:59.999999999Z",
+        ] {
+            assert!(super::recent_instant(value).is_ok(), "{value}");
+        }
+        for value in [
+            "2026-09-30",
+            "2026-09-30 10:00:00Z",
+            "2026-09-30T10:00:00",
+            "2026-09-30T10:00:00Z[UTC]",
+            "2026-09-30T10:00:00+0300",
+            "2026-09-30T10:00:00.1234567890Z",
+        ] {
+            assert!(super::recent_instant(value).is_err(), "{value}");
+        }
+        let cursor = super::RecentCursor {
+            v: 1,
+            workspace: super::WorkspaceId::new(),
+            project: super::ProjectId::new(),
+            since: "2000-01-01T00:00:00Z".into(),
+            updated_at: "2026-09-30T10:00:00Z".into(),
+            path: "page.md".into(),
+        };
+        let raw = super::encode_recent_cursor(&cursor).unwrap();
+        assert_eq!(super::decode_recent_cursor(&raw).unwrap().path, "page.md");
+        let invalid = super::RecentCursor {
+            path: "../page.md".into(),
+            ..cursor
+        };
+        assert!(super::encode_recent_cursor(&invalid).is_err());
+        assert!(super::decode_recent_cursor(&"a".repeat(8194)).is_err());
+        assert!(super::decode_recent_cursor("e30").is_err());
+        for invalid in [format!("{raw}="), "+w".into(), "/w".into()] {
+            assert!(super::decode_recent_cursor(&invalid).is_err());
+        }
+    }
+
+    use super::{internal_error, serves_handoff_body};
+    use ai_memory_core::{AuthLevel, OwnerFilter};
+    use axum::{Extension, body::to_bytes};
+
+    /// The `all_owners` recovery switch routes `Any` into the listing. Reading
+    /// past ownership must cost root — not merely a token the server accepted,
+    /// and not a name the request happens to carry, since the rows returned then
+    /// belong to other operators.
+    #[test]
+    fn cross_owner_filter_serves_body_only_to_root() {
+        for level in [None, Some(AuthLevel::Anonymous), Some(AuthLevel::User)] {
+            assert!(
+                !serves_handoff_body(&OwnerFilter::Any, level.map(Extension)),
+                "cross-owner body served at {level:?}"
+            );
+        }
+        assert!(serves_handoff_body(
+            &OwnerFilter::Any,
+            Some(Extension(AuthLevel::Root))
+        ));
+    }
+
+    #[test]
+    fn named_owner_filter_requires_an_authenticated_tier() {
+        let filter = OwnerFilter::User("user:alice".into());
+        for level in [None, Some(AuthLevel::Anonymous)] {
+            assert!(
+                !serves_handoff_body(&filter, level.map(Extension)),
+                "actor identity without a matching authenticated tier served a body"
+            );
+        }
+        for level in [AuthLevel::User, AuthLevel::Root] {
+            assert!(serves_handoff_body(&filter, Some(Extension(level))));
+        }
+    }
+
+    /// The operator of the ordinary authenticated deployment: root bearer, no
+    /// `[auth].root_username`, so nothing names them and every handoff they
+    /// wrote is shared. Redacting there hides their own data from them.
+    #[test]
+    fn root_reads_the_body_it_wrote_unattributed() {
+        assert!(serves_handoff_body(
+            &OwnerFilter::Unattributed,
+            Some(Extension(AuthLevel::Root))
+        ));
+        assert!(!serves_handoff_body(
+            &OwnerFilter::Unattributed,
+            Some(Extension(AuthLevel::User))
+        ));
+    }
+
+    #[tokio::test]
+    async fn internal_errors_do_not_expose_their_cause() {
+        let sentinel = "web-api-secret /srv/ai-memory/db/memory.sqlite";
+        let response = internal_error(sentinel);
+
+        assert_eq!(
+            response.status(),
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR
+        );
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("error response body should be readable");
+        let body = std::str::from_utf8(&body).expect("error response body should be UTF-8");
+        assert_eq!(body, r#"{"error":"internal server error"}"#);
+        assert!(!body.contains(sentinel));
+        assert!(!body.contains("/srv/ai-memory"));
+    }
+}

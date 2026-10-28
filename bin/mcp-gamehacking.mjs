@@ -127,6 +127,52 @@ Env:
 `);
 }
 
+async function cmdUnpack(skillName) {
+  // Decompress `skills/<name>/source.txt.gz` into `source.txt` next to
+  // it. After release 5.0 the server ships only the `.gz` to keep the
+  // package light; tools that walk the file as a stream decompress on
+  // the fly, but anyone who wants to grep with external utilities can
+  // unpack with this.
+  const { createReadStream, createWriteStream } = await import("node:fs");
+  const { createGunzip } = await import("node:zlib");
+  const { pipeline } = await import("node:stream/promises");
+  const names = skillName && skillName !== "--all" ? [skillName] : (await readdir(join(ROOT, "skills")));
+  let n = 0;
+  for (const name of names) {
+    const src = join(ROOT, "skills", name, "source.txt.gz");
+    const dst = join(ROOT, "skills", name, "source.txt");
+    try {
+      await stat(src);
+      try { await stat(dst); continue; } catch {}
+      await pipeline(createReadStream(src), createGunzip(), createWriteStream(dst));
+      n++;
+      if (n % 100 === 0) process.stderr.write(`[unpack] ${n}\r`);
+    } catch { /* skip missing */ }
+  }
+  console.log(`unpacked ${n} source archives`);
+}
+
+async function cmdPack(skillName) {
+  const { createReadStream, createWriteStream } = await import("node:fs");
+  const { createGzip } = await import("node:zlib");
+  const { pipeline } = await import("node:stream/promises");
+  const { unlink } = await import("node:fs/promises");
+  const names = skillName && skillName !== "--all" ? [skillName] : (await readdir(join(ROOT, "skills")));
+  let n = 0;
+  for (const name of names) {
+    const src = join(ROOT, "skills", name, "source.txt");
+    const dst = join(ROOT, "skills", name, "source.txt.gz");
+    try {
+      await stat(src);
+      await pipeline(createReadStream(src), createGzip({ level: 6 }), createWriteStream(dst));
+      await unlink(src);
+      n++;
+      if (n % 100 === 0) process.stderr.write(`[pack] ${n}\r`);
+    } catch { /* skip missing */ }
+  }
+  console.log(`packed ${n} source archives`);
+}
+
 switch (cmd) {
   case "stats":  await cmdStats(); break;
   case "lookup": await cmdLookup(rest[0] ?? ""); break;
@@ -134,6 +180,8 @@ switch (cmd) {
   case "health": await cmdHealth(rest[0]); break;
   case "tools":  await cmdTools(); break;
   case "serve":  await cmdServe(); break;
+  case "unpack": await cmdUnpack(rest[0]); break;
+  case "pack":   await cmdPack(rest[0]); break;
   case "-h":
   case "--help":
   case "help":

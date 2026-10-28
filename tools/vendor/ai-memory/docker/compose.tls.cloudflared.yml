@@ -1,0 +1,106 @@
+# docker compose template — ai-memory + Cloudflare Tunnel.
+#
+# Outbound-only tunnel from the homelab to Cloudflare's edge. TLS is
+# terminated at the edge with a Cloudflare cert (universally trusted
+# everywhere). No ports exposed on the host, no public IP needed,
+# no DNS records to set up (Cloudflare manages the CNAME).
+#
+# Pairs especially well with the multi-user homelab case from
+# docs/users.md — every per-user token rides encrypted from each
+# client through Cloudflare to the tunnel.
+#
+# Prerequisites (one-time, in the Cloudflare dashboard):
+#   1. Have a domain on Cloudflare (DNS hosted there; registrar
+#      doesn't matter).
+#   2. Zero Trust → Networks → Tunnels → Create a tunnel → name it
+#      `ai-memory-homelab` → save.
+#   3. Copy the token Cloudflare gives you into .env as
+#      CLOUDFLARE_TUNNEL_TOKEN.
+#   4. In the tunnel's "Public hostnames" tab: add `memory.example.com`
+#      pointing at service `http://ai-memory:49374`.
+#   5. (Optional, recommended) Wrap that hostname in a Cloudflare
+#      Access application for SSO on top of ai-memory's bearer auth.
+#
+# Adjacent files this compose expects:
+#   ./.env.production        — AI_MEMORY_AUTH_TOKEN +
+#                              AI_MEMORY_ALLOWED_HOSTS +
+#                              CLOUDFLARE_TUNNEL_TOKEN. NOT committed.
+#
+# Walkthrough + client-side install:
+#   docs/https-via-proxy.md
+
+name: ai-memory-cloudflared
+
+services:
+  ai-memory:
+    image: akitaonrails/ai-memory:latest
+    container_name: ai-memory
+    restart: unless-stopped
+    # No host port. The tunnel reaches ai-memory over the internal
+    # docker network — nothing inbound from the public internet.
+    expose:
+      - "49374"
+    volumes:
+      - ai-memory-data:/data
+    env_file:
+      - .env.production
+    environment:
+      - RUST_LOG=ai_memory=info,ai_memory_store=info,ai_memory_wiki=info,ai_memory_mcp=info,tracing_appender=warn
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ai-memory", "status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: ai-memory-tunnel
+    restart: unless-stopped
+    depends_on:
+      - ai-memory
+    command: tunnel --no-autoupdate run
+    # `cloudflared` exits with code 1 on token rejection, which the
+    # `restart: unless-stopped` policy will loop on. Watch the logs
+    # the first time you start it — `docker compose logs -f cloudflared`
+    # — to confirm registration succeeded.
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+
+volumes:
+  ai-memory-data:
+    name: ai-memory-data
+
+
+# ──────────────────────────────────────────────────────────────────────
+# .env.production minimum content (DO NOT COMMIT THIS FILE):
+# ──────────────────────────────────────────────────────────────────────
+#
+#     AI_MEMORY_AUTH_TOKEN=<long-random-token-from-`ai-memory generate-auth-token`>
+#     AI_MEMORY_ALLOWED_HOSTS=memory.example.com,localhost,127.0.0.1
+#     AI_MEMORY_BIND=0.0.0.0:49374
+#
+#     CLOUDFLARE_TUNNEL_TOKEN=eyJ...<long-base64-from-the-cf-dashboard>...
+#
+#     # Optional LLM provider — see docker-compose.yml for the catalogue.
+#     # AI_MEMORY_LLM_PROVIDER=anthropic
+#     # ANTHROPIC_API_KEY=sk-ant-...
+#
+# `AI_MEMORY_ALLOWED_HOSTS` MUST include the public hostname that
+# Cloudflare forwards under, or ai-memory's DNS-rebinding guard will
+# reject the tunneled requests.
+#
+# ──────────────────────────────────────────────────────────────────────
+# Client config after the tunnel is up
+# ──────────────────────────────────────────────────────────────────────
+#
+#     ai-memory install-mcp   --client claude-code --apply \
+#         --server-url "https://memory.example.com/mcp" \
+#         --auth-token "$AI_MEMORY_AUTH_TOKEN"
+#
+#     ai-memory install-hooks --agent  claude-code --apply \
+#         --server-url "https://memory.example.com" \
+#         --auth-token "$AI_MEMORY_AUTH_TOKEN"
+#
+# (Substitute codex / cursor / gemini-cli / antigravity / opencode /
+# omp / openclaw — same shape, see docs/install.md for the catalogue.)

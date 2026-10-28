@@ -1,0 +1,83 @@
+{
+  "_comment": "Shared by the server sanitizer (crates/ai-memory-core/src/sanitize.rs) and the client scrub (companions/ai-memory-client/src/scrub.rs) so the two copies cannot drift. Every value is a FAKE shape.",
+  "credentials": [
+    "sk-leak-0123456789abcdef0123",
+    "ghp_FAKE0123456789ABCDEFGHIJ0123",
+    "AKIAFAKEFAKEFAKEFAKE"
+  ],
+  "invisibles": [
+    "\u200b",
+    "\u200c",
+    "\u200d",
+    "\u200e",
+    "\u2060",
+    "\u2063",
+    "\ufeff",
+    "\u00ad",
+    "\u034f",
+    "\u115f",
+    "\u17b4",
+    "\u180e",
+    "\u3164",
+    "\ufe0f",
+    "\uffa0",
+    "\udb40\udc01",
+    "\udb40\udd00"
+  ],
+  "key_body_line": "b3BlbnNzaC1rZXktdjEAAAAA",
+  "key_blocks": [
+    {
+      "input": "before\n-----BEGIN PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAA\n-----END PRIVATE KEY-----\nafter",
+      "kept": [
+        "before\n",
+        "\nafter"
+      ]
+    },
+    {
+      "input": "before\n-----BEGIN PGP PRIVATE KEY BLOCK-----\nVersion: 1\n\nb3BlbnNzaC1rZXktdjEAAAAA\n-----END PGP PRIVATE KEY BLOCK-----\nafter",
+      "kept": [
+        "before\n",
+        "\nafter"
+      ]
+    },
+    {
+      "input": "$ head -3 key.pem\n-----BEGIN PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAA\nb3BlbnNzaC1rZXktdjEAAAAA\n$ ls",
+      "kept": [
+        "$ head -3 key.pem\n",
+        "\n$ ls"
+      ]
+    },
+    {
+      "input": "-----BEGIN RSA PRIVATE KEY-----\r\nb3BlbnNzaC1rZXktdjEAAAAA\r\nb3BlbnNzaC1rZXktdjEAAAAA\r\n",
+      "kept": [
+        "\r\n"
+      ]
+    },
+    {
+      "input": "{\"stdout\":\"-----BEGIN OPENSSH PRIVATE KEY-----\\nb3BlbnNzaC1rZXktdjEAAAAA\\nb3BlbnNzaC1rZXktdjEAAAAA\"}",
+      "kept": [
+        "{\"stdout\":\"",
+        "\"}"
+      ]
+    },
+    {
+      "input": "-----BEGIN RSA PRIVATE KEY-----\nProc-Type: 4,ENCRYPTED\nDEK-Info: AES-128-CBC,0123456789ABCDEF\n\nb3BlbnNzaC1rZXktdjEAAAAA\n",
+      "kept": []
+    }
+  ],
+  "unchanged": [
+    "family \ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67 emoji",
+    "keycaps 1\ufe0f\u20e3 #\ufe0f\u20e3",
+    "flag \ud83c\udff4\udb40\udc67\udb40\udc62\udb40\udc73\udb40\udc63\udb40\udc74\udb40\udc7f Scotland",
+    "\u0645\u06cc\u200c\u062e\u0648\u0627\u0647\u0645",
+    "\u0915\u094d\u200d\u0937",
+    "\u0e2a\u0e27\u0e31\u0e2a\u0e14\u0e35\u200b\u0e04\u0e23\u0e31\u0e1a",
+    "\u05e9\u05dc\u05d5\u05dd\u200f world",
+    "co\u00adoperate",
+    "\ufeffstarts with a byte-order mark",
+    "-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nmQENBFakeFakeFakeFakeFakeFakeFake\n-----END PGP PUBLIC KEY BLOCK-----",
+    "The file starts with -----BEGIN OPENSSH PRIVATE KEY----- and that is expected.",
+    "-----BEGIN RSA PRIVATE KEY-----\nThat header marks a PKCS#1 key.",
+    "const HEADER: &str = \"-----BEGIN RSA PRIVATE KEY-----\";\nparseHeaderLineFromInput(x)"
+  ]
+}

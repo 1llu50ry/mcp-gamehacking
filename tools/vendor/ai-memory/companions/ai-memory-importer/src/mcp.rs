@@ -1,0 +1,315 @@
+//! The write seam for the agentmemory routes: the public `memory_write_page`
+//! and `memory_read_page` MCP tools, called with explicit `workspace` and
+//! `project`, the way `ai-memory-wikisync` calls them.
+//!
+//! Every write is conditional (`create_only` for a page's first version,
+//! `expected_page_id` for each later one), so a page that appeared or changed
+//! underneath the import is refused by the server instead of overwritten.
+//! That closes the check-then-write race the `/admin/write-page` routes carry.
+
+use std::fmt;
+
+use anyhow::{Result, anyhow, bail};
+use serde_json::{Value, json};
+
+use crate::ImportClient;
+
+/// Bound on server text echoed to the terminal or a manifest.
+const ERROR_PREVIEW: usize = 300;
+/// JSON-RPC `invalid_request`, the code a failed precondition carries.
+const INVALID_REQUEST: i64 = -32600;
+/// The server release that added conditional page writes.
+pub(crate) const MIN_SERVER: &str = "3.0";
+
+/// What a conditional write requires of the destination page.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Precondition<'a> {
+    /// No page may exist at the path.
+    Absent,
+    /// The page's latest version must still be this id.
+    Latest(&'a str),
+}
+
+/// The server refused a conditional write; nothing was changed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PreconditionFailed {
+    pub(crate) current_page_id: Option<String>,
+}
+
+impl fmt::Display for PreconditionFailed {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "the destination page changed (current version {})",
+            self.current_page_id
+                .as_deref()
+                .map_or_else(|| "none".to_owned(), preview)
+        )
+    }
+}
+
+impl std::error::Error for PreconditionFailed {}
+
+/// One page write: the fields the MCP tool round-trips. The tool clears what
+/// a call omits, so every field is always sent.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct McpWrite<'a> {
+    pub(crate) workspace: &'a str,
+    pub(crate) project: &'a str,
+    pub(crate) path: &'a str,
+    pub(crate) body: &'a str,
+    pub(crate) title: Option<&'a str>,
+    pub(crate) kind: &'a str,
+    pub(crate) tier: &'a str,
+    pub(crate) tags: &'a [String],
+    pub(crate) expires_at: Option<&'a str>,
+}
+
+/// A page as `memory_read_page` returns it.
+#[derive(Debug, Clone)]
+pub(crate) struct ReadPage {
+    pub(crate) page_id: Option<String>,
+    pub(crate) body: String,
+}
+
+impl ImportClient {
+    /// Refuse a server that predates conditional writes. It would accept
+    /// `create_only` as an unknown argument and ignore it, turning every
+    /// guarded write into an unconditional one.
+    pub(crate) async fn ensure_conditional_writes(&self) -> Result<()> {
+        let result = self.mcp_request("tools/list", json!({})).await?;
+        let supported = result
+            .get("tools")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .find(|tool| tool.get("name").and_then(Value::as_str) == Some("memory_write_page"))
+            .and_then(|tool| tool.pointer("/inputSchema/properties/create_only"))
+            .is_some();
+        if !supported {
+            bail!(
+                "server too old for --apply; needs ai-memory >= {MIN_SERVER} (conditional page writes)"
+            );
+        }
+        Ok(())
+    }
+
+    /// Write one page version only if `precondition` holds. Returns the new
+    /// version id; a refused precondition comes back as [`PreconditionFailed`].
+    pub(crate) async fn mcp_write_page(
+        &self,
+        write: &McpWrite<'_>,
+        precondition: Precondition<'_>,
+    ) -> Result<String> {
+        let mut arguments = json!({
+            "workspace": write.workspace,
+            "project": write.project,
+            "path": write.path,
+            "body": write.body,
+            "kind": write.kind,
+            "tier": write.tier,
+            "tags": write.tags,
+            "pinned": false,
+        });
+        if let Some(title) = write.title {
+            arguments["title"] = json!(title);
+        }
+        if let Some(expires_at) = write.expires_at {
+            arguments["expires_at"] = json!(expires_at);
+        }
+        match precondition {
+            Precondition::Absent => arguments["create_only"] = json!(true),
+            Precondition::Latest(id) => arguments["expected_page_id"] = json!(id),
+        }
+        let result = self.call_tool("memory_write_page", arguments).await?;
+        tool_json(&result)
+            .and_then(|written| written.get("page_id")?.as_str().map(str::to_owned))
+            .ok_or_else(|| anyhow!("memory_write_page answered without a page_id"))
+    }
+
+    /// Read one page by exact path.
+    pub(crate) async fn mcp_read_page(
+        &self,
+        workspace: &str,
+        project: &str,
+        path: &str,
+    ) -> Result<ReadPage> {
+        let result = self
+            .call_tool(
+                "memory_read_page",
+                json!({"workspace": workspace, "project": project, "path": path}),
+            )
+            .await?;
+        let page = tool_json(&result)
+            .ok_or_else(|| anyhow!("memory_read_page answered without a page"))?;
+        Ok(ReadPage {
+            page_id: page
+                .get("page_id")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
+            body: page
+                .get("body")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_owned(),
+        })
+    }
+
+    /// Ask for one page of the destination, the read every live run makes
+    /// before writing: reads never create a scope, so an error means the
+    /// destination does not exist (or cannot be read).
+    pub(crate) async fn mcp_scope_exists(&self, workspace: &str, project: &str) -> bool {
+        self.call_tool(
+            "memory_recent",
+            json!({"workspace": workspace, "project": project, "limit": 1}),
+        )
+        .await
+        .is_ok()
+    }
+
+    /// Call one tool; a tool-level error becomes an `Err` carrying a bounded
+    /// preview of the server's text.
+    pub(crate) async fn call_tool(&self, name: &str, arguments: Value) -> Result<Value> {
+        let result = self
+            .mcp_request("tools/call", json!({"name": name, "arguments": arguments}))
+            .await
+            .map_err(|error| match error.downcast::<PreconditionFailed>() {
+                Ok(failed) => anyhow::Error::new(failed),
+                Err(error) => error.context(format!("MCP {name} failed")),
+            })?;
+        if result.get("isError").and_then(Value::as_bool) == Some(true) {
+            let detail = result
+                .pointer("/content/0/text")
+                .and_then(Value::as_str)
+                .unwrap_or("no detail");
+            bail!("MCP {name} refused the call: {}", preview(detail));
+        }
+        Ok(result)
+    }
+
+    /// One JSON-RPC request; its `result`, or the error it answered with.
+    async fn mcp_request(&self, method: &str, params: Value) -> Result<Value> {
+        let request = json!({"jsonrpc": "2.0", "id": 1, "method": method, "params": params});
+        let response = self
+            .request(reqwest::Method::POST, "/mcp")
+            // The streamable HTTP transport refuses a request that does not
+            // accept both; it answers plain JSON in its default stateless
+            // mode and SSE frames in stateful mode.
+            .header(
+                reqwest::header::ACCEPT,
+                "application/json, text/event-stream",
+            )
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| anyhow!("MCP {method} request failed: {e}"))?;
+        let status = response.status();
+        let text = response
+            .text()
+            .await
+            .map_err(|e| anyhow!("reading the MCP {method} response failed: {e}"))?;
+        if !status.is_success() {
+            bail!("MCP {method} returned HTTP {status}: {}", preview(&text));
+        }
+        let mut message = json_rpc_message(&text)
+            .ok_or_else(|| anyhow!("MCP {method} answered with no JSON-RPC message"))?;
+        if let Some(error) = message.get("error") {
+            if let Some(failed) = precondition_failure(error) {
+                return Err(anyhow::Error::new(failed));
+            }
+            bail!("MCP {method} failed: {}", preview(&error.to_string()));
+        }
+        message
+            .get_mut("result")
+            .map(Value::take)
+            .ok_or_else(|| anyhow!("MCP {method} answered with no result"))
+    }
+}
+
+/// The typed precondition failure in a JSON-RPC error, if that is what it is.
+fn precondition_failure(error: &Value) -> Option<PreconditionFailed> {
+    let data = error.get("data")?;
+    if error.get("code").and_then(Value::as_i64) != Some(INVALID_REQUEST)
+        || data.get("reason").and_then(Value::as_str) != Some("precondition_failed")
+    {
+        return None;
+    }
+    Some(PreconditionFailed {
+        current_page_id: data
+            .get("current_page_id")
+            .and_then(Value::as_str)
+            .map(str::to_owned),
+    })
+}
+
+/// The JSON a tool returned as its first text content, if any.
+pub(crate) fn tool_json(result: &Value) -> Option<Value> {
+    let text = result.pointer("/content/0/text")?.as_str()?;
+    serde_json::from_str(text).ok()
+}
+
+/// The JSON-RPC message in a response body: the body itself, or the last
+/// `data:` frame of an SSE stream.
+fn json_rpc_message(text: &str) -> Option<Value> {
+    if let Ok(value) = serde_json::from_str::<Value>(text) {
+        return Some(value);
+    }
+    text.lines()
+        .filter_map(|line| line.strip_prefix("data:"))
+        .filter_map(|data| serde_json::from_str::<Value>(data.trim()).ok())
+        .next_back()
+}
+
+/// Server text is untrusted: bound it and neutralise control characters so
+/// it cannot drive the terminal.
+pub(crate) fn preview(text: &str) -> String {
+    text.chars()
+        .take(ERROR_PREVIEW)
+        .map(|c| if c.is_control() { '?' } else { c })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reads_plain_json_and_sse_frames() {
+        let plain = r#"{"jsonrpc":"2.0","id":1,"result":{"isError":false}}"#;
+        assert_eq!(json_rpc_message(plain).unwrap()["id"], 1);
+        let sse = "event: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}\n\n";
+        assert!(json_rpc_message(sse).unwrap().get("result").is_some());
+        assert!(json_rpc_message("event: ping\n\n").is_none());
+    }
+
+    #[test]
+    fn only_a_typed_precondition_error_is_a_precondition_failure() {
+        let error = json!({
+            "code": -32600,
+            "data": {"reason": "precondition_failed", "current_page_id": "v2"},
+        });
+        assert_eq!(
+            precondition_failure(&error),
+            Some(PreconditionFailed {
+                current_page_id: Some("v2".into())
+            })
+        );
+        assert_eq!(
+            precondition_failure(&json!({"code": -32600, "data": {"reason": "nope"}})),
+            None
+        );
+        assert_eq!(
+            precondition_failure(
+                &json!({"code": -32602, "data": {"reason": "precondition_failed"}})
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn previews_are_bounded_and_inert() {
+        let shown = preview(&format!("\u{1b}[31m{}", "x".repeat(1_000)));
+        assert!(!shown.contains('\u{1b}'));
+        assert_eq!(shown.chars().count(), ERROR_PREVIEW);
+    }
+}

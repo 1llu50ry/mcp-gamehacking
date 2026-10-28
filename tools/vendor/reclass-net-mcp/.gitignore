@@ -1,0 +1,65 @@
+# ReClass.NET source (use git submodule or clone separately)
+ReClass.NET/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build outputs
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+
+# NuGet
+packages/
+nuget.exe
+*.nupkg
+.nuget/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+.env
+*.egg-info/
+dist/
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+nul
+
+# Misc
+*.log
+*.tmp
+*.temp
+
+# Local build output
+dist/
+/.claude

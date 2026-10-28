@@ -1,0 +1,13 @@
+{
+  "context_servers": {
+    "mcp-gamehacking": {
+      "command": {
+        "path": "node",
+        "args": ["/path/to/mcp-gamehacking/dist/index.js"],
+        "env": {
+          "MCP_FS_ALLOW": "~/reverse-projects"
+        }
+      }
+    }
+  }
+}

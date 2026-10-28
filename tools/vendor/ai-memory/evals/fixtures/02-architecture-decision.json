@@ -1,0 +1,15 @@
+{
+  "name": "architecture-decision",
+  "description": "User makes a deliberate architectural choice (single-writer SQLite vs. write-pool). Tests whether the model produces a decisions/ ADR-style page distinct from the session log.",
+  "observations": [
+    {"kind": "session-start", "title": "session start", "body": "cwd=/mnt/data/Projects/ai-memory"},
+    {"kind": "user-prompt", "title": "user prompt", "body": "I'm seeing 'database is locked' under concurrent writes in the integration tests. should I move to a connection pool with retry, or a single-writer actor?"},
+    {"kind": "user-prompt", "title": "user prompt", "body": "actually let me think out loud — a pool means rusqlite serialises writes anyway via BEGIN IMMEDIATE retries, and we'd still see SQLITE_BUSY under contention. With a single-writer actor we get FIFO ordering for free, no BUSY, and an obvious place to add audit log."},
+    {"kind": "user-prompt", "title": "user prompt", "body": "going with single-writer actor; pool the readers separately."},
+    {"kind": "pre-tool-use", "title": "Write", "body": "crates/ai-memory-store/src/writer.rs: new WriterActor owning one Connection, accepts WriteCmd via tokio::sync::mpsc"},
+    {"kind": "pre-tool-use", "title": "Write", "body": "crates/ai-memory-store/src/reader.rs: ReaderPool of 4 read-only Connections"},
+    {"kind": "post-tool-use", "title": "cargo test", "body": "concurrent_writes test green; no SQLITE_BUSY under 100 parallel writers"},
+    {"kind": "user-prompt", "title": "user prompt", "body": "the audit log column was the clincher — we couldn't do it cleanly with a pool"},
+    {"kind": "session-end", "title": "session end", "body": "architecture changed; ADR worth recording"}
+  ]
+}

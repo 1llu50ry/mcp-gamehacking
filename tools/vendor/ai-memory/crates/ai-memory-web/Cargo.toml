@@ -1,0 +1,51 @@
+[package]
+name = "ai-memory-web"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Read-only HTTP browser for the ai-memory wiki (project list, tree navigation, markdown rendering, FTS5 search)."
+
+[features]
+default = []
+management-ui = []
+
+[dependencies]
+ai-memory-core.workspace = true
+ai-memory-llm.workspace = true
+ai-memory-store.workspace = true
+ai-memory-wiki.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+axum.workspace = true
+base64.workspace = true
+jiff.workspace = true
+sha2.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+
+# Templating + markdown. askama's default `config` feature only reads an
+# `askama.toml`, which this crate does not have, and pulls in the
+# unmaintained `basic-toml` (RUSTSEC-2026-0374).
+askama = { version = "0.12", default-features = false, features = ["humansize", "num-traits", "urlencode"] }
+pulldown-cmark = { version = "0.12", default-features = false, features = ["html"] }
+
+[build-dependencies]
+anyhow.workspace = true
+sha2.workspace = true
+
+[dev-dependencies]
+async-trait.workspace = true
+rusqlite.workspace = true
+tempfile.workspace = true
+tower.workspace = true
+
+[lints]
+workspace = true

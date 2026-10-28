@@ -95,7 +95,11 @@ export type ReBackendId =
   | "reva"
   | "rzweb"
   | "vscode-lldb"
-  | "tencentdb-agent-memory";
+  | "tencentdb-agent-memory"
+  | "reclass-net-mcp"
+  | "ai-memory"
+  | "cheatengine-mcp-bridge"
+  | "claude-code-best-practice";
 
 export interface ReBackend {
   id: ReBackendId;
@@ -1347,6 +1351,61 @@ const BACKENDS: Record<ReBackendId, ReBackend> = {
     },
     tags: ["memory", "team", "shared", "proxy", "tencent", "openclaw", "hermes"],
     notes: "Vendored under tools/vendor/tencentdb-agent-memory (assets/ dropped — fetch upstream for the UI video/images). Shared memory server where every agent (Claude, Codex, Cursor, …) sees the same memory. Pairs with our built-in agent-mesh: mesh for coordination, TencentDB-Agent-Memory for durable long-term team memory.",
+  },
+  "reclass-net-mcp": {
+    id: "reclass-net-mcp",
+    name: "ReClass.NET MCP (upstream server)",
+    kind: "dynamic",
+    os: ["windows"],
+    requires: "ReClass.NET running; the plugin exposes an HTTP MCP endpoint from the live process.",
+    install: [
+      "copy tools/vendor/reclass-net-mcp/ReClassNET-MCP.dll into ReClass.NET/Plugins/",
+      "open ReClass.NET → Plugins → enable 'ReClass.NET MCP'",
+    ],
+    launch: { cmd: "echo", args: ["ReClass.NET must be running; MCP exposed from the GUI"], http: { port: 48669 } },
+    mcpConfig: { "reclass-net-mcp": { url: "http://127.0.0.1:48669/mcp" } },
+    tags: ["reclass", "struct-recovery", "windows", "dynamic", "upstream"],
+    notes: "Full upstream server. For offline .rcnet → C++ header conversion the built-in `reclass_to_cpp` tool now covers common node types without needing ReClass.NET to be running.",
+  },
+  "ai-memory": {
+    id: "ai-memory",
+    name: "ai-memory (Rust vector memory)",
+    kind: "static",
+    os: ["windows", "linux", "macos"],
+    requires: "Rust toolchain (vendored crates/ builds locally).",
+    install: [
+      "cd tools/vendor/ai-memory && cargo build --release",
+    ],
+    launch: { cmd: "cargo", args: ["run", "--release"], cwd: "tools/vendor/ai-memory" },
+    mcpConfig: { "ai-memory": { command: "cargo", args: ["run", "--release", "--manifest-path", "tools/vendor/ai-memory/Cargo.toml"] } },
+    tags: ["memory", "rust", "vector", "embeddings", "persistence"],
+    notes: "Rust-backed vector memory server. Pairs with our native memory_* tools: ai-memory for semantic / embedding search, native memory_search for keyword hits.",
+  },
+  "cheatengine-mcp-bridge": {
+    id: "cheatengine-mcp-bridge",
+    name: "Cheat Engine MCP bridge (Python)",
+    kind: "dynamic",
+    os: ["windows"],
+    requires: "Python 3.10+, Cheat Engine 7.5+, ceserver running.",
+    install: [
+      "cd tools/vendor/cheatengine-mcp-bridge && pip install -r requirements.txt",
+    ],
+    launch: { cmd: "python", args: ["-m", "cheatengine_mcp_bridge"], cwd: "tools/vendor/cheatengine-mcp-bridge", http: { port: 52736 } },
+    mcpConfig: { "cheatengine-mcp-bridge": { command: "python", args: ["-m", "cheatengine_mcp_bridge"], cwd: "tools/vendor/cheatengine-mcp-bridge" } },
+    tags: ["cheat-engine", "bridge", "ceserver", "dynamic"],
+    notes: "Vendored. Our native ce_* tools (ce_attach / ce_aob_scan / ce_pointer_scan / ce_read_memory / ce_write_memory / ce_lua / ce_status) talk to the same ceserver HTTP surface this bridge exposes; set MCP_CESERVER_HOST / MCP_CESERVER_PORT (default 127.0.0.1:52736) and use the native tools directly.",
+  },
+  "claude-code-best-practice": {
+    id: "claude-code-best-practice",
+    name: "Claude Code best-practice docs (reference, not server)",
+    kind: "static",
+    os: ["windows", "linux", "macos"],
+    requires: "nothing; documentation.",
+    install: ["browse tools/vendor/claude-code-best-practice/"],
+    launch: { cmd: "echo", args: ["Documentation only — see tools/vendor/claude-code-best-practice/README.md"] },
+    mcpConfig: {},
+    tags: ["claude-code", "docs", "best-practice", "reference"],
+    notes: "Not an MCP backend. Vendored for inclusion in the skill library — tips, changelogs, and practice patterns that inform the agent prompts.",
   },
 };
 

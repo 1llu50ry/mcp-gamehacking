@@ -39,11 +39,18 @@ export function registerDynamicResources(server: McpServer, projectRoot: string)
     new ResourceTemplate("gamehacking://ags/{name}/source", { list: undefined }),
     { description: "Source dump (if available) for an ags-* archive skill." },
     async (uri, { name }) => {
+      // After the gzip migration, source.txt may be absent on disk and
+      // the real payload lives next to it as source.txt.gz. Try both.
+      const base = join(projectRoot, "skills", name as string, "source.txt");
       try {
-        const text = await readFile(join(projectRoot, "skills", name as string, "source.txt"), "utf8");
+        const text = await readFile(base, "utf8");
         return { contents: [{ uri: uri.href, mimeType: "text/plain", text: text.slice(0, 1_000_000) }] };
       } catch {
-        return notFound(uri);
+        try {
+          const { gunzipSync } = await import("node:zlib");
+          const text = gunzipSync(await readFile(base + ".gz")).toString("utf-8");
+          return { contents: [{ uri: uri.href, mimeType: "text/plain", text: text.slice(0, 1_000_000) }] };
+        } catch { return notFound(uri); }
       }
     }
   );

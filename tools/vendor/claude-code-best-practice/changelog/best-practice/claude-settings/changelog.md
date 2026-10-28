@@ -1,0 +1,1325 @@
+# Settings Report — Changelog History
+
+## Status Legend
+
+| Status | Meaning |
+|--------|---------|
+| ✅ `COMPLETE (reason)` | Action was taken and resolved successfully |
+| ❌ `INVALID (reason)` | Finding was incorrect, not applicable, or intentional |
+| ✋ `ON HOLD (reason)` | Action deferred — waiting on external dependency or user decision |
+
+---
+
+## [2026-03-05 06:18 AM PKT] Claude Code v2.1.69
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Missing Settings | Add 13 non-hook missing settings keys (`$schema`, `availableModels`, `fastModePerSessionOptIn`, `teammateMode`, `prefersReducedMotion`, `sandbox.filesystem.*`, `sandbox.network.allowManagedDomainsOnly`, `sandbox.enableWeakerNetworkIsolation`, `allowManagedMcpServersOnly`, `blockedMarketplaces`, `includeGitInstructions`, `pluginTrustMessage`, `fileSuggestion` table entry) | ✅ COMPLETE (added to report) |
+| 2 | HIGH | Missing Env Vars | Add missing environment variables including `CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING`, `CLAUDE_CODE_DISABLE_1M_CONTEXT`, `CLAUDE_CODE_ACCOUNT_UUID`, `CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS`, `ENABLE_CLAUDEAI_MCP_SERVERS`, and more | ✅ COMPLETE (added 13 missing env vars to report) |
+| 3 | HIGH | Effort Default | Update effort level default from "High" to "Medium" for Max/Team subscribers; add Sonnet 4.6 support (changed v2.1.68) | ✅ COMPLETE (updated default and added Sonnet note) |
+| 4 | MED | Settings Hierarchy | Add managed settings via macOS plist/Windows Registry (v2.1.61/v2.1.69); document array merge behavior across scopes | ✅ COMPLETE (added plist/registry and merge note) |
+| 5 | MED | Sandbox Filesystem | Add `sandbox.filesystem.allowWrite`, `denyWrite`, `denyRead` with path prefix semantics (`//`, `~/`, `/`, `./`) | ✅ COMPLETE (added to sandbox table) |
+| 6 | MED | Permission Syntax | Add `Agent(name)` permission pattern; document `MCP(server:tool)` syntax form | ✅ COMPLETE (added to tool syntax table) |
+| 7 | MED | Plugin Gaps | Add `blockedMarketplaces`, `pluginTrustMessage` | ✅ COMPLETE (added to plugins table) |
+| 8 | MED | Model Config | Add `availableModels` setting | ✅ COMPLETE (added to general settings table) |
+| 9 | MED | Suspect Keys | Verify `sandbox.network.deniedDomains`, `sandbox.ignoreViolations`, `pluginConfigs` — present in report but not in official docs | ✋ ON HOLD (kept in report pending verification) |
+| 10 | LOW | Header Counts | Update header from "38 settings and 84 env vars" to reflect actual counts (~55+ settings, ~110+ env vars) | ✅ COMPLETE (updated header) |
+| 11 | LOW | CLAUDE.md Sync | Update CLAUDE.md configuration hierarchy (add managed/CLI/user levels) | ✋ ON HOLD (awaiting user approval) |
+| 12 | LOW | Example Update | Update Quick Reference example with `$schema`, sandbox filesystem, `Agent(*)`, remove hooks example | ✅ COMPLETE (updated example) |
+| 13 | MED | Hooks Redirect | Replace hooks section with redirect to claude-code-hooks repo | ✅ COMPLETE (hooks externalized to dedicated repo) |
+
+---
+
+## [2026-03-07 02:17 PM PKT] Claude Code v2.1.71
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Changed Behavior | Fix `teammateMode`: type `boolean` → `string`, default `false` → `"auto"`, description → "Agent team display: auto, in-process, tmux" | ✅ COMPLETE (type, default, and description updated) |
+| 2 | HIGH | New Setting | Add `allowManagedPermissionRulesOnly` to Permissions table (boolean, managed only) | ✅ COMPLETE (added to Permission Keys table) |
+| 3 | HIGH | Missing Env Vars | Add ~31 missing env vars including confirmed (`CLAUDE_CODE_MAX_OUTPUT_TOKENS`, `CLAUDE_CODE_DISABLE_FAST_MODE`, `CLAUDE_CODE_DISABLE_AUTO_MEMORY`, `CLAUDE_CODE_USER_EMAIL`, `CLAUDE_CODE_ORGANIZATION_UUID`, `CLAUDE_CONFIG_DIR`) and agent-reported (Foundry, Bedrock, mTLS, shell prefix, etc.) | ✅ COMPLETE (added 31 env vars to table) |
+| 4 | MED | Changed Default | Fix `plansDirectory` default from `.claude/plans/` to `~/.claude/plans` | ✅ COMPLETE (default updated) |
+| 5 | MED | Changed Description | Fix `sandbox.enableWeakerNetworkIsolation` description to "(macOS only) Allow access to system TLS trust; reduces security" | ✅ COMPLETE (description updated) |
+| 6 | MED | Scope Fix | Fix `extraKnownMarketplaces` scope from "Any" to "Project" | ✅ COMPLETE (scope and description updated) |
+| 7 | MED | Boundary Violation | Replace `CLAUDE_CODE_EFFORT_LEVEL` in `claude-cli-startup-flags.md` with cross-reference to settings report | ✅ COMPLETE (replaced with link) |
+| 8 | MED | Version Badge | Update report version from v2.1.69 to v2.1.71 | ✅ COMPLETE (badge and header updated) |
+| 9 | LOW | Suspect Keys | Verify `skipWebFetchPreflight`, `sandbox.ignoreViolations`, `sandbox.network.deniedDomains`, `skippedMarketplaces`, `skippedPlugins`, `pluginConfigs` | ✋ ON HOLD (kept in report pending verification — recurring from 2026-03-05) |
+| 10 | LOW | CLAUDE.md Sync | Update CLAUDE.md configuration hierarchy (3 levels → 5+) | ✅ COMPLETE (updated to 5-level hierarchy with managed layer) |
+
+---
+
+## [2026-03-12 12:23 PM PKT] Claude Code v2.1.74
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Changed Behavior | Fix `dontAsk` permission mode description: "Auto-accept all tools" → "Auto-denies tools unless pre-approved via `/permissions` or `permissions.allow` rules" | ✅ COMPLETE (description corrected per official permissions docs) |
+| 2 | HIGH | New Setting | Add `modelOverrides` to Model Configuration section (object, maps Anthropic model IDs to provider-specific IDs like Bedrock ARNs) | ✅ COMPLETE (added with example and description) |
+| 3 | HIGH | New Setting | Add `allow_remote_sessions` to managed-only settings list (boolean, defaults `true`, controls Remote Control/web session access) | ✅ COMPLETE (added to Permission Keys table) |
+| 4 | HIGH | Changed Default | Fix `$schema` URL from `https://www.schemastore.org/...` to `https://json.schemastore.org/...` per official docs | ✅ COMPLETE (updated in description, example, and Sources) |
+| 5 | MED | Changed Description | Fix `ANTHROPIC_CUSTOM_HEADERS` format description from "JSON string" to "Name: Value format, newline-separated" | ✅ COMPLETE (description updated per official docs) |
+| 6 | MED | Unverified Modes | `askEdits` and `viewOnly` permission modes not in official docs — only 5 modes documented (default, acceptEdits, plan, dontAsk, bypassPermissions) | ✅ COMPLETE (marked as "not in official docs — unverified" in table) |
+| 7 | MED | Missing Env Vars | Add `CLAUDE_CODE_SESSIONEND_HOOKS_TIMEOUT_MS`, `CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY`, `CLAUDE_CODE_DISABLE_TERMINAL_TITLE`, `CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL`, `CLAUDE_CODE_OTEL_HEADERS_HELPER_DEBOUNCE_MS` | ✅ COMPLETE (added 5 env vars plus `CLAUDE_CODE_OTEL_HEADERS_HELPER_DEBOUNCE_MS`) |
+| 8 | MED | New Setting | Add `autoMemoryDirectory` to Core Configuration (string, custom auto-memory directory) — version uncertain (agents disagree: v2.1.68 vs v2.1.74), not on settings page | ✅ COMPLETE (added near plansDirectory — version unresolved) |
+| 9 | LOW | Suspect Keys | Verify `skipWebFetchPreflight`, `sandbox.ignoreViolations`, `sandbox.network.deniedDomains`, `skippedMarketplaces`, `skippedPlugins`, `pluginConfigs` — still not in official docs | ✋ ON HOLD (kept in report pending verification — recurring from 2026-03-05) |
+| 10 | LOW | Missing Env Var | Add `CLAUDE_CODE_SUBAGENT_MODEL` to env vars table (already in Model env example block but missing from table) | ✅ COMPLETE (added to env vars table) |
+| 11 | LOW | Example Update | Update Quick Reference example to include `modelOverrides` and corrected `$schema` URL | ✅ COMPLETE (example updated with both) |
+
+---
+
+## [2026-03-14 01:35 AM PKT] Claude Code v2.1.75
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Settings Hierarchy | Restructure to match official 5-level hierarchy: Managed (#1) > CLI args > Local > Project > User. Remove `~/.claude/settings.local.json` row. Add managed-tier internal precedence (server-managed > MDM > file > HKCU). Note Managed "cannot be overridden by any other level, including CLI args" | ✅ COMPLETE (restructured table to 5 levels with Managed as #1, added delivery methods, internal precedence, and file paths) |
+| 2 | HIGH | Changed Behavior | Fix `availableModels` description: change from complex object array (`title`/`modelId`/`effortOptions`) to simple string array `["sonnet", "haiku"]` per official docs | ✅ COMPLETE (updated description to match official docs format) |
+| 3 | HIGH | Changed Behavior | Add `cleanupPeriodDays` `0`-value behavior: "Setting to `0` deletes all existing transcripts at startup and disables session persistence entirely" | ✅ COMPLETE (added 0-value behavior to description) |
+| 4 | HIGH | Permission Syntax | Add evaluation order note to Permissions section: "Rules are evaluated in order: deny rules first, then ask, then allow. The first matching rule wins." | ✅ COMPLETE (added evaluation order before Bash wildcard notes) |
+| 5 | MED | Changed Description | Add `autoMemoryDirectory` scope restriction: "Not accepted in project settings (`.claude/settings.json`). Accepted from policy, local, and user settings" | ✅ COMPLETE (added scope restriction to description) |
+| 6 | MED | Changed Description | Add `permissions.defaultMode` Remote environment note: only `acceptEdits` and `plan` are honored in Remote environments (v2.1.70) | ✅ COMPLETE (added Remote restriction to description) |
+| 7 | MED | Model Config | Add Opus 4.6 1M context default note: as of v2.1.75, 1M context is default for Max/Team/Enterprise plans | ✅ COMPLETE (added to Effort Level note) |
+| 8 | MED | Settings Hierarchy | Add Windows managed path note: v2.1.75 removed deprecated `C:\ProgramData\ClaudeCode\` fallback — use `C:\Program Files\ClaudeCode\managed-settings.json` | ✅ COMPLETE (added deprecation note in hierarchy section) |
+| 9 | MED | Display & UX | Add `fileSuggestion` stdin JSON format (`{"query": "..."}`) and 15-path output limit detail | ✅ COMPLETE (added stdin format and output limit to File Suggestion section) |
+| 10 | MED | Settings Hierarchy | Update array merge note from "merged" to "concatenated and deduplicated" per official docs | ✅ COMPLETE (updated wording in hierarchy Important section) |
+| 11 | LOW | Suspect Keys | `sandbox.ignoreViolations`, `sandbox.network.deniedDomains` still not in official docs or JSON schema top-level | ✋ ON HOLD (kept in report pending verification — recurring from 2026-03-05) |
+| 12 | LOW | Suspect Keys | `skipWebFetchPreflight`, `skippedMarketplaces`, `skippedPlugins`, `pluginConfigs` — confirmed in JSON schema but not on official settings page | ✋ ON HOLD (kept in report — valid per schema, recurring from 2026-03-05) |
+
+---
+
+## [2026-03-15 12:52 PM PKT] Claude Code v2.1.76
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | New Setting | Add `effortLevel` to General Settings or Model Configuration — persists effort level across sessions (`"low"`, `"medium"`, `"high"`). Confirmed on official settings page | ✋ ON HOLD (awaiting user approval) |
+| 2 | HIGH | New Settings | Add Worktree Settings section with `worktree.sparsePaths` (array, sparse-checkout cone mode) and `worktree.symlinkDirectories` (array, symlink dirs to avoid duplication). Confirmed on official settings page | ✋ ON HOLD (awaiting user approval) |
+| 3 | HIGH | New Setting | Add `feedbackSurveyRate` to General Settings — probability (0-1) for session quality survey. Confirmed on official settings page | ✋ ON HOLD (awaiting user approval) |
+| 4 | HIGH | Missing Env Vars | Add 20 missing env vars to table: `CLAUDE_CODE_AUTO_COMPACT_WINDOW`, `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION`, `CLAUDE_CODE_PLAN_MODE_REQUIRED`, `CLAUDE_CODE_TEAM_NAME`, `CLAUDE_CODE_TASK_LIST_ID`, `CLAUDE_ENV_FILE`, `FORCE_AUTOUPDATE_PLUGINS`, `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, `MCP_TOOL_TIMEOUT`, `MCP_CLIENT_SECRET`, `MCP_OAUTH_CALLBACK_PORT`, `IS_DEMO`, `SLASH_COMMAND_TOOL_CHAR_BUDGET`, `VERTEX_REGION_CLAUDE_3_5_HAIKU`, `VERTEX_REGION_CLAUDE_3_7_SONNET`, `VERTEX_REGION_CLAUDE_4_0_OPUS`, `VERTEX_REGION_CLAUDE_4_0_SONNET`, `VERTEX_REGION_CLAUDE_4_1_OPUS`. Confirmed on official /en/env-vars page | ✋ ON HOLD (awaiting user approval) |
+| 5 | HIGH | Missing Env Vars | Move `ANTHROPIC_DEFAULT_OPUS_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, `MAX_THINKING_TOKENS` from code-block-only to Common Environment Variables table | ✋ ON HOLD (awaiting user approval) |
+| 6 | HIGH | Broken Link | Fix `https://claudelog.com/configuration/` — returns ECONNREFUSED. Remove or replace with working source | ✋ ON HOLD (awaiting user approval) |
+| 7 | MED | Changed Description | Update `cleanupPeriodDays` description to add: "hooks receive an empty `transcript_path`" when set to 0. Per official docs | ✋ ON HOLD (awaiting user approval) |
+| 8 | MED | Unverified Env Vars | Mark 7 env vars in report but NOT in official docs as unverified: `CLAUDE_CODE_DISABLE_MCP`, `CLAUDE_CODE_DISABLE_TOOLS`, `CLAUDE_CODE_HIDE_ACCOUNT_INFO`, `CLAUDE_CODE_MAX_TURNS`, `CLAUDE_CODE_PROMPT_CACHING_ENABLED`, `CLAUDE_CODE_SKIP_SETTINGS_SETUP`, `DISABLE_NON_ESSENTIAL_MODEL_CALLS` | ✋ ON HOLD (awaiting user approval) |
+| 9 | MED | New Source | Add `https://code.claude.com/docs/en/env-vars` to Sources section — official env vars reference page | ✋ ON HOLD (awaiting user approval) |
+| 10 | MED | Example Update | Update Quick Reference example to include `effortLevel` and `worktree` settings | ✋ ON HOLD (awaiting user approval) |
+| 11 | LOW | Suspect Keys | `sandbox.ignoreViolations`, `sandbox.network.deniedDomains` still not in official docs sandbox table | ✋ ON HOLD (kept in report pending verification — recurring from 2026-03-05) |
+| 12 | LOW | Suspect Keys | `skipWebFetchPreflight`, `skippedMarketplaces`, `skippedPlugins`, `pluginConfigs` — still in JSON schema but not on official settings page | ✋ ON HOLD (kept in report — valid per schema, recurring from 2026-03-05) |
+
+---
+
+## [2026-03-15 01:10 PM PKT] Claude Code v2.1.76
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | New Setting | Add `effortLevel` to Model Configuration — persists effort level across sessions (`"low"`, `"medium"`, `"high"`). Also added `/effort` command to Useful Commands and updated Effort Level how-to section | ✅ COMPLETE (added to Model Overrides table, updated how-to, added /effort command) |
+| 2 | HIGH | New Settings | Add Worktree Settings section with `worktree.sparsePaths` (array, sparse-checkout cone mode) and `worktree.symlinkDirectories` (array, symlink dirs to avoid duplication) | ✅ COMPLETE (new Worktree Settings subsection in Core Configuration with table and example) |
+| 3 | HIGH | New Setting | Add `feedbackSurveyRate` to General Settings — probability (0-1) for session quality survey | ✅ COMPLETE (added to General Settings table) |
+| 4 | HIGH | Missing Env Vars | Add 23 missing env vars to table (20 genuinely new + 3 from code-block-only) | ✅ COMPLETE (added all 23 env vars to Common Environment Variables table) |
+| 5 | HIGH | Broken Link | Previous run flagged `https://claudelog.com/configuration/` as ECONNREFUSED — now loads successfully | ✅ COMPLETE (link restored, no action needed) |
+| 6 | MED | Permission Syntax | Add Read/Edit gitignore-style path patterns (`//path`, `~/path`, `/path`, `./path`), word-boundary wildcard detail, and legacy `:*` deprecation note | ✅ COMPLETE (added path patterns table, word-boundary note, and `:*` deprecation) |
+| 7 | MED | Changed Description | Update `cleanupPeriodDays` to add "hooks receive an empty `transcript_path`" when set to 0 | ✅ COMPLETE (added to description) |
+| 8 | MED | Unverified Env Vars | Mark 7 env vars not in official docs as unverified | ✅ COMPLETE (added "not in official docs — unverified" markers) |
+| 9 | MED | New Source | Add `https://code.claude.com/docs/en/env-vars` and `https://code.claude.com/docs/en/permissions` to Sources section | ✅ COMPLETE (added both URLs) |
+| 10 | MED | Example Update | Update Quick Reference example to include `effortLevel` and `worktree` settings | ✅ COMPLETE (added effortLevel and worktree block to example) |
+| 11 | LOW | Suspect Keys | `sandbox.ignoreViolations`, `sandbox.network.deniedDomains` still not in official docs sandbox table | ✋ ON HOLD (kept in report pending verification — recurring from 2026-03-05) |
+| 12 | LOW | Suspect Keys | `skipWebFetchPreflight`, `skippedMarketplaces`, `skippedPlugins`, `pluginConfigs` — still in JSON schema but not on official settings page | ✋ ON HOLD (kept in report — valid per schema, recurring from 2026-03-05) |
+
+---
+
+## [2026-03-17 12:54 PM PKT] Claude Code v2.1.77
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | New Setting | Add `sandbox.filesystem.allowRead` to Sandbox Settings table — re-allows read access within `denyRead` regions (array, default `[]`). Confirmed in v2.1.77 changelog | ✅ COMPLETE (added to Sandbox Settings table after denyRead row) |
+| 2 | HIGH | Changed Description | Update `CLAUDE_CODE_MAX_OUTPUT_TOKENS` description: default for Opus 4.6 increased to 64k, upper bound for Opus 4.6 and Sonnet 4.6 increased to 128k (v2.1.77 changelog) | ✅ COMPLETE (description updated with model-specific defaults and bounds) |
+| 3 | HIGH | Missing Env Var | Add `CLAUDECODE` to Common Environment Variables table — set to `1` in spawned shell environments. Confirmed on official /en/env-vars page | ✅ COMPLETE (added to env var table) |
+| 4 | HIGH | Missing Env Var | Add `CLAUDE_CODE_SKIP_FAST_MODE_NETWORK_ERRORS` to Common Environment Variables table — allows fast mode when org status check fails. Confirmed on official /en/env-vars page | ✅ COMPLETE (added to env var table) |
+| 5 | MED | Env Var Table | Move `ANTHROPIC_MODEL` and `ANTHROPIC_DEFAULT_HAIKU_MODEL` from code-block-only to Common Environment Variables table. Both confirmed on official /en/env-vars page | ✅ COMPLETE (added both to env var table near other ANTHROPIC_ vars) |
+| 6 | MED | Suspect Key Escalation | `sandbox.network.deniedDomains` — 8 consecutive ON HOLD runs (since 2026-03-05). NOT in official docs page or JSON schema. Per Rule 10B: mark as "not in official docs — unverified" | ✅ COMPLETE (added unverified annotation to description) |
+| 7 | MED | Suspect Key Escalation | `allow_remote_sessions` — NOT in official docs page or JSON schema. Mark as "not in official docs — unverified" | ✅ COMPLETE (added unverified annotation to description) |
+| 8 | LOW | Suspect Key Resolution | `sandbox.ignoreViolations` — 8 consecutive ON HOLD runs. Confirmed in JSON schema. Annotate: "in JSON schema, not on official settings page" | ✅ COMPLETE (added schema annotation to description) |
+| 9 | LOW | Suspect Key Resolution | `skipWebFetchPreflight`, `skippedMarketplaces`, `skippedPlugins`, `pluginConfigs` — 8 consecutive ON HOLD runs. All confirmed in JSON schema. Annotate: "in JSON schema, not on official settings page" | ✅ COMPLETE (added schema annotation to all 4 descriptions) |
+| 10 | LOW | Header Count | Update header env var count from "160+" to "100+" — actual table has 97 env vars | ✅ COMPLETE (header updated to "100+ environment variables", version to v2.1.77) |
+
+---
+
+## [2026-03-18 11:53 PM PKT] Claude Code v2.1.78
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Missing Setting | Add `voiceEnabled` to General Settings table — enable push-to-talk voice dictation (boolean, written by `/voice`, requires Claude.ai account). Confirmed on official settings page | ✅ COMPLETE (added to General Settings table before feedbackSurveyRate) |
+| 2 | HIGH | Missing Setting | Add `filesystem.allowManagedReadPathsOnly` to Sandbox Settings table — managed-only, only managed `allowRead` paths are respected (boolean, default false). Confirmed on official settings page | ✅ COMPLETE (added to Sandbox Settings table before enableWeakerNetworkIsolation) |
+| 3 | HIGH | Display Location | Move `showTurnDuration` and `terminalProgressBarEnabled` from Display Settings table to a separate "Global Config Settings (~/.claude.json)" subsection. Official docs state: "Adding them to settings.json will trigger a schema validation error" | ✅ COMPLETE (created new subsection with table; removed from settings.json Display Settings table and examples) |
+| 4 | HIGH | Changed Default | Fix `MAX_MCP_OUTPUT_TOKENS` default from 50000 to 25000. Official /en/env-vars page confirms default: 25000 | ✅ COMPLETE (default updated, added warning threshold note) |
+| 5 | HIGH | Missing Env Vars | Add `CLAUDE_CODE_NEW_INIT`, `CLAUDE_CODE_PLUGIN_SEED_DIR`, `DISABLE_FEEDBACK_COMMAND` to env vars table. All confirmed on official /en/env-vars page | ✅ COMPLETE (added all 3 env vars to table) |
+| 6 | MED | Verification Fix | Remove "unverified" annotation from `allow_remote_sessions` — now confirmed on official permissions page as a managed-only setting. Previous run (v2.1.77 #7) incorrectly marked it unverified | ✅ COMPLETE (removed "unverified" annotation) |
+| 7 | MED | Env Var Rename | Update `DISABLE_BUG_COMMAND` to `DISABLE_FEEDBACK_COMMAND` — official docs say `DISABLE_FEEDBACK_COMMAND` is the current name, `DISABLE_BUG_COMMAND` is "the older name" | ✅ COMPLETE (renamed with alias note) |
+| 8 | MED | Changed Description | Update `CLAUDE_CODE_EFFORT_LEVEL` to include `max` (Opus 4.6 only) and `auto` values. Official /en/env-vars page confirms: "Values: low, medium, high, max (Opus 4.6 only), or auto" | ✅ COMPLETE (description updated with all values and precedence note) |
+| 9 | MED | Changed Description | Fix `CLAUDE_CODE_ENABLE_TASKS` description — official: "Set to true to enable task tracking in non-interactive mode (-p flag). Tasks are on by default in interactive mode." Report currently says "Set to false to disable" | ✅ COMPLETE (description corrected to match official docs) |
+| 10 | MED | Changed Description | Update `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` to note: "Equivalent of setting DISABLE_AUTOUPDATER, DISABLE_FEEDBACK_COMMAND, DISABLE_ERROR_REPORTING, and DISABLE_TELEMETRY" | ✅ COMPLETE (description updated with equivalent vars list) |
+| 11 | MED | Example Update | Remove `showTurnDuration` from Quick Reference example — doesn't belong in settings.json per official docs | ✅ COMPLETE (removed from Quick Reference example and Display & UX example) |
+| 12 | LOW | Env Var Default | Verify `MCP_TIMEOUT` default (report says 10000) — official docs don't specify a default value | ✅ COMPLETE (removed unverified default — official docs omit it) |
+
+---
+
+## [2026-03-19 12:38 PM PKT] Claude Code v2.1.79
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Missing Env Vars | Add `ANTHROPIC_CUSTOM_MODEL_OPTION`, `ANTHROPIC_CUSTOM_MODEL_OPTION_NAME`, `ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION` to Common Environment Variables table — model-config vars for adding custom entries to `/model` picker. Confirmed on official /en/env-vars page | ✅ COMPLETE (added 3 env vars after ANTHROPIC_BASE_URL in table) |
+| 2 | HIGH | Changed Description | Update `CLAUDE_CODE_PLUGIN_SEED_DIR` from singular to plural: "Path to one or more read-only plugin seed directories, separated by `:` on Unix or `;` on Windows". Changed in v2.1.79 changelog. Confirmed on official /en/env-vars page | ✅ COMPLETE (description updated to multi-directory support) |
+| 3 | HIGH | Sandbox Path Prefixes | Fix sandbox.filesystem path prefix documentation: `/` = absolute (standard Unix), `./` = project-relative, `//` = legacy still works. Report currently shows reversed convention. Official docs explicitly note: "This syntax differs from Read and Edit permission rules" | ✅ COMPLETE (updated all 4 sandbox.filesystem entries with correct prefix convention, added cross-reference note to Read/Edit permission rules, added merge-across-scopes detail) |
+| 4 | MED | Changed Description | Expand `CLAUDE_CODE_AUTO_COMPACT_WINDOW` description — current "Auto-compact window behavior configuration" is too minimal. Official docs describe: token capacity, defaults (200K standard / 1M extended), interaction with `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`, status line decoupling | ✅ COMPLETE (expanded description with token capacity, model defaults, AUTOCOMPACT_PCT interaction, and status line decoupling) |
+
+---
+
+## [2026-03-20 08:41 AM PKT] Claude Code v2.1.80
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | New Setting | Add `channelsEnabled` to MCP Settings table — managed-only boolean, controls channel message delivery for Team and Enterprise users. Confirmed on official settings page | ✅ COMPLETE (added to MCP Settings table after allowManagedMcpServersOnly) |
+| 2 | MED | Version Badge | Update report version from v2.1.79 to v2.1.80 | ✅ COMPLETE (badge and header updated) |
+
+---
+
+## [2026-03-21 09:17 PM PKT] Claude Code v2.1.81
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Missing Settings (~/.claude.json) | Add `autoConnectIde` (boolean, default `false`) and `autoInstallIdeExtension` (boolean, default `true`) to Global Config Settings table. Confirmed on official settings page under "Global config settings" | ✅ COMPLETE (added both keys to ~/.claude.json table before showTurnDuration) |
+| 2 | HIGH | Incorrect Setting | `allow_remote_sessions` listed in Permission Keys table as managed-only boolean, but official permissions page states: "Access to Remote Control and web sessions is not controlled by a managed settings key." Mark as unverified or remove | ✅ COMPLETE (re-added unverified annotation with official docs quote and admin UI link) |
+| 3 | MED | Version Bump | Update report version badge from v2.1.80 to v2.1.81 | ✅ COMPLETE (badge, header version, and header text updated) |
+| 4 | MED | New Setting | Add `showClearContextOnPlanAccept` — confirmed in v2.1.81 changelog. When `true`, restores "clear context" option on plan accept (hidden by default). Not yet on official settings page — may be a `~/.claude.json` key | ✅ COMPLETE (added to Global Config Settings table with changelog-source note) |
+| 5 | MED | Plugin Documentation | Document `source: 'settings'` as a marketplace source type in Plugin Settings section. Official settings page lists it as one of 7 source types for `extraKnownMarketplaces` | ✅ COMPLETE (added all 7 source types list, inline marketplace example) |
+| 6 | MED | Status Line Fields | Add `rate_limits` field group to Status Line Input Fields table — includes `five_hour.used_percentage`, `five_hour.resets_at`, `seven_day.used_percentage`, `seven_day.resets_at`. Added in v2.1.80 | ✅ COMPLETE (added 4 rate_limits fields to Status Line Input Fields table) |
+
+---
+
+## [2026-03-23 10:02 PM PKT] Claude Code v2.1.81
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Missing Setting (~/.claude.json) | Add `editorMode` (string, default `"normal"`, values: `"normal"` or `"vim"`) to Global Config Settings table. Written automatically when running `/vim`. Confirmed on official settings page | ✅ COMPLETE (added to Global Config Settings table after autoInstallIdeExtension) |
+| 2 | HIGH | File Scope Fix | Move `showClearContextOnPlanAccept` from Global Config Settings (~/.claude.json) to General Settings (settings.json). Official docs now list it in the main Available settings table, not the Global config table. Remove stale annotation "not yet on official settings page" | ✅ COMPLETE (moved to General Settings table before feedbackSurveyRate, removed stale annotation) |
+| 3 | MED | Changed Description | Fix `terminalProgressBarEnabled` supported terminals from "Windows Terminal, iTerm2" to "ConEmu, Ghostty 1.2.0+, and iTerm2 3.6.6+" per official docs | ✅ COMPLETE (terminal list updated) |
+| 4 | MED | Changed Description | Add "Config tool" to `availableModels` description — official docs say "via `/model`, `--model`, Config tool, or `ANTHROPIC_MODEL`". Report currently omits "Config tool" | ✅ COMPLETE (added "Config tool" to description) |
+
+---
+
+## [2026-03-25 08:16 PM PKT] Claude Code v2.1.83
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | New Setting | Add `autoMode` to Permissions section — object with `environment`, `allow`, `soft_deny` arrays for configuring auto mode classifier. Not read from shared project settings (`.claude/settings.json`). Available in user, local, and managed settings. Confirmed on official settings + permissions pages | ✅ COMPLETE (added to Permission Keys table with full description, scope restrictions, and `claude auto-mode defaults` note) |
+| 2 | HIGH | New Setting | Add `disableAutoMode` to Permissions section — string, set to `"disable"` to prevent auto mode activation. Removes `auto` from Shift+Tab cycle. Can be set at any settings level, most useful in managed settings. Confirmed on official settings + permissions pages | ✅ COMPLETE (added to Permission Keys table after `autoMode`) |
+| 3 | HIGH | New Permission Mode | Add `auto` to Permission Modes table — background classifier replaces manual prompts. Research preview. Requires Team plan + Sonnet/Opus 4.6. Confirmed on official permission-modes page | ✅ COMPLETE (added to Permission Modes table with classifier details and fallback behavior) |
+| 4 | HIGH | New Setting | Add `sandbox.failIfUnavailable` to Sandbox Settings table — boolean, default `false`, exit with error when sandbox enabled but cannot start instead of running unsandboxed. Confirmed in v2.1.83 changelog | ✅ COMPLETE (added to Sandbox Settings table after `sandbox.enabled`) |
+| 5 | HIGH | New Setting | Add `disableDeepLinkRegistration` to General Settings table — boolean, prevent `claude-cli://` protocol handler registration. Confirmed in v2.1.83 changelog | ✅ COMPLETE (added to General Settings table before `feedbackSurveyRate`) |
+| 6 | HIGH | Missing Env Var | Add `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB` to Common Environment Variables table — set to `1` to strip Anthropic and cloud provider credentials from subprocess environments (Bash tool, hooks, MCP stdio servers). Confirmed in v2.1.83 changelog | ✅ COMPLETE (added to env vars table after `CLAUDE_CODE_SUBAGENT_MODEL`) |
+| 7 | HIGH | Settings Hierarchy | Add `managed-settings.d/` drop-in directory to Managed Settings section — independent policy fragments alongside `managed-settings.json` that merge alphabetically. Confirmed in v2.1.83 changelog | ✅ COMPLETE (added as bullet under managed settings delivery methods) |
+| 8 | HIGH | Broken Link | Fix `https://claudelog.com/configuration/` in Sources — returns 403 Forbidden. Remove or replace with working source | ✅ COMPLETE (replaced with `https://claudelog.com/claude-code-changelog/` which was verified working) |
+| 9 | MED | Version Badge | Update report version from v2.1.81 to v2.1.83 | ✅ COMPLETE (badge and header updated in Phase 2.6) |
+| 10 | MED | Example Update | Add `autoMode` to Quick Reference example to demonstrate auto mode classifier configuration | ✅ COMPLETE (added `autoMode` block with `environment` array before `permissions` block) |
+| 11 | MED | Changed Path | Fix Windows registry path from `Software\Anthropic\ClaudeCode` to `SOFTWARE\Policies\ClaudeCode` (HKLM and HKCU). Official docs updated to use `Policies` subkey | ✅ COMPLETE (updated to `HKLM\SOFTWARE\Policies\ClaudeCode` and `HKCU\SOFTWARE\Policies\ClaudeCode` with priority note) |
+| 12 | LOW | Missing Alias | Add `opus[1m]` to Model Aliases table — Opus 4.6 with 1M context, available by default on Max/Team/Enterprise since v2.1.75 | ✅ COMPLETE (added to Model Aliases table after `sonnet[1m]`) |
+
+---
+
+## [2026-03-26 01:04 PM PKT] Claude Code v2.1.84
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | New Setting | Add `defaultShell` to General Settings — string, default `"bash"`, accepts `"bash"` or `"powershell"`. Routes interactive `!` commands through PowerShell on Windows. Requires `CLAUDE_CODE_USE_POWERSHELL_TOOL=1`. Confirmed on official settings page | ✅ COMPLETE (added to General Settings table after teammateMode) |
+| 2 | HIGH | New Setting | Add `allowedChannelPlugins` to MCP Settings — array, managed-only. Allowlist of channel plugins that may push messages. Replaces default Anthropic allowlist when set. Requires `channelsEnabled: true`. Confirmed on official settings page | ✅ COMPLETE (added to MCP Settings table after channelsEnabled) |
+| 3 | HIGH | New Setting | Add `useAutoModeDuringPlan` to Permission Keys — boolean, default `true`. Plan mode uses auto mode semantics when auto mode is available. Not read from shared project settings. Confirmed on official settings page | ✅ COMPLETE (added to Permission Keys table after disableAutoMode) |
+| 4 | HIGH | Missing Env Vars | Add 9 model customization env vars: `ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU}_MODEL_{NAME,DESCRIPTION,SUPPORTED_CAPABILITIES}` for `/model` picker customization on Bedrock/Vertex/Foundry. Confirmed on official /en/env-vars page | ✅ COMPLETE (added 3 vars after each base model var: Haiku, Opus, Sonnet) |
+| 5 | HIGH | Missing Env Var | Add `CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK` — disable non-streaming fallback when streaming fails. Prevents duplicate tool execution via proxy. Confirmed on official /en/env-vars page (added v2.1.83, missed in previous run) | ✅ COMPLETE (added after CLAUDE_CODE_DISABLE_FAST_MODE) |
+| 6 | HIGH | Missing Env Var | Add `CLAUDE_CODE_USE_POWERSHELL_TOOL` — enable PowerShell tool on Windows (opt-in preview). Native Windows only, not WSL. Confirmed on official /en/env-vars page | ✅ COMPLETE (added after CLAUDE_CODE_USE_FOUNDRY) |
+| 7 | HIGH | Broken Link | Fix `https://claudelog.com/claude-code-changelog/` in Sources — returns 403 Forbidden. Replace with official GitHub changelog URL | ✅ COMPLETE (replaced with github.com/anthropics/claude-code/blob/main/CHANGELOG.md) |
+| 8 | MED | Settings Hierarchy | Update managed tier precedence: "file-based (`managed-settings.d/*.json` + `managed-settings.json`)" and add "across tiers" qualifier. Add within-tier merge note per official docs | ✅ COMPLETE (updated precedence description with file-based tier and cross-tier qualifier) |
+| 9 | MED | Settings Hierarchy | Expand drop-in directory merge semantics: systemd convention, scalar override, array concat+dedup, deep merge, hidden file exclusion, numeric prefix tip. Per official settings page | ✅ COMPLETE (expanded with full systemd convention details and numeric prefix tip) |
+| 10 | MED | Annotation | Add "in changelog, not on official settings page" annotation to `disableDeepLinkRegistration` per Rule 1F inverse completeness check | ✅ COMPLETE (added annotation to description) |
+| 11 | MED | Example Update | Add `defaultShell` to Quick Reference example to demonstrate PowerShell configuration | ✅ COMPLETE (added "defaultShell": "bash" to example) |
+
+---
+
+## [2026-03-27 06:32 PM PKT] Claude Code v2.1.85
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Missing Env Var | Add `CLAUDE_STREAM_IDLE_TIMEOUT_MS` to Common Environment Variables table — timeout in ms before streaming idle watchdog closes stalled connection (default: 90000). Confirmed on official /en/env-vars page. Added in v2.1.84 but missed in previous run | ✅ COMPLETE (added to env vars table after CLAUDE_CODE_OTEL_HEADERS_HELPER_DEBOUNCE_MS) |
+| 2 | HIGH | Version Bump | Update report version badge from v2.1.84 to v2.1.85 | ✅ COMPLETE (badge, header version, and header text updated in Phase 2.6) |
+| 3 | MED | New Env Var | Add `OTEL_LOG_TOOL_DETAILS` to env vars table — gates `tool_parameters` in OpenTelemetry events. v2.1.85 changelog only (not yet on official env-vars page). Add with changelog-source annotation | ✅ COMPLETE (added with "in v2.1.85 changelog, not yet on official env-vars page" annotation) |
+| 4 | MED | New Env Vars (Ownership) | Decide ownership for `CLAUDE_CODE_MCP_SERVER_NAME` and `CLAUDE_CODE_MCP_SERVER_URL` — env vars passed to MCP `headersHelper` scripts (v2.1.85 changelog). May belong in hooks repo rather than settings report | ✅ COMPLETE (added to settings report with changelog annotation — these are env-configurable via `env` key, not hook-only) |
+
+---
+
+## [2026-03-28 06:10 PM PKT] Claude Code v2.1.86
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | File Scope | Move `teammateMode` from General Settings (settings.json) to Global Config Settings (~/.claude.json). Official settings page lists it under "Global config settings" — adding to settings.json triggers schema validation error (Rule 1H). Same pattern as v2.1.78 `showTurnDuration` fix | ✅ COMPLETE (removed from General Settings table, added to Global Config Settings table after terminalProgressBarEnabled with agent-teams docs link) |
+| 2 | HIGH | Type + Annotation | Fix `disableDeepLinkRegistration`: change type from `boolean` to `string` (value: `"disable"`), update description to match official docs, remove stale "(in changelog, not on official settings page)" annotation. Now confirmed on official settings page (line 169) | ✅ COMPLETE (type changed to string, description updated to match official docs, changelog annotation removed) |
+| 3 | HIGH | Version Bump | Update report version badge from v2.1.85 to v2.1.86 | ✅ COMPLETE (badge and header updated in Phase 2.6) |
+
+---
+
+## [2026-03-31 07:02 PM PKT] Claude Code v2.1.88
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Missing Env Var | Add `CLAUDE_CODE_NO_FLICKER` to Common Environment Variables table — enable flicker-free alt-screen rendering (v2.1.88). Confirmed on official /en/env-vars page | ✅ COMPLETE (added after CLAUDE_CODE_DISABLE_TERMINAL_TITLE) |
+| 2 | HIGH | Missing Env Vars | Add `CLAUDE_CODE_SCROLL_SPEED` and `CLAUDE_CODE_DISABLE_MOUSE` to Common Environment Variables table — fullscreen UI controls. Confirmed on official /en/env-vars page | ✅ COMPLETE (added after CLAUDE_CODE_NO_FLICKER) |
+| 3 | HIGH | Version Bump | Update report version badge from v2.1.86 to v2.1.88 | ✅ COMPLETE (badge, header version, and header text updated in Phase 2.6) |
+| 4 | HIGH | Broken Link | Fix `https://www.eesel.ai/blog/settings-json-claude-code` in Sources — returns CSS-only content, no readable blog post | ✅ COMPLETE (removed broken link from Sources section) |
+| 5 | MED | Settings Hierarchy | Add `managed-mcp.json` to file-based managed delivery methods — official settings page lists it alongside `managed-settings.json` for MCP server configuration | ✅ COMPLETE (added to File delivery method bullet in Settings Hierarchy) |
+| 6 | MED | Plugin Source Types | Annotate `url`, `npm`, `file` marketplace source types as "not in official docs — unverified" (only `github`, `git`, `directory`, `hostPattern`, `settings` confirmed) | ✅ COMPLETE (added unverified annotations to all 3 source types) |
+| 7 | LOW | Header Count | Update header from "60+ settings" to match actual table count after any additions | ❌ INVALID (count is accurate — 60+ settings and 125 env vars, both within stated ranges) |
+
+---
+
+## [2026-04-01 12:32 PM PKT] Claude Code v2.1.89
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Missing Setting | Add `skipDangerousModePermissionPrompt` to Permission Keys table — boolean, skip bypass-mode confirmation prompt. Ignored in project settings. Confirmed on official settings page | ✅ COMPLETE (added after disableBypassPermissionsMode in Permission Keys table) |
+| 2 | HIGH | New Setting | Add `showThinkingSummaries` to General Settings — boolean, default `false`. Thinking summaries no longer generated by default; set `true` to restore. v2.1.89 changelog — not yet on official settings page | ✅ COMPLETE (added before feedbackSurveyRate with changelog annotation) |
+| 3 | HIGH | Changed Behavior | Update `cleanupPeriodDays` description — v2.1.89 changelog says `0` is now rejected with a validation error. CONTRADICTION: official settings page still describes `0` as valid. Flag for user | ✅ COMPLETE (updated description with contradiction note between changelog and docs page) |
+| 4 | HIGH | Missing Env Vars | Add ~46 missing env vars confirmed on official /en/env-vars page: `ANTHROPIC_BEDROCK_BASE_URL`, `ANTHROPIC_VERTEX_BASE_URL`, `ANTHROPIC_BETAS`, `ANTHROPIC_VERTEX_PROJECT_ID`, `CLAUDE_CODE_DISABLE_THINKING`, `DISABLE_INTERLEAVED_THINKING`, `ENABLE_PROMPT_CACHING_1H_BEDROCK`, `DISABLE_AUTO_COMPACT`, `DISABLE_COMPACT`, `CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING`, `CLAUDE_CODE_DISABLE_ATTACHMENTS`, `CLAUDE_CODE_DISABLE_CLAUDE_MDS`, `CLAUDE_CODE_GLOB_HIDDEN`, `CLAUDE_CODE_GLOB_NO_IGNORE`, `CLAUDE_CODE_GLOB_TIMEOUT_SECONDS`, `CLAUDE_CODE_DISABLE_OFFICIAL_MARKETPLACE_AUTOINSTALL`, `CLAUDE_CODE_SYNC_PLUGIN_INSTALL`, `CLAUDE_CODE_SYNC_PLUGIN_INSTALL_TIMEOUT_MS`, `CLAUDE_CODE_AUTO_CONNECT_IDE`, `CLAUDE_CODE_IDE_HOST_OVERRIDE`, `CLAUDE_CODE_IDE_SKIP_VALID_CHECK`, `CLAUDE_CODE_MAX_RETRIES`, `API_TIMEOUT_MS`, `CLAUDE_CODE_OTEL_FLUSH_TIMEOUT_MS`, `CLAUDE_CODE_OTEL_SHUTDOWN_TIMEOUT_MS`, `CLAUDE_ENABLE_STREAM_WATCHDOG`, `CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING`, `CLAUDE_CODE_DEBUG_LOGS_DIR`, `CLAUDE_CODE_DEBUG_LOG_LEVEL`, `CLAUDE_CODE_ACCESSIBILITY`, `CLAUDE_CODE_SYNTAX_HIGHLIGHT`, `CLAUDE_CODE_RESUME_INTERRUPTED_TURN`, `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY`, `CLAUDE_CODE_DISABLE_LEGACY_MODEL_REMAP`, `FALLBACK_FOR_ALL_PRIMARY_MODELS`, `CLAUDE_CODE_GIT_BASH_PATH`, `CLAUDE_AUTO_BACKGROUND_TASKS`, `CLAUDE_AGENT_SDK_DISABLE_BUILTIN_AGENTS`, `CLAUDE_AGENT_SDK_MCP_NO_PREFIX`, `DISABLE_DOCTOR_COMMAND`, `DISABLE_LOGIN_COMMAND`, `DISABLE_LOGOUT_COMMAND`, `DISABLE_UPGRADE_COMMAND`, `DISABLE_EXTRA_USAGE_COMMAND`, `DISABLE_INSTALL_GITHUB_APP_COMMAND`, `CLAUDE_CODE_PLUGIN_CACHE_DIR`, `CLAUDE_CODE_SIMPLE` | ✅ COMPLETE (added all 46 env vars to table near related vars) |
+| 5 | HIGH | Version Bump | Update report version badge from v2.1.88 to v2.1.89 | ✅ COMPLETE (badge and header updated in Phase 2.6) |
+| 6 | MED | New Env Var | Add `MCP_CONNECTION_NONBLOCKING` to env vars table — set to `true` in `-p` mode to skip MCP connection wait. v2.1.89 changelog only, not yet on official /en/env-vars page | ✅ COMPLETE (added after CLAUDE_AGENT_SDK_MCP_NO_PREFIX with changelog annotation) |
+| 7 | MED | Ownership Boundary | `CLAUDE_CODE_SIMPLE` is in CLI startup flags file as startup-only, but official /en/env-vars page lists it as configurable. Reconcile ownership | ✅ COMPLETE (added to settings report env table; updated CLI file to cross-reference settings report) |
+| 8 | MED | Example Update | Update Quick Reference example to include `showThinkingSummaries` if added | ✅ COMPLETE (added showThinkingSummaries: true to example) |
+
+---
+
+## [2026-04-02 09:24 PM PKT] Claude Code v2.1.90
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Changed Type + Description | Fix `forceLoginOrgUUID`: type from `string` to `string \| string[]`. Expand description to include array behavior (any listed org accepted without pre-selection), managed settings enforcement (login fails if account not in listed org), and empty array fail-closed behavior | ✅ COMPLETE (type updated to string \| array, description expanded with array behavior, managed enforcement, fail-closed semantics, example updated) |
+| 2 | HIGH | Missing Env Vars | Add `CLAUDE_CODE_OAUTH_TOKEN`, `CLAUDE_CODE_OAUTH_REFRESH_TOKEN`, `CLAUDE_CODE_OAUTH_SCOPES` to Common Environment Variables table. All confirmed on official /en/env-vars page | ✅ COMPLETE (added 3 OAuth env vars after ANTHROPIC_AUTH_TOKEN) |
+| 3 | HIGH | Changed Description + Annotation | Update `showThinkingSummaries`: remove "(in v2.1.89 changelog, not yet on official settings page)" annotation — now confirmed on official settings page. Update description to match official: "When unset or false (default in interactive mode), thinking blocks are redacted by the API and shown as a collapsed stub. Redaction only changes what you see, not what the model generates" | ✅ COMPLETE (annotation removed, description updated to match official docs) |
+| 4 | HIGH | Sandbox Cross-Merge | Update `sandbox.filesystem.allowWrite` description to add "Also merged with paths from `Edit(...)` allow permission rules". Update `denyWrite` to add "Also merged with paths from `Edit(...)` deny permission rules". Update `denyRead` to add "Also merged with paths from `Read(...)` deny permission rules". Confirmed on official settings page | ✅ COMPLETE (cross-merge behavior added to all 3 filesystem entries) |
+| 5 | HIGH | Changed Description | Simplify `cleanupPeriodDays` description: remove contradiction note, align with official docs which now say "minimum 1, Setting to 0 is rejected with a validation error". Old behavior no longer documented on official page | ✅ COMPLETE (contradiction note removed, description aligned with official docs, added --no-session-persistence alternative) |
+| 6 | HIGH | Version Bump | Update report version badge from v2.1.89 to v2.1.90 | ✅ COMPLETE (badge, header version, and header text updated) |
+| 7 | MED | New Env Var | Add `CLAUDE_CODE_PLUGIN_KEEP_MARKETPLACE_ON_FAILURE` to env vars table — keep marketplace cache on git pull failure (v2.1.90 changelog, not yet on official /en/env-vars page) | ✅ COMPLETE (added after CLAUDE_CODE_SYNC_PLUGIN_INSTALL_TIMEOUT_MS with changelog annotation) |
+| 8 | MED | Hook Redirect Count | Update redirect text from "all 19 hook events" to "all 25 hook events" per official hooks page count | ✅ COMPLETE (updated count in hooks redirect section) |
+| 9 | MED | Ownership Boundary | `CLAUDE_CODE_TMPDIR` is on official /en/env-vars page as configurable via `env` key, but CLI startup flags report lists it as startup-only. Reconcile ownership | ✅ COMPLETE (added to settings report env table; updated CLI flags file to cross-reference settings report) |
+
+---
+
+## [2026-04-03 08:44 PM PKT] Claude Code v2.1.91
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | New Setting | Add `disableSkillShellExecution` to General Settings table — boolean, disable inline shell execution in skills, custom slash commands, and plugin commands. Confirmed in v2.1.91 changelog. Not yet on official settings page or in JSON schema | ✅ COMPLETE (added after showThinkingSummaries with changelog annotation) |
+| 2 | HIGH | Version Bump | Update report version badge from v2.1.90 to v2.1.91 | ✅ COMPLETE (badge and header updated in Phase 2.6) |
+
+---
+
+## [2026-04-04 10:48 PM PKT] Claude Code v2.1.92
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | New Setting | Add `forceRemoteSettingsRefresh` to General Settings — boolean, managed-only, blocks CLI startup until remote managed settings are freshly fetched (fail-closed). Confirmed on official settings page | ✅ COMPLETE (added before feedbackSurveyRate in General Settings table) |
+| 2 | HIGH | Missing Env Var | Add `CLAUDE_REMOTE_CONTROL_SESSION_NAME_PREFIX` to Common Environment Variables table — prefix for auto-generated Remote Control session names, defaults to machine hostname. Confirmed on official /en/env-vars page | ✅ COMPLETE (added before CLAUDE_CODE_ENABLE_TELEMETRY) |
+| 3 | MED | Changed Description | Update `disableSkillShellExecution` — remove "(in v2.1.91 changelog, not yet on official settings page)" annotation. Now confirmed on official settings page with expanded description | ✅ COMPLETE (annotation removed, description expanded per official docs) |
+| 4 | MED | Changed Description | Remove "not in official docs — unverified" tags from marketplace source types `url`, `npm`, and `file`. Official settings page now documents all 8 source types | ✅ COMPLETE (unverified annotations removed — recurring from 2026-03-31, now resolved) |
+| 5 | MED | Changed Description | Enrich `cleanupPeriodDays` — add "Also controls the age cutoff for automatic removal of orphaned subagent worktrees at startup" per official settings page | ✅ COMPLETE (worktree cleanup detail added) |
+| 6 | MED | Changed Description | Enrich `disableDeepLinkRegistration` — add multi-line prompt support via `%0A` per official settings page | ✅ COMPLETE (multi-line prompt detail added) |
+| 7 | MED | Changed Description | Enrich `includeGitInstructions` — update to include git status snapshot and env var precedence per official settings page | ✅ COMPLETE (description expanded with git status snapshot and CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS precedence) |
+| 8 | MED | Changed Description | Enrich `language` — add "Also sets the voice dictation language" per official settings page | ✅ COMPLETE (voice dictation detail added) |
+| 9 | MED | Changed Description | Enrich `allowUnsandboxedCommands` — add enterprise policy detail per official settings page | ✅ COMPLETE (expanded with fail-closed behavior and enterprise use case) |
+
+---
+
+## [2026-04-08 09:51 PM PKT] Claude Code v2.1.96
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Missing Env Vars | Add `CLAUDE_CODE_USE_MANTLE`, `ANTHROPIC_BEDROCK_MANTLE_BASE_URL`, `CLAUDE_CODE_SKIP_MANTLE_AUTH` to Common Environment Variables table — Bedrock Mantle endpoint support (v2.1.94). All confirmed on official /en/env-vars page | ✅ COMPLETE (added near related cloud provider vars) |
+| 2 | HIGH | Changed Default | Update Effort Level section — default changed from Medium to High for API-key, Bedrock/Vertex/Foundry, Team, and Enterprise users (v2.1.94). Update table default marker and historical note | ✅ COMPLETE (table updated High as default, historical note expanded with v2.1.94 change) |
+| 3 | HIGH | Version Bump | Update report version badge from v2.1.92 to v2.1.96 | ✅ COMPLETE (badge, header version, and header text updated in Phase 2.6) |
+| 4 | MED | Stale Annotation | Remove "(in v2.1.90 changelog, not yet on official env-vars page)" from `CLAUDE_CODE_PLUGIN_KEEP_MARKETPLACE_ON_FAILURE` — now confirmed on official /en/env-vars page. Update description to match official wording | ✅ COMPLETE (annotation removed, description updated per official docs) |
+| 5 | MED | Changed Description | Update `CLAUDE_CODE_GLOB_HIDDEN` description to match official: "Set to `false` to exclude dotfiles from Glob results. Included by default. Does not affect `@` file autocomplete, `ls`, Grep, or Read" | ✅ COMPLETE (description rewritten per official env-vars page) |
+
+---
+
+## [2026-04-09 11:39 PM PKT] Claude Code v2.1.97
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | New Setting | Add `sandbox.network.allowMachLookup` to Sandbox Settings table — array, macOS only, XPC/Mach service names with trailing `*` wildcard support. Confirmed on official settings page | ✅ COMPLETE (added after allowManagedDomainsOnly in sandbox network sub-keys) |
+| 2 | HIGH | Display & UX | Add `refreshInterval` field to Status Line Configuration section — optional, re-runs command every N seconds, minimum 1 (v2.1.97). Confirmed on official status line docs | ✅ COMPLETE (added to config table with `padding` field, updated JSON example) |
+| 3 | HIGH | Display & UX | Expand Status Line Input Fields table from 9 to 30+ fields to match official status line docs. Add `model.*`, `workspace.*`, `cost.*`, `session_id`, `session_name`, `transcript_path`, `version`, `output_style.name`, `vim.mode`, `agent.name`, `worktree.*` fields | ✅ COMPLETE (expanded from 9 to 30 fields per official status line documentation) |
+| 4 | HIGH | Version Bump | Update report version badge from v2.1.96 to v2.1.97 | ✅ COMPLETE (badge and header updated in Phase 2.6) |
+| 5 | MED | Field Naming | Fix `current_usage` → `context_window.current_usage` in Status Line Input Fields table | ✅ COMPLETE (renamed with full path and expanded description) |
+| 6 | MED | Ownership Boundary | Add `CCR_FORCE_BUNDLE` to `claude-cli-startup-flags.md` — startup-only var for `claude --remote` bundling. On official /en/env-vars page but not in either file | ✅ COMPLETE (added to CLI startup flags env vars table) |
+| 7 | MED | Changed Description | Update `CLAUDE_CODE_GLOB_NO_IGNORE` description to match official: "Set to `false` to make the Glob tool respect `.gitignore` patterns. By default, Glob returns all matching files including gitignored ones. Does not affect `@` file autocomplete" | ✅ COMPLETE (description rewritten per official env-vars page) |
+| 8 | MED | Changed Description | Update `editorMode` description — remove stale `/vim` reference (removed in v2.1.94), change config label from "Key binding mode" to "Editor mode" per official docs | ✅ COMPLETE (removed /vim reference, config label updated) |
+
+---
+
+## [2026-04-13 08:10 PM PKT] Claude Code v2.1.101
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Missing Env Var | Add `CLAUDE_CODE_CERT_STORE` to Common Environment Variables table — comma-separated CA certificate sources for TLS (`bundled`, `system`). Default: `bundled,system`. Native binary required for system store. v2.1.101. Confirmed on official /en/env-vars page | ✅ COMPLETE (added after CLAUDE_CODE_CLIENT_KEY_PASSPHRASE) |
+| 2 | HIGH | Missing Env Var | Add `CLAUDE_CODE_PERFORCE_MODE` to Common Environment Variables table — set to `1` to enable Perforce-aware write protection. Edit/Write/NotebookEdit fail with `p4 edit` hint if target file lacks owner-write bit. v2.1.98. Confirmed on official /en/env-vars page | ✅ COMPLETE (added after CLAUDE_CODE_SCRIPT_CAPS) |
+| 3 | HIGH | Missing Env Var | Add `CLAUDE_CODE_SCRIPT_CAPS` to Common Environment Variables table — JSON object limiting script invocation counts per session when `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB` is set. Keys are substrings matched against command text; values are integer call limits. Confirmed on official /en/env-vars page | ✅ COMPLETE (added after CLAUDE_CODE_SUBPROCESS_ENV_SCRUB) |
+| 4 | HIGH | Version Bump | Update report version badge from v2.1.97 to v2.1.101 | ✅ COMPLETE (badge, header version, and header text updated in Phase 2.6) |
+| 5 | MED | Changed Description | Update `disableSkillShellExecution` — add ` ```! ` (triple-backtick shell) block syntax and "from user, project, plugin, or additional-directory sources" qualifier per official settings page | ✅ COMPLETE (description expanded per official docs) |
+| 6 | MED | Ownership Boundary | Add `DISABLE_AUTOUPDATER` to settings report env vars table — on official /en/env-vars page as configurable via `env` key, currently only in CLI startup flags file. Add with cross-reference to CLI flags file | ✅ COMPLETE (added to settings report before DISABLE_TELEMETRY; CLI flags file updated with cross-ref) |
+
+---
+
+## [2026-04-14 11:22 PM PKT] Claude Code v2.1.107
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | New Setting | Add `viewMode` to General Settings table — string, values `"default"`, `"verbose"`, `"focus"`. Default transcript view mode on startup, overrides sticky Ctrl+O selection. Confirmed on official settings page | ✅ COMPLETE (added after showClearContextOnPlanAccept in General Settings) |
+| 2 | HIGH | Missing Env Vars | Add 5 missing env vars confirmed on official /en/env-vars page: `ANTHROPIC_CUSTOM_MODEL_OPTION_SUPPORTED_CAPABILITIES`, `CLAUDE_CODE_DISABLE_VIRTUAL_SCROLL`, `CLAUDE_ENABLE_BYTE_WATCHDOG`, `CLAUDE_CODE_MAX_CONTEXT_TOKENS`, `CLAUDE_CODE_SKIP_PROMPT_HISTORY` | ✅ COMPLETE (added near related vars in env table) |
+| 3 | HIGH | Changed Description | Update `disableAllHooks` description — add "and any custom status line" per official settings page line 180 | ✅ COMPLETE (updated inline in hooks redirect section) |
+| 4 | HIGH | Changed Default | Fix `teammateMode` default from `"in-process"` to `"auto"` in Global Config Settings table. Official docs describe `auto` as primary behavior. Regressed during v2.1.86 file-scope move | ✅ COMPLETE (default updated to "auto" — recurring from 2026-03-07, regression from v2.1.86 move) |
+| 5 | MED | Changed Description | Update `CLAUDE_STREAM_IDLE_TIMEOUT_MS` description — distinguish byte watchdog (default/minimum 300000ms) from event watchdog (default 90000ms). Per official /en/env-vars page | ✅ COMPLETE (description expanded with dual-watchdog detail and cross-reference to CLAUDE_ENABLE_BYTE_WATCHDOG) |
+| 6 | MED | Annotation Fix | Remove "(startup-only)" from `CLAUDE_CODE_GIT_BASH_PATH` — official /en/env-vars page lists it as env-configurable | ✅ COMPLETE (description rewritten per official docs, startup-only annotation removed) |
+| 7 | MED | Example Update | Add `viewMode` to Quick Reference example after `showThinkingSummaries` | ✅ COMPLETE (added "viewMode": "default" to example) |
+| 8 | MED | Stale Annotation | `OTEL_LOG_TOOL_DETAILS` still marked "in v2.1.85 changelog, not yet on official env-vars page" — confirmed still absent from official page after 10+ versions and 7 consecutive runs | ✋ ON HOLD (annotation is accurate — keeping as-is pending official docs update) |
+| 7 | MED | Ownership Boundary | Add `CCR_FORCE_BUNDLE` to settings report env vars table — on official /en/env-vars page as configurable via `env` key, currently only in CLI startup flags file. Add with cross-reference to CLI flags file | ✅ COMPLETE (added to settings report before CLAUDE_CODE_GIT_BASH_PATH; CLI flags file updated with cross-ref) |
+
+---
+
+## [2026-04-16 08:25 PM PKT] Claude Code v2.1.110
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Missing Setting | Add `minimumVersion` to General Settings table — string, prevents auto-updater from downgrading below a specific version. Confirmed on official settings page | ✅ COMPLETE (added after autoUpdatesChannel in General Settings table) |
+| 2 | HIGH | Missing Env Var | Add `CLAUDE_CODE_TMUX_TRUECOLOR` to Common Environment Variables table — set to `1` to allow 24-bit truecolor output inside tmux. Confirmed on official /en/env-vars page | ✅ COMPLETE (added before CLAUDE_CODE_NO_FLICKER) |
+| 3 | HIGH | Missing Env Var | Add `CLAUDE_CODE_REMOTE` to Common Environment Variables table — read-only, set to `true` in cloud sessions. Confirmed on official /en/env-vars page | ✅ COMPLETE (added before CLAUDE_REMOTE_CONTROL_SESSION_NAME_PREFIX) |
+| 4 | HIGH | Missing Env Var | Add `CLAUDE_CODE_REMOTE_SESSION_ID` to Common Environment Variables table — read-only, cloud session ID. Confirmed on official /en/env-vars page | ✅ COMPLETE (added before CLAUDE_REMOTE_CONTROL_SESSION_NAME_PREFIX) |
+| 5 | HIGH | Inverse Env Var Check | Mark `ENABLE_PROMPT_CACHING_1H_BEDROCK` as "not in official docs — unverified". No longer on official /en/env-vars page. Per Rule 5D | ✅ COMPLETE (added unverified annotation with deprecation note) |
+| 6 | MED | New Setting (Changelog) | Add `autoScrollEnabled` to General Settings — boolean, disable conversation auto-scroll in fullscreen mode. v2.1.110 changelog only, not yet on official settings page | ✅ COMPLETE (added before feedbackSurveyRate with changelog annotation) |
+| 7 | MED | New Setting (Changelog) | Add `tui` to General Settings — setting for flicker-free rendering mode (`/tui fullscreen`). v2.1.110 changelog only, not yet on official settings page | ✅ COMPLETE (added before feedbackSurveyRate with changelog annotation) |
+| 8 | MED | New Env Var (Changelog) | Add `ENABLE_PROMPT_CACHING_1H` to env vars table — 1-hour prompt cache TTL (replaces deprecated `ENABLE_PROMPT_CACHING_1H_BEDROCK`). v2.1.108 changelog only, not yet on official /en/env-vars page | ✅ COMPLETE (added before DISABLE_PROMPT_CACHING with changelog annotation) |
+| 9 | MED | New Env Var (Changelog) | Add `FORCE_PROMPT_CACHING_5M` to env vars table — force 5-minute TTL. v2.1.108 changelog only, not yet on official /en/env-vars page | ✅ COMPLETE (added before DISABLE_PROMPT_CACHING with changelog annotation) |
+| 10 | MED | Effort Level Table | Add `Max` row to Effort Level table — Opus 4.6 only, documented in env var but missing from table | ✅ COMPLETE (added as first row in Effort Level table) |
+| 11 | MED | Sandbox Descriptions | Add platform-specific notes: `allowUnixSockets` (macOS only), `allowAllUnixSockets` (Linux/WSL2 detail), `enableWeakerNestedSandbox` (Linux/WSL2 only) | ✅ COMPLETE (all 3 descriptions updated with platform-specific notes per official docs) |
+| 12 | LOW | Changelog-Only Env Vars | Consider adding `CLAUDE_CODE_ENABLE_AWAY_SUMMARY` (v2.1.108), `OTEL_LOG_USER_PROMPTS` (v2.1.101), `OTEL_LOG_TOOL_CONTENT` (v2.1.101) — all changelog-only, not on official env-vars page. Defer per Rule 8A until official docs confirm | ✋ ON HOLD (deferred — changelog-only, not confirmed by official docs) |
+
+---
+
+## [2026-04-18 07:56 PM PKT] Claude Code v2.1.114
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update report version badge from v2.1.110 to v2.1.114 and header "As of v2.1.110" → "As of v2.1.114" | ✅ COMPLETE (badge and header text updated) |
+| 2 | HIGH | New Setting | Add `awaySummaryEnabled` to General Settings table — boolean, controls whether idle-session recap ("away summary") is generated. Confirmed on official settings page. Paired with `CLAUDE_CODE_ENABLE_AWAY_SUMMARY` env var | ✅ COMPLETE (added to General Settings table between `tui` and `feedbackSurveyRate` with pairing note) |
+| 3 | HIGH | Missing Env Var | Add `CLAUDE_CODE_ENABLE_AWAY_SUMMARY` to Common Environment Variables table — opt-out for away summary/session recap. Confirmed on official /en/env-vars page | ✅ COMPLETE (added after `FORCE_PROMPT_CACHING_5M` — RECURRING resolved, first seen 2026-04-16) |
+| 4 | HIGH | Missing Value | Add `xhigh` to `effortLevel` valid values (line 497) — v2.1.111 introduced `xhigh` for Opus 4.7. Currently lists only `"low"`, `"medium"`, `"high"` | ✅ COMPLETE (description updated with `"xhigh"` value, Opus 4.7 support, and fallback behavior) |
+| 5 | HIGH | Effort Level Table | Add `xhigh` row to Effort Level table (between Max and High) — Opus 4.7 only, introduced v2.1.111 | ✅ COMPLETE (XHigh row added; default marker updated to "default on Opus 4.6/Sonnet 4.6"; Note section expanded with v2.1.111 xhigh default on Opus 4.7) |
+| 6 | HIGH | File Scope Move | Move `autoScrollEnabled` from General Settings (line 88) to Global Config Settings (`~/.claude.json`) table — official docs list it as a `~/.claude.json` key, not `settings.json`. Default `true`. Per Rule 1H. Adding to settings.json may trigger schema validation error | ✅ COMPLETE (removed from General Settings, added to Global Config Settings table between `autoInstallIdeExtension` and `editorMode` with default `true`) |
+| 7 | HIGH | Stale Annotation | Remove "(in v2.1.110 changelog, not yet on official settings page)" from `tui` description (line 89) — now officially documented. Update description per official docs: `"fullscreen"` or `"default"` | ✅ COMPLETE (annotation removed, description updated with values and v2.1.110 reference) |
+| 8 | HIGH | New Setting | Add `externalEditorContext` to Global Config Settings (`~/.claude.json`) table — confirmed on official settings page under "Global config settings" section. Per Rule 1A | ✅ COMPLETE (added to Global Config Settings table after `editorMode` with default `true`) |
+| 9 | HIGH | Stale Annotation | Remove "(not in official docs — unverified)" from `sandbox.network.deniedDomains` (line 388) — officially added in v2.1.113 changelog. Update description per official docs (takes precedence over `allowedDomains`). Per Rule 10B, unblocks after 11 consecutive ON HOLD runs | ✅ COMPLETE (annotation removed, description rewritten with precedence and glob support notes — RECURRING resolved, first seen 2026-03-05) |
+| 10 | MED | Example Update | Update Quick Reference example (lines 938–1023) to include `awaySummaryEnabled`, `tui: "fullscreen"`, and `effortLevel: "xhigh"` to showcase v2.1.111–v2.1.114 additions | ✅ COMPLETE (all 3 keys added to example; `effortLevel` bumped from `"medium"` to `"xhigh"`) |
+| 11 | MED | Header Setting Count | Verify "60+ settings" count still accurate after adding `awaySummaryEnabled` and `externalEditorContext`; env var count "175+" still reasonable | ✅ COMPLETE (both counts remain within stated ranges — net +2 settings, +1 env var, headers accurate as "60+" and "175+") |
+| 12 | LOW | Cross-Link | Add bidirectional cross-links for `CLAUDE_CODE_SIMPLE` and `CLAUDE_CODE_EFFORT_LEVEL` between settings report and `claude-cli-startup-flags.md`. Currently one-way; startup-flags file links to settings report but settings report does not link back | ✅ COMPLETE (added cross-reference links back to `./claude-cli-startup-flags.md#environment-variables` for both env vars) |
+| 13 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` still marked "in v2.1.85 changelog, not yet on official env-vars page" after 11+ consecutive runs. Per Rule 10B: consider resolving — either confirm via official docs or remove. Currently agent research confirms still absent from official docs | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107, annotation still accurate) |
+| 14 | LOW | Suspect Key Recurrence | `OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_CONTENT` still changelog-only. Defer per Rule 8A | ✋ ON HOLD (kept — recurring from 2026-04-16 v2.1.110) |
+
+---
+
+## [2026-04-24 12:27 AM PKT] Claude Code v2.1.118
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | New Setting | Add `wslInheritsWindowsSettings` to managed-only settings (Windows HKLM registry / `C:\Program Files\ClaudeCode\managed-settings.json` only — WSL inherits Windows policy chain). Confirmed on official settings page | ✅ COMPLETE (added to General Settings table after `forceRemoteSettingsRefresh` with full description and v2.1.118 attribution) |
+| 2 | HIGH | Changed Behavior | Update `autoMode` description to document `"$defaults"` sentinel — allows custom rules to be added alongside built-in rules instead of replacing them (v2.1.118). Confirmed on official settings page | ✅ COMPLETE (description updated — sentinel inheritance behavior documented inline with v2.1.118 attribution) |
+| 3 | HIGH | New Env Var (Changelog) | Add `DISABLE_UPDATES` to env vars table — completely blocks all update paths including manual `claude update` (stricter than `DISABLE_AUTOUPDATER`). v2.1.118 changelog only, not yet on official /en/env-vars page | ✅ COMPLETE (added after `DISABLE_AUTOUPDATER` with changelog-only annotation) |
+| 4 | MED | Stale Suspect Key | Remove `askEdits` and `viewOnly` rows from Permission Modes table — official permissions page lists only 6 modes (`default`, `acceptEdits`, `plan`, `auto`, `dontAsk`, `bypassPermissions`). Report has flagged both as "unverified" since v2.1.74 (2026-03-12). Per Rule 10B (5+ run ON HOLD escalation), resolve by removing | ✅ COMPLETE (both rows removed — RECURRING resolved, first seen 2026-03-12) |
+| 5 | MED | Stale Suspect Key | Remove `allow_remote_sessions` from Permission Keys table — official permissions page explicitly notes "Access to Remote Control and web sessions is not controlled by a managed settings key." Admins manage this via Claude Code admin settings UI. First added v2.1.74 (2026-03-12) as a speculative managed setting; has not been documented since | ✅ COMPLETE (row removed from Permission Keys table — RECURRING resolved, first seen 2026-03-12) |
+| 6 | MED | Changed Behavior | Update `cleanupPeriodDays` description — v2.1.117 expanded sweep to also clean `~/.claude/tasks/`, `~/.claude/shell-snapshots/`, and `~/.claude/backups/` (previously only transcripts and orphaned worktrees) | ✅ COMPLETE (description rewritten to cover the full sweep scope with v2.1.117 attribution) |
+| 7 | MED | Effort Level Note | Add v2.1.117 Pro/Max default-effort change to Effort Level section — default for Pro/Max subscribers on Opus 4.6 and Sonnet 4.6 moved from `medium` to `high`. Current note only mentions the earlier v2.1.94 change for API-key/Bedrock/Vertex/Foundry/Team/Enterprise users | ✅ COMPLETE (Effort Level Note expanded with v2.1.117 Pro/Max alignment sentence) |
+| 8 | LOW | Example Update | Update Quick Reference example to showcase v2.1.118 features — either `wslInheritsWindowsSettings` or `"$defaults"` sentinel in `autoMode.soft_deny` | ✅ COMPLETE (added `"soft_deny": ["$defaults", "Never run terraform apply"]` to autoMode block in Quick Reference) |
+| 9 | LOW | New Env Var (Changelog) | Consider adding `CLAUDE_CODE_FORK_SUBAGENT` to env vars table — enables forked subagents on external builds. v2.1.117 changelog only, not yet on official /en/env-vars page | ✅ COMPLETE (added after `OTEL_LOG_RAW_API_BODIES` with changelog-only annotation) |
+| 10 | LOW | New Env Var (Changelog) | Consider adding `OTEL_LOG_RAW_API_BODIES` to env vars table — emit full API request/response bodies as OpenTelemetry log events. v2.1.111 changelog only, not yet on official /en/env-vars page | ✅ COMPLETE (added after `OTEL_LOG_TOOL_DETAILS` with changelog-only annotation) |
+| 11 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` still "in v2.1.85 changelog, not yet on official env-vars page" after 12+ consecutive runs. Per Rule 10B, deferred pending official docs update | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+| 12 | LOW | Suspect Key Recurrence | `OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_CONTENT` still changelog-only. Defer per Rule 8A | ✋ ON HOLD (kept — recurring from 2026-04-16 v2.1.110) |
+| 13 | INVALID | Spurious Drift Claim | `workflow-claude-settings-agent` reported `sandbox.allowUnsandboxedCommands` default was wrong (claimed docs say `false`). Verified against official settings page — documented default is **`true`**. Report is correct as-is | ❌ INVALID (agent report contradicted by official docs on re-verification) |
+---
+
+## [2026-04-26 01:10 PM PKT] Claude Code v2.1.119
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update report version badge from v2.1.118 to v2.1.119 and header "As of v2.1.118" → "As of v2.1.119" | ✅ COMPLETE (badge, header version, and header text updated in Phase 2.6) |
+| 2 | HIGH | New Setting | Add `prUrlTemplate` to Attribution Settings table — string, URL template that controls how the PR badge in commit attribution links to the pull request UI. Useful for self-hosted GitLab/Bitbucket/GitHub Enterprise instances. Confirmed in v2.1.119 changelog | ✅ COMPLETE (added between `attribution.pr` and `includeCoAuthoredBy` in Attribution Settings table with v2.1.119 attribution and self-hosted use case) |
+| 3 | HIGH | Missing Env Var | Add `CLAUDE_CODE_HIDE_CWD` to Common Environment Variables table — set to `1` to hide the current working directory in the startup logo banner. Useful in screen recordings or shared sessions where the CWD path is sensitive. Confirmed in v2.1.119 changelog | ✅ COMPLETE (added after `CLAUDE_CODE_DISABLE_MOUSE` in env vars table grouped with other UI/display vars) |
+| 4 | HIGH | Changed Behavior | Update `auto` permission mode description (line 247) — remove outdated `--enable-auto-mode` flag reference (flag was REMOVED in v2.1.111). Per official permissions docs, current description is: "Auto-approves tool calls with background safety checks that verify actions align with your request. Currently a research preview." Auto mode is now in the default `Shift+Tab` cycle | ✅ COMPLETE (description rewritten using official wording; `--enable-auto-mode` flag reference removed; noted Shift+Tab cycle inclusion since v2.1.111 and `--permission-mode auto` as the current entry point) |
+| 5 | MED | Changed Behavior | Update `blockedMarketplaces` description in Plugin Settings — note v2.1.119 enforcement of `hostPattern` and `pathPattern` matching. Blocked sources now correctly reject before downloading touches the filesystem | ✅ COMPLETE (description expanded with hostPattern/pathPattern matchers and v2.1.119 pre-download enforcement detail) |
+| 6 | MED | Voice Setting Expansion | Expand `voiceEnabled` (boolean, line 81) into the full `voice` object documented per v2.1.118 — supports `enabled` (boolean), `mode` (`"hold"` or `"tap"`), and `autoSubmit` (boolean). Keep `voiceEnabled` as legacy alias with DEPRECATED marker | ✅ COMPLETE (added new `voice` object row with all 3 fields; `voiceEnabled` row updated to DEPRECATED legacy alias pointing to `voice` object) |
+| 7 | MED | New Subcommand | Add `claude plugin tag` to Useful Commands table — added in v2.1.118 for tagging plugin versions in marketplaces | ✅ COMPLETE (added after `/plugin` in Useful Commands table with v2.1.118 attribution and run-from-marketplace-repo usage note) |
+| 8 | LOW | Sources URL Drift | `https://json.schemastore.org/claude-code-settings.json` now 301-redirects to `https://www.schemastore.org/claude-code-settings.json`. v2.1.74 #4 explicitly fixed it the other direction. Source still resolves via redirect — decide whether to flip or leave with redirect | ❌ INVALID (URL still resolves correctly via 301 redirect; flipping would oscillate against v2.1.74 #4 fix without functional benefit. Re-evaluate only if schemastore deprecates the redirect) |
+| 9 | LOW | MCP OAuth Note | Add brief MCP OAuth RFC 9728 mention to MCP Servers section — added in v2.1.111. Informational, not a settings key | ✅ COMPLETE (added blockquote callout above MCP Settings table with RFC 9728 link, `/.well-known/oauth-protected-resource` discovery endpoint, and note that compliant servers no longer need `apiKeyHelper`/`headersHelper`) |
+| 10 | LOW | Quick Reference Update | Add `prUrlTemplate` to Quick Reference example after attribution block, once the new key is added | ✅ COMPLETE (added `"prUrlTemplate": "https://gitlab.example.com/{owner}/{repo}/-/merge_requests/{number}"` after the `attribution` block in the example) |
+| 11 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` still "in v2.1.85 changelog, not yet on official env-vars page" after 13+ consecutive runs. Per Rule 10B, deferred pending official docs update | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+| 12 | LOW | Suspect Key Recurrence | `OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_CONTENT` still changelog-only. Defer per Rule 8A | ✋ ON HOLD (kept — recurring from 2026-04-16 v2.1.110) |
+| 13 | INVALID | Spurious Drift Claim | `claude-code-guide` agent reported `attribution.pr` as a NEW v2.1.119 setting. Verified against current report (line 149) — already documented in Attribution Settings table | ❌ INVALID (already in report) |
+| 14 | INVALID | Spurious Drift Claim | `claude-code-guide` agent claimed `sandbox.network.deniedDomains` was added v2.1.116. Workflow agent and report (line 386) both confirm v2.1.113 introduction (matches recent v2.1.114 changelog entry that resolved its prior unverified status). Report value retained | ❌ INVALID (agent contradicted by report-specific agent + prior changelog) |
+
+---
+
+## [2026-04-29 12:49 AM PKT] Claude Code v2.1.121
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update report version badge from v2.1.119 → v2.1.121 and header "As of v2.1.119" → "As of v2.1.121" | ✅ COMPLETE (badge updated in Phase 2.6, header text updated to v2.1.121) |
+| 2 | HIGH | New Setting | Add `sshConfigs` to a new Workspace & Teams subsection (object[], required: `id`/`name`/`sshHost`; optional: `sshPort`/`sshIdentityFile`/`startDirectory`). Provides SSH connection dropdown in Desktop. Per official settings page section 14 | ✅ COMPLETE (new Workspace & Teams subsection added with Key table, Field reference table, and JSON example) |
+| 3 | HIGH | New MCP Option | Add `alwaysLoad` to MCP Settings — boolean per-server option, exempts server from tool-search deferral; available on all server types; requires v2.1.121+. Per-tool variant via `_meta: {"anthropic/alwaysLoad": true}`. Confirmed on official MCP page | ✅ COMPLETE (new "Per-Server Tool Loading" subsection added under MCP Servers with rationale, JSON example, and per-tool `_meta` variant) |
+| 4 | HIGH | Status Line Fields | Add `effort.level` (low/medium/high/xhigh/max) and `thinking.enabled` to Status Line Input Fields table (v2.1.121). Confirmed on official statusline docs | ✅ COMPLETE (both fields added after `agent.name` row with v2.1.121 attribution) |
+| 5 | HIGH | File Scope Migration | Move `autoScrollEnabled`, `editorMode`, `showTurnDuration`, `teammateMode`, `terminalProgressBarEnabled` from Global Config Settings (`~/.claude.json`) table to main Display Settings table (settings.json). Add historical note: "Versions before v2.1.119 stored these in `~/.claude.json`". Reverses Rule 1H findings from v2.1.78/v2.1.86/v2.1.107/v2.1.114 — official docs now explicitly list them under "Available settings" with the historical note | ✅ COMPLETE (5 keys added to Display Settings table with per-key historical note; removed from Global Config Settings table; v2.1.119 migration callout added to Global Config Settings preamble) |
+| 6 | HIGH | Missing Env Var | Add `AI_AGENT` to env vars table — env var injected into subprocesses by Claude Code (similar to `CLAUDECODE`). v2.1.120 changelog only — annotate accordingly | ✅ COMPLETE (added after `CLAUDECODE` row with changelog-only annotation) |
+| 7 | HIGH | Missing Env Var | Add `OTEL_LOG_USER_PROMPTS` to env vars table — gates `user_system_prompt` field in OTel LLM request spans. v2.1.121 changelog. **RECURRING** (first seen 2026-04-16 v2.1.110) — was deferred per Rule 8A but now actionable per fresh v2.1.121 changelog mention | ✅ COMPLETE (added after `OTEL_LOG_RAW_API_BODIES` with changelog-only annotation — RECURRING resolved, first seen 2026-04-16) |
+| 8 | MED | Permission Behavior | Add v2.1.121 `--dangerously-skip-permissions` exclusion note to Permissions section. Re-verified against official permission-modes docs: the change is that writes to `.claude/commands/`, `.claude/agents/`, `.claude/skills/`, and `.claude/worktrees/` are EXEMPT from the protected-paths prompt under bypassPermissions — i.e., these subdirectories now auto-approve, opposite of the agent's original framing | ✅ COMPLETE (description added to `bypassPermissions` row in Permission Modes table with corrected framing per official docs — exemption, not restriction) |
+| 9 | MED | Changed Description | Update `language` setting description — v2.1.121 also applies the language to the terminal tab title | ✅ COMPLETE (terminal tab title behavior appended to `language` description with v2.1.121 attribution) |
+| 10 | MED | Useful Commands | Update `/effort` row to include `xhigh` value (currently lists only `low`/`medium`/`high`) | ✅ COMPLETE (`/effort` row now lists `low`, `medium`, `high`, `xhigh` (Opus 4.7 only, v2.1.111), and `max` (Opus 4.6 only)) |
+| 11 | LOW | Skill Variable Note | Add brief `${CLAUDE_EFFORT}` skill template variable note (v2.1.120) — informational, not strictly a settings key | ✅ COMPLETE (added to Effort Level Note section as "Skill template variable" sentence with v2.1.120 attribution) |
+| 12 | LOW | Example Update | Update Quick Reference example to showcase v2.1.121 features (MCP `alwaysLoad`, `sshConfigs`, or new status line fields) | ✅ COMPLETE (added `mcpServers` block with `alwaysLoad: true` and `sshConfigs` block to Quick Reference example) |
+| 13 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` still "in v2.1.85 changelog, not yet on official env-vars page" after 14+ consecutive runs. Per Rule 10B, deferred pending official docs update | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+| 14 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_CONTENT` still changelog-only. Defer per Rule 8A | ✋ ON HOLD (kept — recurring from 2026-04-16 v2.1.110) |
+| 15 | HIGH | Broken Link | Fix two `[auto mode](/en/permission-modes#eliminate-prompts-with-auto-mode)` links at lines 237 and 238 (in `autoMode` and `disableAutoMode` descriptions) — relative paths missing domain prefix. Replace with `https://code.claude.com/docs/en/permission-modes#eliminate-prompts-with-auto-mode`. Anchor verified valid on official permission-modes page | ✅ COMPLETE (both links updated to absolute `https://code.claude.com/docs/en/permission-modes#eliminate-prompts-with-auto-mode` URL) |
+
+---
+
+## [2026-05-01 03:29 PM PKT] Claude Code v2.1.126
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update report version badge from v2.1.121 → v2.1.126 and header "As of v2.1.121" → "As of v2.1.126" | ✅ COMPLETE (badge updated in Phase 2.6, body header text updated to v2.1.126) |
+| 2 | HIGH | New Setting | Add `preferredNotifChannel` to Display Settings table — string, default `"auto"`, values: `"auto"`, `"terminal_bell"`, `"iterm2"`, `"iterm2_with_bell"`, `"kitty"`, `"ghostty"`, `"notifications_disabled"`. Method for task-complete and permission-prompt notifications. Confirmed on official settings page | ✅ COMPLETE (added to Display Settings table after `terminalProgressBarEnabled` with full enum values, default, and `/en/terminal-config` cross-link) |
+| 3 | HIGH | New Env Var | Add `ANTHROPIC_BEDROCK_SERVICE_TIER` to env vars table — Bedrock service tier (`default`, `flex`, or `priority`); sent as `X-Amzn-Bedrock-Service-Tier` header. v2.1.122. Confirmed on official /en/env-vars page | ✅ COMPLETE (added after `ANTHROPIC_BEDROCK_MANTLE_BASE_URL` with v2.1.122 attribution and `/en/amazon-bedrock#service-tiers` cross-link) |
+| 4 | HIGH | New Env Var | Add `CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST` to env vars table — set by host platforms that embed Claude Code; provider/auth env vars in settings.json are ignored when set; telemetry follows standard `DISABLE_TELEMETRY` opt-out instead of auto-disabling on Bedrock/Vertex/Foundry. v2.1.126. Confirmed on official /en/env-vars page | ✅ COMPLETE (added after `ANTHROPIC_BEDROCK_SERVICE_TIER` with full description, ignored-vars list, and v2.1.126 attribution) |
+| 5 | MED | Permission Modes | Update `bypassPermissions` description (line 248) — v2.1.126 extended exemption to also bypass writes to `.claude/`, `.git/`, `.vscode/`, and shell config files. Catastrophic removal commands still prompt. Builds on v2.1.121 `.claude/commands/`, `.claude/agents/`, `.claude/skills/`, `.claude/worktrees/` exemption | ✅ COMPLETE (description extended with v2.1.126 exemptions for `.claude/`, `.git/`, `.vscode/`, and shell config files; catastrophic-removal safety net retained) |
+| 6 | MED | Changed Description | Enrich `defaultShell` description — v2.1.126: when PowerShell is enabled (`CLAUDE_CODE_USE_POWERSHELL_TOOL=1`), it is treated as the **primary** shell. v2.1.120: PowerShell is the fallback shell when Git for Windows is unavailable. Also note v2.1.126 PowerShell 7 detection (Microsoft Store, MSI without PATH, .NET global tool) | ✅ COMPLETE (description enriched with v2.1.120 fallback behavior, v2.1.126 primary-shell flip, and PowerShell 7 detection sources) |
+| 7 | LOW | spinnerTipsOverride Note | Optionally enrich `spinnerTipsOverride.excludeDefault` description (line 580) with v2.1.121 detail "suppresses time-based spinner tips". Currently accurate per official settings page wording but lacks the v2.1.121 changelog refinement | ✅ COMPLETE (description expanded with `excludeDefault` semantics from official docs and v2.1.121 time-based tip suppression refinement) |
+| 8 | LOW | /config Persistence Note | Add brief note to Settings Hierarchy section that `/config` now persists changes to `~/.claude/settings.json` (v2.1.126). Informational, not a new key | ✅ COMPLETE (added v2.1.126 `> Note` block under Settings Hierarchy after the v2.1.75 Windows path note) |
+| 9 | LOW | Example Update | Update Quick Reference example to showcase v2.1.122–v2.1.126 features — `preferredNotifChannel` and an `ANTHROPIC_BEDROCK_SERVICE_TIER` env example | ✅ COMPLETE (added `"preferredNotifChannel": "terminal_bell"` after `prefersReducedMotion` and `"ANTHROPIC_BEDROCK_SERVICE_TIER": "priority"` to the `env` block) |
+| 10 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` still "in v2.1.85 changelog, not yet on official env-vars page" after 16+ consecutive runs. Per Rule 10B, deferred pending official docs update | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+| 11 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_CONTENT` still changelog-only. Defer per Rule 8A | ✋ ON HOLD (kept — recurring from 2026-04-16 v2.1.110) |
+| 12 | INVALID | Spurious Drift Claim | `workflow-claude-settings-agent` reported `autoSummaryEnabled` as a separate setting from `awaySummaryEnabled` (HIGH-confidence claim). Verified directly against official settings page — `autoSummaryEnabled` does NOT exist; only `awaySummaryEnabled` is documented | ❌ INVALID (agent contradicted by direct doc verification) |
+| 13 | INVALID | Spurious Drift Claim | `workflow-claude-settings-agent` claimed `Agent` permission rule syntax should be `Agent(agent:name)` with an `agent:` prefix. Verified against official settings page — only references `Agent` rules without showing the `agent:` prefix syntax. Report's existing `Agent(name)` form matches established convention; no source confirms the prefix variant | ❌ INVALID (no source-verified evidence for `agent:` prefix) |
+
+---
+
+## [2026-05-09 06:58 PM PKT] Claude Code v2.1.138
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update report version badge from v2.1.126 → v2.1.138 and header "As of v2.1.126" → "As of v2.1.138" | ✅ COMPLETE (badge updated in Phase 2.6; body header line 6 updated to v2.1.138) |
+| 2 | HIGH | New Setting | Add `worktree.baseRef` to Worktree Settings — string, values `"fresh"` or `"head"`, controls whether new worktrees branch from a fresh main HEAD or the current HEAD. Confirmed in v2.1.133 changelog | ✅ COMPLETE (added after `worktree.sparsePaths` with default `"fresh"` and v2.1.133 attribution) |
+| 3 | HIGH | New Setting | Add `sandbox.bwrapPath` to Sandbox table — string (Linux/WSL managed-only), custom path to `bwrap` (bubblewrap) binary. Confirmed in v2.1.133 changelog | ✅ COMPLETE (added after `sandbox.enableWeakerNetworkIsolation` with managed-only annotation) |
+| 4 | HIGH | New Setting | Add `sandbox.socatPath` to Sandbox table — string (Linux/WSL managed-only), custom path to `socat` binary. Confirmed in v2.1.133 changelog | ✅ COMPLETE (added after `sandbox.bwrapPath` with managed-only annotation) |
+| 5 | HIGH | Changed Behavior | Update `autoMode` description to document the new `hard_deny` array — auto-mode classifier rules that block unconditionally, sibling to `allow` and `soft_deny`. Confirmed in v2.1.136 changelog | ✅ COMPLETE (description extended with `hard_deny` semantics, sentinel-incompatibility note, and v2.1.136 attribution) |
+| 6 | HIGH | New Setting | Add `parentSettingsBehavior` (managed-only) to Settings Hierarchy section — string `"first-wins"` or `"merge"`, controls how SDK `managedSettings` parent tier merges. Confirmed in v2.1.133 changelog | ✅ COMPLETE (added to new "Dynamic & Parent-Tier Policy" subsection under Settings Hierarchy) |
+| 7 | HIGH | New Setting | Add `policyHelper` (managed-only) to a managed-policy subsection — object with `path`, `timeoutMs`, `refreshIntervalMs`. Managed executable that computes managed settings dynamically. Confirmed in v2.1.136 changelog | ✅ COMPLETE (added to new "Dynamic & Parent-Tier Policy" subsection with field reference and use-case note) |
+| 8 | HIGH | New Setting | Add `skillOverrides` to General Settings — string `"off"` / `"user-invocable-only"` / `"name-only"`, controls automatic skill invocation behavior. Confirmed in v2.1.129 changelog | ✅ COMPLETE (added after `disableSkillShellExecution` with all 3 enum values and v2.1.129 attribution) |
+| 9 | HIGH | New Env Var | Add `CLAUDE_CODE_ENABLE_FEEDBACK_SURVEY_FOR_OTEL` to env vars table — re-enables session-quality feedback survey for OpenTelemetry-enabled enterprises. v2.1.136 changelog | ✅ COMPLETE (added in display/UI env vars cluster after `CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY`) |
+| 10 | HIGH | New Env Var | Add `CLAUDE_CODE_SESSION_ID` to env vars table — current session ID injected into Bash subprocess environment. v2.1.132 changelog | ✅ COMPLETE (added after `CLAUDECODE` with read-only annotation and v2.1.132 attribution) |
+| 11 | HIGH | New Env Var | Add `CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN` to env vars table — opt out of fullscreen renderer; use classic scrollback. v2.1.132 changelog | ✅ COMPLETE (added after `CLAUDE_CODE_DISABLE_VIRTUAL_SCROLL`) |
+| 12 | HIGH | New Env Var | Add `CLAUDE_CODE_FORCE_SYNC_OUTPUT` to env vars table — force synchronous output (debugging aid). v2.1.129 changelog | ✅ COMPLETE (added after `CLAUDE_CODE_HIDE_CWD`) |
+| 13 | HIGH | New Env Var | Add `CLAUDE_CODE_PACKAGE_MANAGER_AUTO_UPDATE` to env vars table — controls background package-manager-auto-update behavior. v2.1.129 changelog | ✅ COMPLETE (added after `CLAUDE_CODE_FORCE_SYNC_OUTPUT` with cross-reference to `DISABLE_AUTOUPDATER`) |
+| 14 | HIGH | New Env Var | Add `CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY` to env vars table — opt-in to fetching available models from LLM gateway. v2.1.129 changelog | ✅ COMPLETE (added after `CLAUDE_CODE_PACKAGE_MANAGER_AUTO_UPDATE`) |
+| 15 | MED | New Env Var (Hook Input) | Add `$CLAUDE_EFFORT` to env vars table — Bash subprocess and hook input env exposing the active effort level (companion to `CLAUDE_CODE_EFFORT_LEVEL`). Hooks also receive `effort.level` JSON field. v2.1.133 changelog | ✋ ON HOLD (deferred — user scoped this run to HIGH priority items only; will pick up next run) |
+| 16 | MED | Plugin Marketplace | Add brief note that plugin marketplace `source: 'settings'` is now supported for inline plugin entries directly in settings.json (v2.1.137 changelog) | ON HOLD (awaiting user approval) |
+| 17 | MED | MCP Reserved Name | Add `workspace` to a "Reserved server names" note in MCP Servers section — v2.1.128 reserved this name for the workspace MCP integration | ON HOLD (awaiting user approval) |
+| 18 | MED | Missing Setting | Add `disableRemoteControl` to Permissions/Managed-only settings — official permissions docs explicitly note "Remote Control can additionally be disabled per device with the `disableRemoteControl` managed setting" | ON HOLD (awaiting user approval) |
+| 19 | MED | Missing Setting | Add `claudeMdExcludes` to Core Configuration — array, skip CLAUDE.md files matching globs. Listed on official settings page | ON HOLD (awaiting user approval) |
+| 20 | MED | Missing Setting | Add `autoMemoryEnabled` to Core Configuration — boolean (default `true`), enables auto memory. Currently only `autoMemoryDirectory` is listed | ON HOLD (awaiting user approval) |
+| 21 | MED | Example Update | Update Quick Reference example to showcase v2.1.129–v2.1.138 features — `worktree.baseRef`, `autoMode.hard_deny`, `skillOverrides`, plus a new env var | ON HOLD (awaiting user approval) |
+| 22 | LOW | Header Count | Update header claim from "60+ settings" → "80+ settings" to better reflect actual official count after additions | ON HOLD (awaiting user approval) |
+| 23 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` still "in v2.1.85 changelog, not yet on official env-vars page" after 17+ consecutive runs. Per Rule 10B, deferred pending official docs update | ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+| 24 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_CONTENT` still changelog-only. Defer per Rule 8A | ON HOLD (kept — recurring from 2026-04-16 v2.1.110) |
+| 25 | INVALID | Spurious Drift Claim | `claude-code-guide` agent listed `disableSkillShellExecution` as NEW in v2.1.137. Verified against current report (line 89) — already documented in General Settings table | ❌ INVALID (already in report; pre-existing key) |
+| 26 | INVALID | Spurious Drift Claim | `workflow-claude-settings-agent` flagged `syntaxHighlightingDisabled` as missing settings.json key. Could not confirm it as a `settings.json` key on official docs (the env var `CLAUDE_CODE_SYNTAX_HIGHLIGHT` is documented, the settings-key form was not source-verified). Per Rule 8A | ❌ INVALID (no source-verified evidence the settings.json key exists) |
+| 14 | INVALID | Spurious Drift Claim | `workflow-claude-settings-agent` flagged `model` default (`"default"`) and `language` default (`"english"`) in Core Configuration as cosmetically wrong because the official docs show `-`. The report's values are descriptive placeholders explaining behavior when unset; flipping to `-` would lose information without any user-facing benefit | ❌ INVALID (cosmetic re-verification with no user-facing benefit) |
+
+---
+
+## [2026-05-12 11:40 PM PKT] Claude Code v2.1.139
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | New Setting | Add `autoMode.hard_deny` field to `autoMode` description (v2.1.136) — unconditional block rules, cannot be overridden by `allow` exceptions or `$defaults` sentinel. Confirmed on official settings page | ✅ COMPLETE (added to `autoMode` field-list description) |
+| 2 | HIGH | New Setting | Add `worktree.baseRef` (`"fresh" \| "head"`, default `"fresh"`, v2.1.133) to Worktree Settings table — which ref new worktrees branch from. Confirmed on official settings page | ✅ COMPLETE (added to Worktree Settings table after `worktree.sparsePaths`) |
+| 3 | HIGH | New Setting | Add `sandbox.bwrapPath` and `sandbox.socatPath` (managed-only, Linux/WSL2, v2.1.133) to Sandbox Settings table — absolute paths to bubblewrap and socat binaries, overriding `PATH` detection. Confirmed on official settings page | ✅ COMPLETE (added to Sandbox Settings table after `enableWeakerNetworkIsolation`) |
+| 4 | HIGH | New Setting | Add `parentSettingsBehavior` (`"first-wins" \| "merge"`, managed-only, default `"first-wins"`, v2.1.133) — controls whether SDK-host parent managed settings apply when admin-deployed managed tier is also present. Confirmed on official settings page | ✅ COMPLETE (added to new "Managed-only policy keys" subsection under Settings Hierarchy) |
+| 5 | HIGH | New Setting | Add `policyHelper` (`{path: string}`, managed-only via MDM or file, v2.1.136) — admin-deployed executable that computes managed settings dynamically at startup. Confirmed on official settings page | ✅ COMPLETE (added alongside `parentSettingsBehavior` in Managed-only policy keys subsection) |
+| 6 | HIGH | New Setting | Add `skillOverrides` (object, v2.1.129) to General Settings table — per-skill visibility (`"on" / "name-only" / "user-invocable-only" / "off"`). Confirmed on official settings page | ✅ COMPLETE (added to General Settings table between `awaySummaryEnabled` and `disableRemoteControl`) |
+| 7 | HIGH | New Setting | Add `disableRemoteControl` (boolean, any scope, v2.1.128) to General Settings table — blocks `claude remote-control`, the `--remote-control` flag, auto-start, and in-session toggle. Confirmed on official settings page | ✅ COMPLETE (added to General Settings table before `feedbackSurveyRate`) |
+| 8 | HIGH | New Setting | Add `gcpAuthRefresh` (string script) to AWS & Cloud Credentials section — custom script that refreshes GCP ADC when expired. Confirmed on official settings page | ✅ COMPLETE (added to Authentication Helpers table after `forceLoginOrgUUID`) |
+| 9 | HIGH | Missing Env Vars | Add 6 env vars to Common Environment Variables table: `CLAUDE_CODE_ENABLE_FEEDBACK_SURVEY_FOR_OTEL` (v2.1.136), `CLAUDE_CODE_SESSION_ID` (v2.1.132), `CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN` (v2.1.132), `CLAUDE_CODE_FORCE_SYNC_OUTPUT` (v2.1.129), `CLAUDE_CODE_PACKAGE_MANAGER_AUTO_UPDATE` (v2.1.129), `CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY` (v2.1.129). All confirmed on official /en/env-vars page | ✅ COMPLETE (all 6 env vars added to grouped sections of Common Environment Variables table) |
+| 10 | HIGH | Version Bump | Update report version badge from v2.1.126 → v2.1.139 and header "As of v2.1.126" → "As of v2.1.139" | ✅ COMPLETE (badge updated in Phase 2.6; body header text updated; env var count bumped 175+ → 180+) |
+| 11 | MED | Permission Syntax | Add `Skill(name *)` wildcard prefix-match note to Tool Permission Syntax (v2.1.139) — mirrors `Bash(ls *)` behavior, allowing patterns like `Skill(weather *)` to match `weather-fetcher`, `weather-svg-creator` | ✅ COMPLETE (Skill row in Tool Permission Syntax table updated with prefix-match example and v2.1.139 attribution) |
+| 12 | MED | Permission Behavior | Add v2.1.136 plan-mode note: writes are blocked even when a matching `Edit(...)` allow rule exists | ✅ COMPLETE (plan-mode row in Permission Modes table updated with v2.1.136 override-allow-rules note) |
+| 13 | MED | MCP Reserved Name | Add `Workspace` reserved MCP server name note (v2.1.128) — existing servers named "workspace" are skipped with a warning | ✅ COMPLETE (blockquote added under MCP Servers section header) |
+| 14 | MED | Effort Variable Scope | Expand `${CLAUDE_EFFORT}` skill-template note: v2.1.133 also passes the env var to Bash tool subprocesses and hook handlers (not just skill templates) | ✅ COMPLETE (skill template variable note rewritten as "Effort env propagation" with v2.1.133 Bash + hook scope detail) |
+| 15 | MED | Example Update | Update Quick Reference example to include `worktree.baseRef`, `autoMode.hard_deny`, and `skillOverrides` to showcase v2.1.129–v2.1.136 features | ✅ COMPLETE (all 3 keys added to Quick Reference example) |
+| 16 | LOW | Useful Commands | Add `claude plugin prune` (v2.1.121) and `claude plugin details` (v2.1.139) to Useful Commands table | ✅ COMPLETE (both commands added after `claude plugin tag`) |
+| 17 | LOW | Sandbox Footnote | Add v2.1.139 `autoAllowBashIfSandboxed` shell-expansion fix note — now handles `$VAR` and `$(cmd)` correctly | ✅ COMPLETE (description expanded in Sandbox Settings table) |
+| 18 | LOW | MCP Improvements | Add v2.1.139 `.mcp.json` hot-reload (via `/mcp` Reconnect) and `CLAUDE_PROJECT_DIR` MCP stdio injection notes to MCP Servers section | ✅ COMPLETE (combined into single blockquote under MCP Servers section) |
+| 19 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` still "in v2.1.85 changelog, not yet on official env-vars page" after 17+ consecutive runs. Per Rule 10B, deferred pending official docs update | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+| 20 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_CONTENT` still changelog-only. Defer per Rule 8A | ✋ ON HOLD (kept — recurring from 2026-04-16 v2.1.110) |
+| 21 | INVALID | Spurious Drift Claim | `claude-code-guide` listed effort values as `"fast"`, `"balanced"`, `"thorough"`. Verified against official /en/env-vars — valid values are `low`, `medium`, `high`, `xhigh`, `max`, `auto`. Report retained | ❌ INVALID (agent contradicted by official docs) |
+| 22 | INVALID | Spurious Drift Claim | `claude-code-guide` claimed `CLAUDE_EFFORT` is a documented env var. Verified — only `CLAUDE_CODE_EFFORT_LEVEL` exists on /en/env-vars. `CLAUDE_EFFORT` is changelog-only (subprocess injection, not user-configurable). Report retained | ❌ INVALID (agent contradicted by official docs) |
+
+---
+
+## [2026-05-21 12:07 AM PKT] Claude Code v2.1.145
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update report version badge from v2.1.139 → v2.1.145 and header "As of v2.1.139" → "As of v2.1.145" | ✅ COMPLETE (header text updated to v2.1.145; badge synced in Phase 2.6) |
+| 2 | HIGH | New Setting | Add `claudeMdExcludes` (array, glob patterns of CLAUDE.md files to skip) to Core Configuration — listed on official settings page. RECURRING (first seen 2026-05-09 v2.1.138 #19, was deferred to HIGH-only scope) | ✅ COMPLETE (added to General Settings table with official wording) |
+| 3 | HIGH | New Setting | Add `autoMemoryEnabled` (boolean, default `true`, enables auto memory read/write) to Core Configuration — currently only `autoMemoryDirectory` is documented. RECURRING (first seen 2026-05-09 v2.1.138 #20) | ✅ COMPLETE (added to Plans & Memory Directories table beside autoMemoryDirectory) |
+| 4 | HIGH | New Worktree Setting | Add `worktree.bgIsolation` (string, `"worktree" \| "none"`, default `"worktree"`) to Worktree Settings table — `"none"` lets background sessions edit the working copy directly (v2.1.143). Confirmed on official settings page | ✅ COMPLETE (added to Worktree Settings table with official wording) |
+| 5 | HIGH | New Env Var | Add `ANTHROPIC_WORKSPACE_ID` to Common Environment Variables table — workload identity federation, scopes the minted token (v2.1.139/v2.1.141). Confirmed in changelog | ✅ COMPLETE (added to env vars table — confirmed ON official /en/env-vars page this run, not changelog-only) |
+| 6 | HIGH | Missing Permission Mode | Confirm/keep `dontAsk` and `auto` modes; verify `acceptEdits` description matches official permissions page wording ("Automatically accepts file edits and common filesystem commands `mkdir`, `touch`, `mv`, `cp`, etc. for paths in the working directory or `additionalDirectories`") — report's current description is shorter | ✅ COMPLETE (acceptEdits description expanded to official wording) |
+| 7 | MED | Permission Behavior | Update `bypassPermissions` description with v2.1.144/v2.1.145 detail per official permissions page: "Removals targeting the filesystem root or home directory such as `rm -rf /` and `rm -rf ~` still prompt as a circuit breaker" (current report says "Catastrophic removal commands still prompt") | ✅ COMPLETE (bypassPermissions circuit-breaker wording updated to official text) |
+| 8 | MED | Permission Syntax | Add PowerShell tool permission rules to Tool Permission Syntax table — official permissions page documents `PowerShell(cmd *)` rules with same shape as Bash, alias canonicalization, AST-based compound-command checking. Not currently in the report's tool syntax table | ✅ COMPLETE (PowerShell row added with alias-canonicalization + AST compound-command note) |
+| 9 | MED | Permission Semantics | Add compound-command / process-wrapper semantics to Bash wildcard notes — official permissions page documents wrapper stripping (`timeout`, `time`, `nice`, `nohup`, `stdbuf`, bare `xargs`), exec-wrapper prompting (`watch`, `setsid`, `ionice`, `flock`, `find -exec`/`-delete`), and per-subcommand matching for `&&`/`||`/`;`/`|` | ✅ COMPLETE (compound-command + process-wrapper bullets added to Bash wildcard notes) |
+| 10 | MED | Permission Semantics | Add symlink resolution behavior to Read/Edit path patterns — official permissions page: allow rules require both symlink path and target to match; deny rules apply if either matches | ✅ COMPLETE (symlink resolution note added after Read/Edit prefix table) |
+| 11 | MED | New Env Var (Hook Input) | Add `$CLAUDE_EFFORT` to env vars table — Bash subprocess and hook input env exposing active effort level (companion to `CLAUDE_CODE_EFFORT_LEVEL`). RECURRING (first seen 2026-05-09 v2.1.138 #15, deferred) | ✅ COMPLETE (added to env vars table; confirmed NOT on official /en/env-vars page — annotated read-only/changelog-only per Rule 5D) |
+| 12 | MED | New Env Var (Changelog) | Add `CLAUDE_CODE_OPUS_4_6_FAST_MODE_OVERRIDE` to env vars table — set to `1` to use Opus 4.6 for fast mode (v2.1.142 changed fast-mode default to Opus 4.7). v2.1.142 changelog only | ✅ COMPLETE (added to env vars table — confirmed ON official /en/env-vars page this run, NOT changelog-only as originally flagged) |
+| 13 | MED | New Env Var (Changelog) | Add `CLAUDE_CODE_POWERSHELL_RESPECT_EXECUTION_POLICY` to env vars table — set to `1` to opt out of PowerShell tool passing `-ExecutionPolicy Bypass` (v2.1.143). Changelog only | ✅ COMPLETE (added to env vars table — confirmed ON official /en/env-vars page this run, NOT changelog-only as originally flagged) |
+| 14 | MED | New Env Var (Changelog) | Add `CLAUDE_CODE_PLUGIN_PREFER_HTTPS` to env vars table — clone GitHub plugin sources over HTTPS (v2.1.141). Changelog only | ✅ COMPLETE (added to env vars table — confirmed ON official /en/env-vars page this run, NOT changelog-only as originally flagged) |
+| 15 | MED | Plugin Marketplace | Add brief note that plugin marketplace `source: 'settings'` supports inline plugin entries directly in settings.json (v2.1.137). RECURRING (first seen 2026-05-09 v2.1.138 #16) | ✅ COMPLETE (verified already documented in Plugin Settings + inline example; no change needed) |
+| 16 | MED | Status Line | Add `terminalSequence` hook-output field reference and note that status line JSON now includes GitHub repo + PR information when detected (v2.1.145) to Status Line section | ✅ COMPLETE (github status-line input field added; terminalSequence is a hook-output field, deferred to claude-code-hooks repo per Rule 4A) |
+| 17 | MED | Model Aliases | Verify Model Aliases table reflects Opus 4.7 / fast-mode-default-Opus-4.7 (v2.1.142) and `/model` session-only-change behavior (v2.1.144, press `d` to set default). Add `opus[1m]` default-on-Max/Team/Enterprise note already present; add note that `/model` change is session-scoped | ✅ COMPLETE (added /model session-scoped note v2.1.144; opus alias left as 4.6 — version is platform-dependent: 4.7 on Anthropic API, 4.6 on Bedrock/Vertex) |
+| 18 | MED | Useful Commands | Add `/usage-credits` to Useful Commands (renamed from `/extra-usage` in v2.1.144; old name still works) | ✅ COMPLETE (/usage-credits added to Useful Commands) |
+| 19 | MED | Env Var Rename | Annotate `DISABLE_EXTRA_USAGE_COMMAND` — `/extra-usage` renamed to `/usage-credits` in v2.1.144; verify whether a `DISABLE_USAGE_CREDITS_COMMAND` alias now exists | ✅ COMPLETE (annotated DISABLE_EXTRA_USAGE_COMMAND with the rename; no separate DISABLE_USAGE_CREDITS_COMMAND var observed this run) |
+| 20 | LOW | Header Count | Update header claim from "60+ settings" → "80+ settings" to reflect actual official count after additions. RECURRING (first seen 2026-05-09 v2.1.138 #22) | ✅ COMPLETE (header count updated 60+ → 80+) |
+| 21 | LOW | Example Update | Update Quick Reference example to showcase v2.1.140–v2.1.145 features (e.g., `worktree.bgIsolation`, `claudeMdExcludes`, or `ANTHROPIC_WORKSPACE_ID` env example) | ✅ COMPLETE (Quick Reference now showcases claudeMdExcludes + worktree.bgIsolation) |
+| 22 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` still "in v2.1.85 changelog, not yet on official env-vars page" after 18+ consecutive runs. Per Rule 10B, deferred pending official docs update | ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+| 23 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_CONTENT` still changelog-only. Defer per Rule 8A | ON HOLD (kept — recurring from 2026-04-16 v2.1.110) |
+| 24 | INVALID | Ownership Boundary (no-op) | Cross-checked all env vars in `claude-cli-startup-flags.md` (CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS, CLAUDE_CODE_TMPDIR, CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD, DISABLE_AUTOUPDATER, CLAUDE_CODE_EFFORT_LEVEL, USE_BUILTIN_RIPGREP, CLAUDE_CODE_SIMPLE, CLAUDE_BASH_NO_LOGIN, CCR_FORCE_BUNDLE) against the settings report. No duplication-without-cross-reference found; shared vars correctly carry cross-reference links both ways | ❌ INVALID (no boundary violation — Rule 5B passes) |
+| 25 | INVALID | Hyperlink Validation (no-op) | All report hyperlinks validated: 12 ToC anchors resolve to headings; external URLs (settings, env-vars, permissions, schemastore via 301, feiskyer repo, shipyard blog, GitHub changelog) all return valid pages. `json.schemastore.org` still 301-redirects to `www.schemastore.org` (working) — leave as-is per v2.1.119 #8 decision | ❌ INVALID (no broken links — Rules 9A/9B/9C pass) |
+
+---
+
+## [2026-05-25 04:28 PM PKT] Claude Code v2.1.150
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update report version badge from v2.1.145 → v2.1.150 and header "As of v2.1.145" → "As of v2.1.150" | ✅ COMPLETE (badge synced in Phase 2.6; body header text updated to v2.1.150) |
+| 2 | HIGH | New Setting | Add `allowAllClaudeAiMcps` to MCP Settings table — managed-only boolean, loads claude.ai cloud MCP connectors alongside `managed-mcp.json`. v2.1.150 changelog only (NOT yet on official settings page) — annotate per Rule 1F. Agent reported it as v2.1.149; corrected to **v2.1.150** per direct changelog read | ✅ COMPLETE (added to MCP Settings table with v2.1.150 changelog-only annotation) — NEW |
+| 3 | MED | New Setting | Add `disableAgentView` to General Settings — boolean, any scope (typically managed). Turns off background agents and agent view (`claude agents`, `--bg`, `/background`, on-demand supervisor). Equivalent to `CLAUDE_CODE_DISABLE_AGENT_VIEW=1`. Confirmed on official settings page | ✅ COMPLETE (added to General Settings table after `disableRemoteControl`) — NEW |
+| 4 | MED | New Setting | Add `strictPluginOnlyCustomization` to Plugin Settings table — managed-only, boolean or array (`["skills","hooks"]`). Blocks skills/agents/hooks/MCP from user+project sources. Confirmed on official settings AND permissions pages | ✅ COMPLETE (added to Plugin Settings table after `strictKnownMarketplaces`) — NEW |
+| 5 | MED | New Setting | Add `maxSkillDescriptionChars` to General Settings — integer, default `1536`, any scope (min-version 2.1.105). Per-skill cap on description+when_to_use text in the skill listing. Confirmed on official settings page | ✅ COMPLETE (added to General Settings table after `skillOverrides`) — NEW |
+| 6 | MED | New Setting | Add `skillListingBudgetFraction` to General Settings — number, default `0.01` (1%), any scope (min-version 2.1.105). Fraction of context window reserved for the skill listing. Confirmed on official settings page | ✅ COMPLETE (added to General Settings table after `maxSkillDescriptionChars`) — NEW |
+| 7 | MED | New Setting | Add `claudeMd` to Core Configuration (memory) — string, managed-only. CLAUDE.md-style instructions injected as org-managed memory; ignored in user/project/local settings. Confirmed on official settings page | ✅ COMPLETE (added to General Settings table after `claudeMdExcludes`) — NEW |
+| 8 | MED | New Setting | Add `syntaxHighlightingDisabled` to Display Settings — boolean, default `false`, any scope. Disables syntax highlighting in diffs, code blocks, and file previews. Confirmed on official settings page (distinct from existing env var `CLAUDE_CODE_SYNTAX_HIGHLIGHT`) | ✅ COMPLETE (added to Display Settings table after `prefersReducedMotion`) — NEW |
+| 9 | MED | Changed Behavior | Fix `externalEditorContext` (Global Config Settings table): default `true` → **`false`** (Rule 1C) AND description → "Prepend Claude's previous response as `#`-commented context when you open the external editor with `Ctrl+G`" (Rule 1D). Both confirmed wrong vs official settings page | ✅ COMPLETE (default and description corrected in Global Config Settings table) — NEW |
+| 10 | MED | Changed Description | Update Model Aliases: `opus` "Claude Opus 4.6" → platform-dependent (Opus 4.7 on Anthropic API, 4.6 on Bedrock/Vertex/Foundry); `sonnet` similarly. Opus 4.7 is now latest + fast-mode default (v2.1.142); current "Latest Opus model (Claude Opus 4.6)" is self-contradictory | ✅ COMPLETE (opus → 4.7 Anthropic API / 4.6 Bedrock-Vertex-Foundry + fast-mode-default note; sonnet → 4.6 API / 4.5 third-party) — RECURRING (first seen 2026-05-21 v2.1.145 #17) |
+| 11 | LOW | New Env Var | Add `CLAUDE_CODE_DISABLE_AGENT_VIEW` to env vars table — companion to `disableAgentView` setting (referenced on settings page as the env equivalent; not directly confirmed on env-vars page — annotate if added) | ✅ COMPLETE (added to env vars table after `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS` with not-on-env-vars-page annotation) — NEW |
+| 12 | LOW | Checklist | Add Rule 1I (Skills Settings Keys Completeness) — `maxSkillDescriptionChars`/`skillListingBudgetFraction` existed since v2.1.105 but were never caught; forces an explicit skills-key sweep each run | ✅ COMPLETE (appended Rule 1I to verification-checklist.md) |
+| 13 | LOW | Example Update | Optionally showcase new keys (e.g., `maxSkillDescriptionChars`, `disableAgentView`, or `allowAllClaudeAiMcps`) in the Quick Reference complete example once added | ✅ COMPLETE (added `maxSkillDescriptionChars`, `skillListingBudgetFraction`, `disableAgentView`, `syntaxHighlightingDisabled` to Quick Reference; JSON re-validated) — NEW |
+| 14 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` still "in v2.1.85 changelog, not yet on official env-vars page" after 19+ consecutive runs. Already in report with annotation (Rule 10B option a) | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+| 15 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_CONTENT` still changelog-only. Defer per Rule 8A | ✋ ON HOLD (kept — recurring from 2026-04-16 v2.1.110) |
+| 16 | INVALID | Spurious Drift Claim | `claude-code-guide` agent flagged `NO_COLOR` / `FORCE_COLOR` as missing env vars (claimed v2.1.143 subprocess pass-through). Verified directly against official /en/env-vars page — neither is documented; the v2.1.143 changelog entry covers `worktree.bgIsolation` + PowerShell ExecutionPolicy, not NO_COLOR. Not added per Rule 8A/5D | ❌ INVALID (agent claim unverified against official docs) |
+| 17 | INVALID | Spurious Drift Claim | `workflow-claude-settings-agent` low-confidence noise keys `additionaleventDirectory` and `teammateDefaultModel` — garbled WebFetch-summary artifacts, not source-verified on official settings page. Not added per Rule 8A | ❌ INVALID (WebFetch-summary transcription noise) |
+
+---
+
+## [2026-06-01 12:03 AM PKT] Claude Code v2.1.158
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update report version badge from v2.1.150 → v2.1.158 and header "As of v2.1.150" → "As of v2.1.158" | ✅ COMPLETE (badge synced in Phase 2.6; body header text updated to v2.1.158) |
+| 2 | HIGH | New Setting | Add `disableWorkflows` (boolean, default `false`, any scope) to General Settings — disables dynamic workflows + bundled workflow commands (v2.1.154 introduced workflows). Env equiv `CLAUDE_CODE_DISABLE_WORKFLOWS`. Confirmed on official settings page | ✅ COMPLETE (added to General Settings table after `disableAgentView`) — NEW |
+| 3 | HIGH | New Setting | Add `workflowKeywordTriggerEnabled` (boolean, default `true`, min-version 2.1.157) to General Settings — whether the word "workflow" in a prompt triggers a dynamic workflow. Appears in `/config`. Confirmed on official settings page | ✅ COMPLETE (added to General Settings table after `disableWorkflows`) — NEW |
+| 4 | HIGH | Model Aliases | Update Model Aliases + Effort Level: Opus 4.8 is now the latest Opus on the Anthropic API (v2.1.154), defaults to high effort, `/effort xhigh` supported. Report currently says `opus` = "Opus 4.7 (Anthropic API)" with no mention of 4.8. RECURRING-style platform-version drift (last touched v2.1.150 #10) | ✅ COMPLETE (updated `opus` alias to Opus 4.8 on Anthropic API; updated `effortLevel` desc, Effort Level table XHigh row, and effort note for Opus 4.8) — NEW |
+| 5 | HIGH | New Env Var | Add `CLAUDE_CODE_ENABLE_AUTO_MODE` (set to `1`) to env vars table — enables auto mode on Bedrock/Vertex/Foundry for Opus 4.7 and Opus 4.8 (v2.1.158). Changelog-only — NOT on official /en/env-vars page; annotate per Rule 5D | ✅ COMPLETE (added to env vars table after `CLAUDE_CODE_DISABLE_WORKFLOWS` with changelog-only annotation; also added to Quick Reference `env` block) — NEW |
+| 6 | MED | New Setting | Add `teammateDefaultModel` (string, default `null`, `~/.claude.json` Global config) to Global Config Settings table — default model for agent-team teammates; `null` inherits lead's model. Confirmed on official settings page. NOTE: prior run v2.1.150 #17 wrongly rejected this as "garbled noise" — now source-verified | ✅ COMPLETE (added to Global Config Settings `~/.claude.json` table after `externalEditorContext`; corrects v2.1.150 #17 false-reject) — NEW |
+| 7 | MED | New Setting | Add `pluginSuggestionMarketplaces` (array, managed-only) to Plugin Settings table — marketplace names whose plugins can appear as contextual install suggestions. Confirmed on official settings page | ✅ COMPLETE (added to Plugin Settings table after `strictPluginOnlyCustomization`) — NEW |
+| 8 | MED | New Setting | Add `disableWorkflows` companion env var `CLAUDE_CODE_DISABLE_WORKFLOWS` to env vars table — confirmed on official /en/env-vars page | ✅ COMPLETE (added to env vars table after `CLAUDE_CODE_DISABLE_AGENT_VIEW`) — NEW |
+| 9 | MED | MCP Annotation | Remove "(in v2.1.150 changelog, not yet on official settings page)" annotation from `allowAllClaudeAiMcps` in MCP Settings table — now confirmed on official settings page (managed-only boolean). Per Rule 1F | ✅ COMPLETE (stale changelog-only annotation removed from MCP Settings table row) — NEW |
+| 10 | MED | Permission Mode | Update `auto` permission mode note — official settings page states auto mode is "not allowed in project/local settings as of v2.1.142". Verify report's `disableAutoMode`/`autoMode` scope notes capture this | ❌ INVALID (verification-only; report's `autoMode`/`disableAutoMode` rows already document "not read from shared project settings" — no change needed) — NEW |
+| 11 | LOW | New Setting (session-only) | Consider documenting `ultracode` (boolean, session-only, not persisted) — appears in official "Available settings" list but is session-scoped (set via `/effort ultracode`, `--settings`, or SDK). Low value; annotate as session-only if added | ✅ COMPLETE (added to General Settings table after `workflowKeywordTriggerEnabled` with **(Session-only — not persisted)** annotation) — NEW |
+| 12 | LOW | Worktree Default | Verify `worktree.symlinkDirectories`/`worktree.sparsePaths` defaults — report shows `[]`, official page shows `null`/undefined. Cosmetic; both behave as "no entries" | ❌ INVALID (cosmetic only — `[]` and `null`/undefined are behaviorally identical; report's `[]` is clearer for users) — NEW |
+| 13 | LOW | Example Update | Update Quick Reference example to showcase v2.1.151–v2.1.158 features (e.g., `disableWorkflows`, `workflowKeywordTriggerEnabled`, or `CLAUDE_CODE_ENABLE_AUTO_MODE` env example) | ✅ COMPLETE (added `disableWorkflows`, `workflowKeywordTriggerEnabled`, and `CLAUDE_CODE_ENABLE_AUTO_MODE` to Quick Reference; JSON re-validated, 39 keys) — NEW |
+| 14 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — v2.1.157 changelog says `OTEL_LOG_TOOL_DETAILS=1` includes tool parameters in telemetry, but still NOT on official /en/env-vars page after 20+ runs. Already in report with annotation (Rule 10B option a) | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107; v2.1.157 changelog re-confirms behavior) |
+| 15 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_CONTENT` still changelog-only. Defer per Rule 8A | ✋ ON HOLD (kept — recurring from 2026-04-16 v2.1.110) |
+| 16 | INVALID | Source Guard | Changelog v2.1.158 lists `CLAUDE_CODE_ENABLE_AUTO_MODE` but env-vars page does not yet document it — flagged as changelog-only (item #5), not as a confirmed env-vars-page var, per Rule 8A/5D | ❌ INVALID (changelog-only; annotated rather than treated as docs-confirmed) |
+
+---
+
+## [2026-06-01 10:58 AM PKT] Claude Code v2.1.159
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update report version badge from v2.1.158 → v2.1.159 and header "As of v2.1.158" → "As of v2.1.159"; update env var count from "180+" → "200+" | ✅ COMPLETE (badge, header, and count updated) — NEW |
+| 2 | HIGH | Duplicate Settings Key | Remove string-type `skillOverrides` duplicate row — NOT in official docs (object-type row at the correct position is confirmed). String-form `"off"`/`"user-invocable-only"`/`"name-only"` values are documented under the object type | ✅ COMPLETE (string-type duplicate removed; object-type row kept) — NEW |
+| 3 | HIGH | Duplicate Env Vars | Remove 5 duplicate env var rows: `CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN`, `CLAUDE_CODE_FORCE_SYNC_OUTPUT`, `CLAUDE_CODE_PACKAGE_MANAGER_AUTO_UPDATE`, `CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY`, `CLAUDE_CODE_ENABLE_FEEDBACK_SURVEY_FOR_OTEL` — each appeared twice with different (conflicting) descriptions | ✅ COMPLETE (5 duplicate rows removed; first/better-quality instance kept for each) — NEW |
+| 4 | HIGH | Broken Link | Remove `https://shipyard.build/blog/claude-code-cheat-sheet/` from Sources — returns 403 Forbidden (Rule 9B) | ✅ COMPLETE (dead link removed from Sources section) — NEW |
+| 5 | HIGH | New Env Vars | Add `ANTHROPIC_AWS_API_KEY`, `ANTHROPIC_AWS_BASE_URL`, `ANTHROPIC_AWS_WORKSPACE_ID` — Claude Platform on AWS vars confirmed on official /en/env-vars page; missing from report | ✅ COMPLETE (added after `ANTHROPIC_BEDROCK_SERVICE_TIER`) — NEW |
+| 6 | HIGH | New Env Vars | Add `GCLOUD_PROJECT`, `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT` — GCP/Vertex AI pass-through vars confirmed on official /en/env-vars page; missing from report | ✅ COMPLETE (added after `ANTHROPIC_VERTEX_PROJECT_ID`) — NEW |
+| 7 | HIGH | New Env Vars | Add 5 OTEL vars confirmed on official /en/env-vars page: `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_LOG_TOOL_CONTENT` (RESOLVED from ON HOLD — now official), `OTEL_METRICS_EXPORTER`, `OTEL_TRACES_EXPORTER` | ✅ COMPLETE (added in OTEL section after `OTEL_LOG_USER_PROMPTS`) — NEW |
+| 8 | HIGH | New Env Vars | Add 13 CLAUDE_CODE_*/other env vars confirmed on official /en/env-vars page: `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD`, `CLAUDE_CODE_ALT_SCREEN_FULL_REPAINT`, `CLAUDE_CODE_ATTRIBUTION_HEADER`, `CLAUDE_CODE_DISABLE_POLICY_SKILLS`, `CLAUDE_CODE_ENABLE_BACKGROUND_PLUGIN_REFRESH`, `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`, `CLAUDE_CODE_EXTRA_BODY`, `CLAUDE_CODE_MCP_ALLOWLIST_ENV`, `CLAUDE_CODE_NATIVE_CURSOR`, `CLAUDE_CODE_PROPAGATE_TRACEPARENT`, `CLAUDE_ASYNC_AGENT_STALL_TIMEOUT_MS`, `DO_NOT_TRACK`, `INIT_PROMPT` | ✅ COMPLETE (each added at appropriate section in env vars table) — NEW |
+| 9 | MED | Unverified Annotation | Mark `DISABLE_AUTO_COMPACT` as *(not in official docs — unverified)* per Rule 5D — confirmed NOT on official /en/env-vars D section (D section has: DISABLE_AUTOUPDATER, DISABLE_COMPACT, DISABLE_ERROR_REPORTING, DISABLE_FEEDBACK_COMMAND, DISABLE_TELEMETRY, DO_NOT_TRACK — no DISABLE_AUTO_COMPACT) | ✅ COMPLETE (annotation added) — NEW |
+| 10 | LOW | Resolved ON HOLD | `OTEL_LOG_TOOL_CONTENT` — ON HOLD since v2.1.110 (2026-04-16) as changelog-only. Now confirmed on official /en/env-vars O section. Added to report without annotation | ✅ COMPLETE (RESOLVED after 20+ consecutive ON HOLD runs) — RESOLVED (from 2026-04-16 v2.1.110) |
+| 11 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — v2.1.157 changelog re-confirms `OTEL_LOG_TOOL_DETAILS=1` includes tool parameters. Still NOT on official /en/env-vars page (O section confirmed). Annotation kept | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+| 12 | INVALID | Rule 8A Rejection | Previous session flagged rename `CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR` → `CLAUDE_CODE_BASH_MAINTAIN_PROJECT_WORKING_DIR`. Official env-vars page confirms `CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR` (without `_CODE_`) is the correct name. No rename | ❌ INVALID (official page confirms current name; prior-session finding was wrong) — NEW |
+| 13 | INVALID | Rule 8A Rejection | Previous session flagged `CLAUDE_CODE_OPUS_4_6_FAST_MODE_OVERRIDE` as REMOVED per changelog v2.1.154. Official env-vars page still lists it without any REMOVED tag. Per Rule 8A, no change | ❌ INVALID (official page still lists var; per Rule 8A, changelog alone insufficient to mark REMOVED) — NEW |
+| 14 | INVALID | Rule 8A Rejection | Previous session flagged `skipLfs` for plugin marketplace source types. Official settings page makes no mention of `skipLfs` or LFS. Not added per Rule 8A | ❌ INVALID (not found on official settings page) — NEW |
+
+---
+
+## [2026-06-02 10:47 AM PKT] Claude Code v2.1.160
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update report version badge from v2.1.159 → v2.1.160 and header "As of v2.1.159" → "As of v2.1.160" | ✅ COMPLETE (badge and header updated) — NEW |
+| 2 | HIGH | Changed Behavior | Update `acceptEdits` description: v2.1.160 always prompts before writing build-tool config files that grant code execution (`.npmrc`, `.yarnrc*`, `bunfig.toml`, `.bazelrc`, `.pre-commit-config.yaml`, `.devcontainer/`) and before writing to shell startup files (`.zshenv`, `.zlogin`, `.bash_login`) and `~/.config/git/` | ✅ COMPLETE (description updated per official v2.1.160 changelog) — NEW |
+| 3 | HIGH | Removed Env Var | Mark `CLAUDE_CODE_OPUS_4_6_FAST_MODE_OVERRIDE` as REMOVED in v2.1.160 — "the environment variable is now a no-op" per changelog | ✅ COMPLETE (marked REMOVED with no-op annotation; v2.1.160 attribution added) — RESOLVED (from 2026-06-01 v2.1.159, where it was INVALID per Rule 8A; v2.1.160 changelog now explicitly states "now a no-op") |
+| 4 | MED | Changed Description | Update `workflowKeywordTriggerEnabled` description: trigger keyword renamed from "workflow" to "ultracode" in v2.1.160 per official changelog | ✅ COMPLETE (description updated; "ultracode" keyword noted with v2.1.160 attribution) — NEW |
+| 5 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 20+ consecutive runs | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+
+---
+
+## [2026-06-03 10:48 AM PKT] Claude Code v2.1.161
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update report version badge from v2.1.160 → v2.1.161 and header "As of v2.1.160" → "As of v2.1.161" | ✅ COMPLETE (badge and header updated in Phase 2.6) — NEW |
+| 2 | HIGH | Changed Description | Update `CLAUDE_CODE_ENABLE_TASKS` — official env-vars page now describes it as controlling Task tools vs legacy TodoWrite (default Task tools since v2.1.142; set to `0` to revert). Prior description referred to non-interactive mode task tracking | ✅ COMPLETE (description updated per official env-vars page) — NEW |
+| 3 | HIGH | Changed Description | Update `CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING` — enabled by default on Anthropic API; set to `0` to opt out. Prior description said "`1` to enable" (inverted behavior) | ✅ COMPLETE (description updated per official env-vars page) — NEW |
+| 4 | MED | Annotation Fix | Add "not in official docs — unverified" annotation to `CLAUDE_CODE_SESSION_ID` — confirmed NOT on official /en/env-vars page per Rule 5D | ✅ COMPLETE (annotation added) — NEW |
+| 5 | LOW | Ownership Boundary | `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` in both files; `claude-cli-startup-flags.md` lacks cross-reference note | ✅ COMPLETE (cross-reference note added to CLI flags file) — NEW |
+| 6 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` still changelog-only, not on official env-vars page after 23+ consecutive runs | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+
+---
+
+## [2026-06-04 10:47 AM PKT] Claude Code v2.1.162
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update report version badge from v2.1.161 → v2.1.162 and header "As of v2.1.161" → "As of v2.1.162" | ✅ COMPLETE (badge and header updated in Phase 2.6) — NEW |
+| 2 | HIGH | Changed Description | Update `bypassPermissions` description: report said protected paths (`.git`, `.claude`, `.vscode`, `.idea`, `.husky`) "still prompt" — official permissions page confirms all path-based prompts are now skipped. Added new exempt paths: `.config/git`, `.cargo`, `.devcontainer`, `.yarn`, `.mvn`. Only `rm -rf /` and `rm -rf ~` still prompt | ✅ COMPLETE (description corrected; new paths added; v2.1.121/v2.1.126 history preserved) — NEW |
+| 3 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` still changelog-only, not on official env-vars page after 24+ consecutive runs | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+
+---
+
+## [2026-06-05 10:48 AM PKT] Claude Code v2.1.163
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update report version badge from v2.1.162 → v2.1.163 and header "As of v2.1.162" → "As of v2.1.163" | ✅ COMPLETE (badge and header updated in Phase 2.6) — NEW |
+| 2 | HIGH | New Setting | Add `requiredMinimumVersion` (managed-only) to Managed-only policy keys table — prevents CLI from starting below a specified version floor (v2.1.163 changelog) | ✅ COMPLETE (added to managed-only policy keys table with changelog annotation) — NEW |
+| 3 | HIGH | New Setting | Add `requiredMaximumVersion` (managed-only) to Managed-only policy keys table — prevents CLI from starting above a specified version ceiling (v2.1.163 changelog) | ✅ COMPLETE (added to managed-only policy keys table with changelog annotation) — NEW |
+| 4 | HIGH | Annotation Fix | Remove stale annotation from `skipWebFetchPreflight` — key is now confirmed on official settings page with full description (use case: Bedrock/Vertex/Foundry restrictive egress environments) | ✅ COMPLETE (stale annotation removed; description updated to match official docs) — NEW |
+| 5 | HIGH | Annotation Fix | Remove stale annotation from `CLAUDE_CODE_ENABLE_AUTO_MODE` — key is now confirmed on official env-vars page; description updated to match official wording and fix stale link | ✅ COMPLETE (stale annotation removed; description and link updated per official env-vars page) — NEW |
+| 6 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 25+ consecutive runs | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+
+---
+
+## [2026-06-06 10:42 AM PKT] Claude Code v2.1.167
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update report version badge from v2.1.163 → v2.1.167 and header "As of v2.1.163" → "As of v2.1.167" | ✅ COMPLETE (badge and header updated in Phase 2.6) — NEW |
+| 2 | HIGH | New Setting | Add `fallbackModel` to Model Overrides table — configure up to 3 fallback models tried sequentially when the primary model is unavailable (v2.1.166) | ✅ COMPLETE (added to Model Overrides table) — NEW |
+| 3 | HIGH | Permission Syntax | Document glob pattern support in deny rules — `"*"` in the tool-name position of a deny rule matches ALL tools (v2.1.166). Added note to Permission section | ✅ COMPLETE (note added to Tool Permission Syntax section) — NEW |
+| 4 | MED | Annotation Fix | Remove stale annotation from `requiredMinimumVersion` and `requiredMaximumVersion` — both keys are now confirmed on official settings page (were annotated "not yet on official settings page" from v2.1.163 run) | ✅ COMPLETE (stale annotations removed from both keys) — RESOLVED (from 2026-06-05 v2.1.163) |
+| 5 | MED | Missing Env Var | Add `OTEL_RESOURCE_ATTRIBUTES` to OTEL environment variables table — allows key=value pairs as labels on OpenTelemetry metric data points (v2.1.162) | ✅ COMPLETE (added after `OTEL_LOG_RAW_API_BODIES`) — NEW |
+| 6 | MED | Ownership Boundary | Add cross-reference for `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD` in settings report (Rule 5B) — var is in both files without a cross-reference | ✅ COMPLETE (cross-reference note added in both files) — NEW |
+| 7 | LOW | Annotation Fix | Upgrade `CLAUDE_CODE_SESSION_ID` annotation from "not in official docs — unverified" to "in v2.1.163 changelog for stdio MCP servers on --resume" | ✅ COMPLETE (annotation upgraded) — NEW |
+| 8 | LOW | Example Update | Fix Quick Reference `"effortLevel": "xhigh"` paired with `"model": "sonnet"` — xhigh is Opus 4.7/4.8 only; Sonnet tops out at `high` | ✅ COMPLETE (changed to `"high"`) — NEW |
+| 9 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 26+ consecutive runs | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+
+---
+
+## [2026-06-07 10:34 AM PKT] Claude Code v2.1.168
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update report version badge from v2.1.167 → v2.1.168 and header "As of v2.1.167" → "As of v2.1.168" | ✅ COMPLETE (badge synced in Phase 2.6; body header text still reads v2.1.167 — flagged as action item #2) — NEW |
+| 2 | MED | Changed Description | Update `MAX_THINKING_TOKENS` env var (line 1050) — v2.1.166 changelog: `MAX_THINKING_TOKENS=0` (and `--thinking disabled`) now disables thinking on models that think by default. Report description only says "Maximum extended thinking tokens per response" | ✋ ON HOLD (awaiting user approval) — NEW |
+| 3 | MED | Header Count | Header line 6 still says "As of v2.1.167" — update to v2.1.168 to match badge | ✋ ON HOLD (awaiting user approval) — NEW |
+| 4 | LOW | Sandbox Predicate Note | Optionally note v2.1.166 fix: `allowedMcpServers`/`deniedMcpServers` predicates now match with `${VAR}` references. Behavior/bug-fix detail, not a new key | ✋ ON HOLD (awaiting user approval — low value, bug-fix detail) — NEW |
+| 5 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 27+ consecutive runs | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+| 6 | INVALID | Spurious Drift Claim | Re-verified `fallbackModel` (report line 561, type `array`) against v2.1.166 changelog ("up to three fallback models") — report is accurate, including the 3-model cap. No change | ❌ INVALID (report already correct) — NEW |
+| 7 | INVALID | Spurious Drift Claim | Deny-rule glob `"*"` (v2.1.166) already documented in report line 296. No change | ❌ INVALID (already in report) — NEW |
+
+---
+
+## [2026-06-07 10:45 AM PKT] Claude Code v2.1.168
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | MED | Changed Description | Update `MAX_THINKING_TOKENS` env var description — add that `=0` disables extended thinking on Anthropic API (or use `--thinking disabled`). Previously only said "Maximum extended thinking tokens per response" | ✅ COMPLETE (description expanded in claude-settings.md) — RESOLVED (from 2026-06-07 10:34 AM PKT) |
+| 2 | MED | Header Update | Fix header line 6: "As of v2.1.167" → "As of v2.1.168" to match badge and current version | ✅ COMPLETE (header updated in claude-settings.md) — RESOLVED (from 2026-06-07 10:34 AM PKT) |
+| 3 | LOW | MCP Timeout Note | Add note to MCP section: per-server `timeout` values < 1000ms are ignored and fall back to `MCP_TOOL_TIMEOUT` global default (v2.1.162 changelog) | ✅ COMPLETE (note added as version-tagged callout in MCP section) — NEW |
+| 4 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 28+ consecutive runs | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+
+---
+
+## [2026-06-08 10:36 AM PKT] Claude Code v2.1.168
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | LOW | New Env Var (Changelog) | Add `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT` to env vars table — forces the effort parameter on all models (v2.1.154 changelog). NOT on official /en/env-vars page; annotate as changelog-only per Rule 5D/8A | ✋ ON HOLD (awaiting user approval — changelog-only, low value) — NEW |
+| 2 | LOW | New Env Var (Changelog) | Add `OTEL_METRICS_INCLUDE_ENTRYPOINT` to OTEL env vars table — includes session entrypoint as a metric attribute (v2.1.161 changelog). NOT on official /en/env-vars page; annotate as changelog-only per Rule 5D/8A | ✋ ON HOLD (awaiting user approval — changelog-only, low value) — NEW |
+| 3 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 29+ consecutive runs | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+
+---
+
+## [2026-06-08 10:44 AM PKT] Claude Code v2.1.168
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | LOW | New Env Var (Changelog) | Add `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT` to env vars table — forces the effort parameter on all models (v2.1.154 changelog). Annotated as changelog-only per Rule 5D/8A | ✅ COMPLETE (added after `CLAUDE_EFFORT` row with changelog-only annotation) |
+| 2 | LOW | New Env Var (Changelog) | Add `OTEL_METRICS_INCLUDE_ENTRYPOINT` to OTEL env vars table — includes session entrypoint as a metric attribute (v2.1.161 changelog). Annotated as changelog-only per Rule 5D/8A | ✅ COMPLETE (added after `OTEL_TRACES_EXPORTER` row with changelog-only annotation) |
+| 3 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 29+ consecutive runs | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+
+---
+
+## [2026-06-09 10:39 AM PKT] Claude Code v2.1.169
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update report version badge from v2.1.168 → v2.1.169 and header "As of v2.1.168" → "As of v2.1.169" | ✅ COMPLETE (badge and header updated in Phase 2.6) — NEW |
+| 2 | HIGH | New Setting | Add `disableBundledSkills` (boolean, default `false`) to General Settings table — conceals Claude Code's built-in capabilities from the model. Paired with `CLAUDE_CODE_DISABLE_BUNDLED_SKILLS` env var. Changelog-only (not yet on official settings page); annotated per Rule 1F (v2.1.169) | ✅ COMPLETE (added after `ultracode` row with changelog-only annotation) — NEW |
+| 3 | MED | New Env Var | Add `CLAUDE_CODE_DISABLE_BUNDLED_SKILLS` to Common Environment Variables table — env-var equivalent of `disableBundledSkills` setting. Changelog-only per Rule 5D/8A (v2.1.169) | ✅ COMPLETE (added after `CLAUDE_CODE_ENABLE_AUTO_MODE` with changelog-only annotation) — NEW |
+| 4 | MED | Ownership Question | `CLAUDE_CODE_SAFE_MODE` (v2.1.169, paired with `--safe-mode` startup flag) — determined to be a startup-only variable; belongs in `claude-cli-startup-flags.md`, not in `claude-settings.md`. Per Rule 13 (env vars split across two files) | ✋ ON HOLD (out of scope for this report — add to `claude-cli-startup-flags.md` in a separate run) — NEW |
+| 5 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 30+ consecutive runs | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+
+---
+
+## [2026-06-11 10:43 AM PKT] Claude Code v2.1.172
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | New Setting | Add `advisorModel` (string, unset, any scope) to General Settings table — model for server-side advisor tool; accepts alias (opus, sonnet, fable) or full model ID. Confirmed on official settings page (min v2.1.98) | ✅ COMPLETE (added after `feedbackSurveyRate` row) — NEW |
+| 2 | HIGH | Version Bump | Update report version badge from v2.1.169 → v2.1.172 and header "As of v2.1.169" → "As of v2.1.172" | ✅ COMPLETE (badge and header updated in Phase 2.6) — NEW |
+| 3 | HIGH | New Permission Rule | Add `Cd` to Tool Permission Syntax table — controls `/cd` command directory access; confirmed on official permissions page (v2.1.169+) | ✅ COMPLETE (added after `MCP` row) — NEW |
+| 4 | HIGH | New Env Vars | Add 4 `ANTHROPIC_DEFAULT_FABLE_MODEL*` vars (override, name, description, supported capabilities) for Fable 5 model pinning on Bedrock/Vertex/Foundry; confirmed on official env-vars page (v2.1.170) | ✅ COMPLETE (added after `ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES`) — NEW |
+| 5 | HIGH | Model Alias | Add `fable` to Model Aliases table — Claude Fable 5, Anthropic API only (v2.1.170+); confirmed on official settings page | ✅ COMPLETE (added after `opusplan` row) — NEW |
+| 6 | HIGH | Example Update | Update Quick Reference example: add `advisorModel` field to showcase v2.1.172 feature | ✅ COMPLETE (updated example) — NEW |
+| 7 | INVALID | Rule 8A Rejection | `DISABLE_PROMPT_CACHING_FABLE` — pattern-implied from Haiku/Sonnet/Opus siblings but NOT explicitly listed on official /en/env-vars page. Per Rule 8A, pattern inference is insufficient — not added | ❌ INVALID (not on official env-vars page; pattern only — Rule 8A) — NEW |
+| 8 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 31+ consecutive runs | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+
+---
+
+## [2026-06-12 10:46 AM PKT] Claude Code v2.1.175
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | New Setting | Add `enforceAvailableModels` (managed-only boolean, v2.1.175) to General Settings after `availableModels` — enforces the `availableModels` allowlist on the Default model option | ✅ COMPLETE (added after `availableModels` row) — NEW |
+| 2 | HIGH | New Setting | Add `wheelScrollAccelerationEnabled` (boolean, v2.1.174) to Display Settings table — disables mouse-wheel scroll acceleration in fullscreen mode | ✅ COMPLETE (added after `preferredNotifChannel` row) — NEW |
+| 3 | HIGH | Version Bump | Update report version badge from v2.1.172 → v2.1.175 and header "As of v2.1.172" → "As of v2.1.175" | ✅ COMPLETE (badge and header updated in Phase 2.6) — NEW |
+| 4 | MED | Missing Env Var | Add `API_FORCE_IDLE_TIMEOUT` to env vars table near `API_TIMEOUT_MS` — override 5-minute idle timeout for streaming; confirmed on official /en/env-vars page (v2.1.169) | ✅ COMPLETE (added after `API_TIMEOUT_MS` row) — NEW |
+| 5 | MED | Missing Env Var | Add `CLAUDE_CODE_DISABLE_ADVISOR_TOOL` to env vars table near other DISABLE_ vars — disable the advisor tool and `/advisor` command; confirmed on official /en/env-vars page (min v2.1.98) | ✅ COMPLETE (added after `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS` row) — NEW |
+| 6 | MED | Changed Description | Update `availableModels` — add v2.1.172 note that it also constrains subagent model picker and `advisorModel` picker; add `enforceAvailableModels` cross-reference | ✅ COMPLETE (description updated in General Settings table) — NEW |
+| 7 | LOW | Changed Description | Fix `CLAUDE_CODE_EFFORT_LEVEL` — "xhigh (Opus 4.7 only, v2.1.111)" → "xhigh (Opus 4.7 and 4.8, v2.1.111)" | ✅ COMPLETE (updated in env vars table) — NEW |
+| 8 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 32+ consecutive runs | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+
+---
+
+## [2026-06-13 10:37 AM PKT] Claude Code v2.1.176
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | New Setting | Add `footerLinksRegexes` to Display Settings table — regex patterns matched against URLs to display as link badges in the footer row (v2.1.176 changelog; not yet on official settings page — annotated per Rule 1F) | ✅ COMPLETE (added after `wheelScrollAccelerationEnabled` with changelog annotation) — NEW |
+| 2 | HIGH | Version Badge | Update report version badge v2.1.175 → v2.1.176 and header "As of v2.1.175" → "As of v2.1.176" | ✅ COMPLETE (badge and header updated in Phase 2.6) — NEW |
+| 3 | MED | Changed Description | Update intro line 6: "As of v2.1.175" → "As of v2.1.176" | ✅ COMPLETE (intro updated) — NEW |
+| 4 | LOW | Changed Description | Add Fable 5 1M-context auto-strip note to `"fable"` alias — Fable 5 includes 1M context by default; the `[1m]` suffix is auto-stripped (v2.1.173 changelog) | ✅ COMPLETE (note added to fable alias in Model Aliases table) — NEW |
+| 5 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 33+ consecutive runs | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+| 6 | INVALID | Spurious Drift Claims (agent-2) | `workflow-claude-settings-agent` (agent-2) attributed `worktree.baseRef`, `wheelScrollAccelerationEnabled`, and `enforceAvailableModels` to v2.1.176. Verified: `worktree.baseRef` was added in v2.1.133, `wheelScrollAccelerationEnabled` in v2.1.174, `enforceAvailableModels` in v2.1.175 — all already in the report. Per Rule 8A | ❌ INVALID (keys already documented; agent version attribution was wrong) |
+
+---
+
+## [2026-06-14 10:49 AM PKT] Claude Code v2.1.176
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Missing Env Var | Add `CLAUDE_CODE_CHILD_SESSION` to Common Environment Variables table — set to `1` in subprocesses Claude Code spawns (Bash, PowerShell, Monitor tools, hooks, status line). Not set for stdio MCP servers. Reliably distinguishes nested `claude` sessions from top-level IDE launches unlike `CLAUDECODE`. Nested TUI sessions excluded from `--resume`/`--continue`/history; override with `CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1`. Confirmed on official /en/env-vars page (v2.1.172) | ✅ COMPLETE (added after `CLAUDECODE` row in env vars table) — NEW |
+| 2 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 34+ consecutive runs. Annotation "in v2.1.85 changelog, not yet on official env-vars page" remains accurate | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+
+---
+
+## [2026-06-15 10:45 AM PKT] Claude Code v2.1.176
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 35+ consecutive runs. Annotation "in v2.1.85 changelog, not yet on official env-vars page" remains accurate | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+| 2 | INVALID | Spurious Drift Claim | `claude-code-guide` listed `DISABLE_PROMPT_CACHING_FABLE` as missing from env vars table. Not on official /en/env-vars page per Rule 8A. RECURRING (first rejected 2026-06-11 v2.1.172 #7) | ❌ INVALID (Rule 8A — not on official env-vars page) |
+| 3 | INVALID | Spurious Drift Claim | `claude-code-guide` listed `best` as a missing model alias. Not found in the official settings page model aliases section per Rule 8A | ❌ INVALID (Rule 8A — not on official settings page) |
+| 4 | INVALID | Spurious Drift Claim | `claude-code-guide` listed effort values as `fast`/`balanced`/`thorough`. Official /en/env-vars page confirms valid values are `low`, `medium`, `high`, `xhigh`, `max`, `auto`. RECURRING from v2.1.139 and v2.1.145 | ❌ INVALID (agent contradicted by official docs — recurring error) |
+
+---
+
+## [2026-06-16 10:46 AM PKT] Claude Code v2.1.178
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Missing Settings | Add `agentPushNotifEnabled` (boolean, false) and `inputNeededNotifEnabled` (boolean, false) to General Settings table — Remote Control push notification controls. Confirmed on official settings page | ✅ COMPLETE (added to General Settings table after disableRemoteControl) |
+| 2 | HIGH | Missing Setting | Add `autoCompactEnabled` (boolean, true) to General Settings table — auto-compact conversation when context approaches limit. Confirmed on official settings page | ✅ COMPLETE (added after awaySummaryEnabled) |
+| 3 | HIGH | Missing Setting | Add `fileCheckpointingEnabled` (boolean, true) to Plans & Memory Directories table — snapshot files before edits for /rewind restoration. Confirmed on official settings page | ✅ COMPLETE (added after autoMemoryEnabled) |
+| 4 | HIGH | Permission Syntax | Add `Tool(param:value)` row to Tool Permission Syntax table — new parameter-matching syntax (v2.1.178 changelog). Example: `Agent(model:opus)` | ✅ COMPLETE (added after MCP row with wildcard support note) |
+| 5 | MED | Stale Annotation | Remove "(in v2.1.176 changelog, not yet on official settings page)" from `footerLinksRegexes` — now confirmed on official settings page | ✅ COMPLETE (annotation updated to (v2.1.176)) |
+| 6 | MED | Stale Annotation | Remove "*(in v2.1.169 changelog, not yet on official settings page)*" from `disableBundledSkills` and `CLAUDE_CODE_DISABLE_BUNDLED_SKILLS` — now confirmed on official page | ✅ COMPLETE (annotations updated to (v2.1.169)) |
+| 7 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 36+ consecutive runs. Annotation "in v2.1.85 changelog, not yet on official env-vars page" remains accurate | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+
+---
+
+## [2026-06-17 10:44 AM PKT] Claude Code v2.1.179
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update report version badge from v2.1.178 → v2.1.179 and header "As of v2.1.178" → "As of v2.1.179" | ✅ COMPLETE (badge and header updated in Phase 2.6) — NEW |
+| 2 | LOW | Stale Text | Fix `/model` Useful Commands row: "Switch models and adjust Opus 4.6 effort level" → "Switch models and adjust effort level (Opus 4.7 and 4.8)" — Opus 4.6 is superseded | ✅ COMPLETE (updated in Useful Commands table) — NEW |
+| 3 | LOW | Stale Text | Fix `/effort` Useful Commands row: "xhigh (Opus 4.7 only, v2.1.111)" → "xhigh (Opus 4.7 and 4.8, v2.1.111)" — Opus 4.8 also supports xhigh; consistent with env var row fix from v2.1.175 run | ✅ COMPLETE (updated in Useful Commands table) — NEW |
+| 4 | LOW | Ownership Boundary | Add startup-flag cross-link to `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` in settings report — CLI flags file already has cross-link to settings report (v2.1.161), but settings report was missing the reciprocal link. Rule 5B | ✅ COMPLETE (cross-reference note added to settings report line 907) — RECURRING (first identified 2026-06-03 v2.1.161 #5; CLI flags direction was fixed then; settings→flags direction missed) |
+| 5 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 37+ consecutive runs. Annotation "in v2.1.85 changelog, not yet on official env-vars page" remains accurate | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+
+---
+
+## [2026-06-18 10:40 AM PKT] Claude Code v2.1.181
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update report version badge from v2.1.179 → v2.1.181 and "As of v2.1.179" → "As of v2.1.181" | ✅ COMPLETE (badge and header updated in Phase 2.6) — NEW |
+| 2 | HIGH | New Setting | Add `sandbox.allowAppleEvents` (boolean, macOS only, default `false`) to Sandbox Settings table — opt-in for sandboxed commands to send Apple Events; required for `open`, `osascript`, browser auth flows (v2.1.181 changelog) | ✅ COMPLETE (added after sandbox.socatPath with changelog annotation) — NEW |
+| 3 | MED | New Env Var | Add `CLAUDE_CLIENT_PRESENCE_FILE` to Common Environment Variables table — path to a file that suppresses mobile push notifications when present (v2.1.181 changelog) | ✅ COMPLETE (added after CLAUDE_REMOTE_CONTROL_SESSION_NAME_PREFIX with changelog annotation) — NEW |
+| 4 | MED | Useful Commands | Update `/config` entry to mention `key=value` syntax for prompt-based settings configuration: `/config model=sonnet` (v2.1.181 changelog) | ✅ COMPLETE (description updated in Useful Commands table) — NEW |
+| 5 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 38+ consecutive runs. Annotation "in v2.1.85 changelog, not yet on official env-vars page" remains accurate | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+| 6 | LOW | Ownership Question | `CLAUDE_CODE_SAFE_MODE` (v2.1.169, paired with `--safe-mode` startup flag) — out of scope for this report per previous run decision; belongs in `claude-cli-startup-flags.md` | ✋ ON HOLD (out of scope — recurring from 2026-06-09 v2.1.169 #4) |
+
+---
+
+## [2026-06-20 10:39 AM PKT] Claude Code v2.1.183
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update report version badge from v2.1.181 → v2.1.183 and header "As of v2.1.181" → "As of v2.1.183" | ✅ COMPLETE (badge and header updated in Phase 2.6) |
+| 2 | HIGH | New Setting | Add `attribution.sessionUrl` (boolean, default `true`, any scope) to Attribution Settings table — omit claude.ai session link from commits/PRs in web and Remote Control sessions (v2.1.183) | ✅ COMPLETE (added after attribution.pr row) |
+| 3 | HIGH | New Setting | Add `axScreenReader` (boolean, default `false`, User scope) to Display Settings table — screen-reader-friendly flat text output; also available via `--ax-screen-reader` CLI flag (v2.1.181) | ✅ COMPLETE (added to Display Settings table after prefersReducedMotion) |
+| 4 | HIGH | New Setting | Add `disableClaudeAiConnectors` (boolean, default `false`, any scope) to MCP Settings table — disable auto-fetching of claude.ai MCP connectors (v2.1.182) | ✅ COMPLETE (added to MCP Settings table after allowAllClaudeAiMcps) |
+| 5 | HIGH | New Setting | Add `disableArtifact` (boolean, default `false`, any scope) to General Settings table — disable Artifact web publishing tool (confirmed on official settings page) | ✅ COMPLETE (added after disableBundledSkills) |
+| 6 | HIGH | New Setting | Add `remoteControlAtStartup` (boolean/null, any scope) to General Settings table — auto-connect Remote Control on startup; `true`/`false`/unset-for-org-default (v2.1.119+, confirmed on official settings page) | ✅ COMPLETE (added after inputNeededNotifEnabled) |
+| 7 | MED | Annotation Fix | Remove "(in v2.1.181 changelog, not yet on official settings page)" from `sandbox.allowAppleEvents` — now confirmed on official settings page | ✅ COMPLETE (annotation updated to (v2.1.181)) |
+| 8 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 39+ consecutive runs. Annotation "in v2.1.85 changelog, not yet on official env-vars page" remains accurate | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+
+---
+
+## [2026-06-21 10:47 AM PKT] Claude Code v2.1.185
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update badge v2.1.183 → v2.1.185 and header "As of v2.1.183" → "As of v2.1.185" | ✅ COMPLETE (badge and header updated in Phase 2.6) |
+| 2 | HIGH | Missing Env Var | Add `CLAUDE_CODE_CONNECT_TIMEOUT_MS` — timeout (ms) for connect/TLS/response-header phase; default 60000ms (60s); set `0` to disable and rely on `API_TIMEOUT_MS` alone | ✅ COMPLETE (added after API_FORCE_IDLE_TIMEOUT) |
+| 3 | HIGH | Missing Env Var | Add `CLAUDE_AX_SCREEN_READER` — set `1` for screen-reader friendly output (flat text, no borders/animations); set `0` to force off even when `axScreenReader: true`; `--ax-screen-reader` CLI flag takes precedence (v2.1.181+) | ✅ COMPLETE (added after CLAUDE_CODE_ACCESSIBILITY) |
+| 4 | HIGH | Missing Env Var | Add `CLAUDE_CODE_DISABLE_ARTIFACT` — set `1` to disable the Artifact tool; equivalent to `disableArtifact` setting | ✅ COMPLETE (added after CLAUDE_CODE_DISABLE_BUNDLED_SKILLS) |
+| 5 | HIGH | Missing Env Var | Add `CLAUDE_CODE_ARTIFACT_AUTO_OPEN` — set `0` to stop Claude Code from auto-opening browser when a new artifact is published | ✅ COMPLETE (added after CLAUDE_CODE_DISABLE_ARTIFACT) |
+| 6 | HIGH | Missing Env Var | Add `CLAUDE_CODE_FORCE_SESSION_PERSISTENCE` — set `1` to override exclusion of nested interactive sessions from `--resume`/`--continue`/history/`claude agents` | ✅ COMPLETE (added after CLAUDE_CODE_CHILD_SESSION) |
+| 7 | MED | Changed Description | Fix `CLAUDE_CODE_DEBUG_LOGS_DIR` — official docs say "despite the name, this is a file path, not a directory"; current report says "Override debug log file directory path" | ✅ COMPLETE (description updated to clarify file path vs directory) |
+| 8 | MED | Annotation Resolved | Remove "not yet on official env-vars page" annotation from `CLAUDE_CLIENT_PRESENCE_FILE` — confirmed present on official /en/env-vars page | ✅ COMPLETE (annotation removed) |
+| 9 | LOW | Invalid Finding | `disableSkillShellExecution` managed-only annotation proposed but INVALID per official docs — scope is User/Project/Local/Managed (any scope) | ❌ INVALID (official settings page confirms any scope — not managed-only) |
+| 10 | LOW | Invalid Finding | `verbose` missing setting proposed but INVALID per official docs — it is a `/config` session-only parameter, not a persistable `settings.json` key | ❌ INVALID (official settings page confirms not a settings.json key) |
+| 11 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — 40+ consecutive ON HOLD runs; still not on official /en/env-vars page | ✋ ON HOLD (recurring from 2026-04-14 v2.1.107; annotation retained)
+
+---
+
+## [2026-06-22 10:42 AM PKT] Claude Code v2.1.185
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | MED | Ownership | Add `CLAUDE_CODE_SAFE_MODE` / `--safe-mode` (v2.1.169) to `claude-cli-startup-flags.md` — absent from both docs | ✋ ON HOLD (out of scope for this report — belongs in CLI flags; recurring from 2026-06-09 v2.1.169 #4) |
+| 2 | LOW | Changed Description | `forceLoginMethod`: add "Blocks API key authentication in managed settings" clause | ✋ ON HOLD (0.7 confidence from summarized fetch — insufficient content-match depth per Rule 8A) |
+| 3 | LOW | Changed Description | `feedbackSurveyRate`: add "Set to 0 to suppress" note | ✋ ON HOLD (0.6 confidence — not confirmed at content-match depth) |
+| 4 | LOW | Changed Description | `autoScrollEnabled`: add "Permission prompts still scroll" note | ✋ ON HOLD (0.6 confidence — not confirmed at content-match depth) |
+| 5 | LOW | Suspect Key | `OTEL_LOG_TOOL_DETAILS` — 41+ consecutive ON HOLD runs; annotation "in v2.1.85 changelog, not yet on official env-vars page" remains accurate | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+
+---
+
+## [2026-06-24 10:44 AM PKT] Claude Code v2.1.187
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | New Setting | Add `sandbox.credentials` (boolean, default `false`, v2.1.187) to Sandbox Settings table — blocks sandboxed commands from reading credential files and secret environment variables | ✅ COMPLETE (added to Sandbox Settings table after sandbox.allowAppleEvents) |
+| 2 | HIGH | Changed Behavior | Add `"iterm2"` to `teammateMode` valid values — force iTerm2 split-pane display for agent teammates (v2.1.186) | ✅ COMPLETE (added to Display Settings table teammateMode row) |
+| 3 | HIGH | New Setting | Add `respondToBashCommands` (boolean, default `true`, v2.1.186) to General Settings table — controls whether Claude auto-responds after `!` shell commands | ✅ COMPLETE (added to General Settings table after advisorModel) |
+| 4 | MED | Version Bump | Update report version badge from v2.1.185 → v2.1.187 and header "As of v2.1.185" → "As of v2.1.187" | ✅ COMPLETE (badge and header updated in Phase 2.6) |
+| 5 | LOW | Suspect Key | `OTEL_LOG_TOOL_DETAILS` — 42+ consecutive ON HOLD runs; annotation "in v2.1.85 changelog, not yet on official env-vars page" remains accurate | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+
+---
+
+## [2026-06-26 10:46 AM PKT] Claude Code v2.1.193
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Changed Behavior | Update `sandbox.credentials` type from `boolean \| false` to object with `files` (array) and `envVars` (array) sub-fields per official settings page (v2.1.191+ change; entry was added as boolean in v2.1.187, evolved to object) | ✅ COMPLETE (type and description updated in Sandbox Settings table) |
+| 2 | HIGH | New Setting | Add `autoMode.classifyAllShell` (boolean) to `autoMode` description — routes all Bash/PowerShell commands through auto-mode classifier instead of only arbitrary-code-execution patterns (v2.1.193 changelog) | ✅ COMPLETE (added to autoMode description and Quick Reference JSON example) |
+| 3 | HIGH | Version Bump | Update report version badge v2.1.187 → v2.1.193 and header "As of v2.1.187" → "As of v2.1.193" | ✅ COMPLETE (badge and header updated in Phase 2.6) |
+| 4 | MED | New Env Var | Add `CLAUDE_CODE_DISABLE_BG_SHELL_PRESSURE_REAP` to env vars section — disable memory-pressure reaping of idle background shell commands (v2.1.193 changelog, not yet on official env-vars page) | ✅ COMPLETE (added with changelog annotation) |
+| 5 | LOW | Suspect Key | `OTEL_LOG_TOOL_DETAILS` — 43+ consecutive ON HOLD runs (since v2.1.107, 2026-04-14); Rule 10B escalation threshold exceeded but still not on official env-vars page or JSON schema | ✋ ON HOLD (recurring from 2026-04-14 v2.1.107) |
+| 6 | LOW | Suspect Key | `OTEL_LOG_ASSISTANT_RESPONSES` — possible new OTEL env var for `claude_code.assistant_response` event added in v2.1.193, not confirmed on official env-vars page | ✋ ON HOLD (new — pending official confirmation) |
+| 7 | LOW | Potential New Setting | `skillDirectories` — listed on official settings page but description truncated; type, default, and scope unconfirmed | ✋ ON HOLD (new — pending official confirmation) |
+
+---
+
+## [2026-06-29 10:37 AM PKT] Claude Code v2.1.195
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Missing Env Var | Add `CLAUDE_CODE_DISABLE_MOUSE_CLICKS` to Common Environment Variables table — disables mouse interactions in fullscreen while preserving wheel scroll (v2.1.195 changelog; not on official env-vars page — annotated per Rule 5D/8A) | ✅ COMPLETE (added after `CLAUDE_CODE_DISABLE_MOUSE` with changelog annotation) — NEW |
+| 2 | HIGH | Version Bump | Update report version badge from v2.1.193 → v2.1.195 and header "As of v2.1.193" → "As of v2.1.195" | ✅ COMPLETE (badge and header updated in Phase 2.6) — NEW |
+| 3 | MED | Missing Env Var | Add `OTEL_LOG_ASSISTANT_RESPONSES` to OTEL env vars section — controls logging of model responses to telemetry (v2.1.193 changelog; not on official env-vars page — annotated per Rule 5D/8A) | ✅ COMPLETE (added after `OTEL_LOG_USER_PROMPTS` with changelog annotation) — RECURRING (first seen 2026-06-26 v2.1.193 #6) |
+| 4 | LOW | Annotation | Annotate `spinnerTipsEnabled` as "in JSON schema, not on official settings page" per Rule 1F — key has been in report without official backing annotation | ✅ COMPLETE (annotation added to description) — NEW |
+| 5 | LOW | Resolve ON HOLD | `skillDirectories` (ON HOLD from 2026-06-26 v2.1.193 #7) — NOT found on official settings page per direct verification this run; prior run finding was based on truncated fetch | ❌ INVALID (not on official settings page per direct check) — RECURRING (first seen 2026-06-26) |
+| 6 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official env-vars page after 44+ consecutive runs | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+
+---
+
+## [2026-07-01 10:40 AM PKT] Claude Code v2.1.197
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update report version badge from v2.1.195 → v2.1.197 and header "As of v2.1.195" → "As of v2.1.197" | ✅ COMPLETE (badge and header updated in Phase 2.6) — NEW |
+| 2 | HIGH | Missing Setting | Add `enableArtifact` (boolean, v2.1.196+) to General Settings table — user-level opt-in for the Artifact web publishing tool | ✅ COMPLETE (added after `disableArtifact` in General Settings table) — NEW |
+| 3 | HIGH | Missing Setting | Add `forceLoginGatewayUrl` (string, Managed only) to Authentication Helpers table — pre-fills gateway URL when `forceLoginMethod: "gateway"` | ✅ COMPLETE (added to Authentication Helpers table after `forceLoginOrgUUID`) — NEW |
+| 4 | HIGH | Changed Description | Add `"gateway"` as third value for `forceLoginMethod` (alongside `"claudeai"` and `"console"`) | ✅ COMPLETE (description updated in Authentication Helpers table) — NEW |
+| 5 | HIGH | Missing Setting | Add `disableSideloadFlags` (boolean, Managed only, v2.1.193) to Plugin Settings table — rejects `--plugin-dir` and `--plugin-url` startup flags | ✅ COMPLETE (added at end of Plugin Settings table) — NEW |
+| 6 | MED | Changed Description | Fix `CLAUDE_ENABLE_STREAM_WATCHDOG` — now enabled by default as of v2.1.163; set to `0` to disable (old description implied opt-in with `1`) | ✅ COMPLETE (description updated to reflect default-on behavior) — NEW |
+| 7 | MED | Missing Setting | Add `thinkingBudgetTokens` (number) to General Settings table — fixed token budget for extended thinking per response | ✅ COMPLETE (added after `alwaysThinkingEnabled` in General Settings table) — NEW |
+| 8 | MED | Changed Default | Fix `teammateMode` default from `"auto"` → `"in-process"` (changed in v2.1.179 per CLI reference) | ✅ COMPLETE (Default column updated; description updated to note "default since v2.1.179") — NEW |
+| 9 | MED | New Command | Add `claude gateway` to Useful Commands table (v2.1.195) | ✅ COMPLETE (added to Useful Commands table) — NEW |
+| 10 | LOW | MCP Security | Add v2.1.196 `.mcp.json` self-approval security hardening note to `enableAllProjectMcpServers` description | ✅ COMPLETE (security note added to `enableAllProjectMcpServers` description in MCP Settings table) — NEW |
+| 11 | LOW | Model Alias | Update `"sonnet"` alias to point to Claude Sonnet 5 per v2.1.197 changelog | ✋ ON HOLD (claude-code-guide agent returned `claude-sonnet-4-6` contradicting workflow-claude-settings-agent finding; per Rule 8A skipping until confirmed by official settings docs) — NEW |
+| 12 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official env-vars page after 45+ consecutive runs | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+
+---
+
+## [2026-07-03 10:42 AM PKT] Claude Code v2.1.199
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update report version badge from v2.1.197 → v2.1.199 and header "As of v2.1.197" → "As of v2.1.199" | ✅ COMPLETE (badge and header updated in Phase 2.6) — NEW |
+| 2 | HIGH | Model Alias | Update `"sonnet"` alias to point to Claude Sonnet 5 on the Anthropic API (native 1M-token context, v2.1.197); Claude Sonnet 4.6 on Bedrock/Vertex/Foundry | ✅ COMPLETE (Model Aliases table updated; both agents confirm Sonnet 5 this run) — RECURRING (first seen 2026-07-01 #11) |
+| 3 | HIGH | Missing Env Var | Add `CLAUDE_AFK_TIMEOUT_MS` (v2.1.198) — AskUserQuestion dialog auto-continue timeout (default 60000ms) | ✅ COMPLETE (added after `CLAUDE_CODE_CONNECT_TIMEOUT_MS`) — NEW |
+| 4 | HIGH | Missing Env Var | Add `CLAUDE_AFK_COUNTDOWN_MS` (v2.1.198) — countdown display delay before auto-continue (default 20000ms) | ✅ COMPLETE (added after `CLAUDE_AFK_TIMEOUT_MS`) — NEW |
+| 5 | HIGH | Missing Env Var | Add `CLAUDE_CODE_DISABLE_BG_EXIT_HANDOFF` (v2.1.198) — prevent background task handoff when supervisor restarts | ✅ COMPLETE (added after `CLAUDE_CODE_DISABLE_BG_SHELL_PRESSURE_REAP`) — NEW |
+| 6 | HIGH | Missing Env Var | Add `CLAUDE_CODE_DISABLE_EXPLORE_PLAN_AGENTS` (v2.1.198) — disable built-in Explore and Plan subagents | ✅ COMPLETE (added after `CLAUDE_CODE_DISABLE_AGENT_VIEW`) — NEW |
+| 7 | HIGH | Missing Env Var | Add `CLAUDE_CODE_BRIDGE_SESSION_ID` (v2.1.199) — read-only Remote Control session ID in Bash/hook subprocesses | ✅ COMPLETE (added after `CLAUDE_CODE_REMOTE_SESSION_ID`) — NEW |
+| 8 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official env-vars page after 46+ consecutive runs | ✋ ON HOLD (kept — recurring from 2026-04-14 v2.1.107) |
+| 9 | LOW | Unconfirmed Env Var | `CLAUDE_CODE_RETRY_WATCHDOG` — flagged by workflow agent at 0.85 confidence but NOT found on official env-vars page per Rule 8A | ✋ ON HOLD (not on official env-vars page; will re-check next run) — NEW |
+
+---
+
+## [2026-07-04 10:47 AM PKT] Claude Code v2.1.201
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update report version badge from v2.1.199 → v2.1.201 and header "As of v2.1.199" → "As of v2.1.201" | ✅ COMPLETE (badge and header updated in Phase 2.6) — NEW |
+| 2 | HIGH | New Setting | Add `askUserQuestionTimeout` to General Settings table — string, default `"never"`, values `"60s"/"5m"/"10m"/"never"`. Controls auto-continue behavior for unanswered AskUserQuestion dialogs. Confirmed on official settings page (v2.1.200) | ✅ COMPLETE (added after `respondToBashCommands` in General Settings table) — NEW |
+| 3 | HIGH | New Permission Mode | Add `"manual"` alias row to Permission Modes table and update `permissions.defaultMode` description — v2.1.200 introduced `"manual"` as an alias for `"default"` for UI clarity across CLI, VS Code, and JetBrains. Confirmed in v2.1.200 changelog | ✅ COMPLETE (added to Permission Modes table; defaultMode description updated) — NEW |
+| 4 | MED | Changed Description | Update `CLAUDE_AFK_TIMEOUT_MS` — v2.1.200 changed the default behavior: AskUserQuestion dialogs no longer auto-continue by default (`askUserQuestionTimeout: "never"` is the new default). `CLAUDE_AFK_TIMEOUT_MS` now applies only when `askUserQuestionTimeout` is explicitly set to a duration | ✅ COMPLETE (description updated to clarify v2.1.200 semantics) — NEW |
+| 5 | LOW | Changed Description | Update `apiKeyHelper` — description said only `X-Api-Key`; official docs confirm the script output is also sent as `Authorization: Bearer` header. Completed. | ✅ COMPLETE (description updated in Authentication Helpers table) — NEW |
+| 6 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 47+ consecutive runs | ✋ ON HOLD (recurring from 2026-04-14 v2.1.107) |
+| 7 | LOW | Suspect Key Recurrence | `CLAUDE_CODE_RETRY_WATCHDOG` — still NOT on official env-vars page per Rule 8A verification | ✋ ON HOLD (recurring from 2026-07-03 v2.1.199) |
+
+---
+
+## [2026-07-05 10:45 AM PKT] Claude Code v2.1.201
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 48+ consecutive runs; entry annotated "(in v2.1.85 changelog, not yet on official env-vars page)" | ✋ ON HOLD (recurring from 2026-04-14 v2.1.107) |
+| 2 | LOW | Suspect Key Recurrence | `CLAUDE_CODE_RETRY_WATCHDOG` — still NOT on official env-vars page per Rule 8A verification | ✋ ON HOLD (recurring from 2026-07-03 v2.1.199) |
+
+---
+
+## [2026-07-06 10:43 AM PKT] Claude Code v2.1.201
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | LOW | Suspect Key Resolution | `OTEL_LOG_TOOL_DETAILS` — Rule 10B escalation at 49 consecutive ON HOLD runs: resolved. Variable IS already in report at line 1076 annotated "(in v2.1.85 changelog, not yet on official env-vars page)". Recurring action "Add to env vars table" was a false positive — variable added and annotated in an earlier run. Official /en/env-vars page still does not list it | ❌ INVALID (already in report with correct annotation; no action needed — RECURRING 49 runs) |
+| 2 | LOW | Suspect Key Recurrence | `CLAUDE_CODE_RETRY_WATCHDOG` — still NOT on official env-vars page per Rule 8A and live /en/env-vars verification this run | ✋ ON HOLD (4 consecutive runs; escalation threshold is 5 — recurring from 2026-07-03 v2.1.199) |
+
+---
+
+## [2026-07-07 10:44 AM PKT] Claude Code v2.1.202
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update report version badge from v2.1.201 → v2.1.202 and header "As of v2.1.201" → "As of v2.1.202" | ✅ COMPLETE (badge and header updated in Phase 2.6) — NEW |
+| 2 | HIGH | Missing Env Var | Add `CLAUDE_CODE_DISABLE_NOTIFICATION_PRESENCE_CHECK` — set to `1` to send push notifications regardless of active user presence. Confirmed on official /en/env-vars page (v2.1.193). Added after `CLAUDE_CLIENT_PRESENCE_FILE` | ✅ COMPLETE (added after `CLAUDE_CLIENT_PRESENCE_FILE`) — NEW |
+| 3 | HIGH | Suspect Key Resolution (Rule 10B) | `CLAUDE_CODE_RETRY_WATCHDOG` — 5 consecutive ON HOLD runs; Rule 10B escalation threshold reached. Key confirmed in v2.1.199 changelog but NOT on official /en/env-vars page. Resolved by adding with annotation "*(in v2.1.199 changelog, not on official env-vars page)*" after `CLAUDE_CODE_MAX_RETRIES` | ✅ COMPLETE (added with changelog-only annotation) — RECURRING (5 runs) |
+| 4 | LOW | Unconfirmed Setting | "Dynamic workflow size" feature (v2.1.202 changelog) — exact `settings.json` key unconfirmed on official settings page per Rule 8A | ✋ ON HOLD (new; awaiting official settings page confirmation) |
+| 5 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 50+ consecutive runs; entry annotated "(in v2.1.85 changelog, not yet on official env-vars page)" | ✋ ON HOLD (recurring from 2026-04-14 v2.1.107) |
+
+---
+
+## [2026-07-08 10:46 AM PKT] Claude Code v2.1.204
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update report version badge from v2.1.202 → v2.1.204 and header "As of v2.1.202" → "As of v2.1.204" | ✅ COMPLETE (badge and header updated in Phase 2.6) — NEW |
+| 2 | MED | Stale Annotation | Remove "(in v2.1.154 changelog, not yet on official env-vars page)" from `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT` — confirmed on official /en/env-vars page | ✅ COMPLETE (annotation removed) — NEW |
+| 3 | LOW | Unconfirmed Setting | "Dynamic workflow size" feature (v2.1.202 changelog) — exact `settings.json` key unconfirmed on official settings page per Rule 8A | ✋ ON HOLD (RECURRING from 2026-07-07 v2.1.202; exact key not found on official settings page) |
+| 4 | LOW | Suspect Key Recurrence | `CLAUDE_CODE_RETRY_WATCHDOG` — still NOT on official /en/env-vars page; entry annotated "*(in v2.1.199 changelog, not on official env-vars page)*" | ✋ ON HOLD (RECURRING from 2026-07-03 v2.1.199; not yet on official page) |
+| 5 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 51+ consecutive runs; entry annotated "*(in v2.1.85 changelog, not yet on official env-vars page)*" | ✋ ON HOLD (RECURRING from 2026-04-14 v2.1.107; 51+ consecutive runs) |
+
+---
+
+## [2026-07-09 10:47 AM PKT] Claude Code v2.1.205
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | New Setting | Add `dynamicWorkflowSize` to General Settings table. Raw changelog confirms: `v2.1.202: dynamicWorkflowSize (advisory guideline for workflow agent counts)` and `v2.1.205: dynamicWorkflowSize (small/medium/large for workflow agent counts)`. Type: string, values: `"small"`, `"medium"`, `"large"`. Inserted after `ultracode` row | ✅ COMPLETE (added to General Settings table; key confirmed in raw changelog — RECURRING from 2026-07-07 v2.1.202 ON HOLD, now resolved) |
+| 2 | HIGH | MCP Setting Change | Update reserved MCP server names callout (line ~382) to add `Claude Browser` and `Claude Preview` alongside existing `workspace`. Confirmed on official settings page and v2.1.205 changelog | ✅ COMPLETE (callout updated to list all three reserved names) — NEW |
+| 3 | LOW | Suspect Key Recurrence | `CLAUDE_CODE_RETRY_WATCHDOG` — still NOT on official /en/env-vars page; entry annotated "*(in v2.1.199 changelog, not on official env-vars page)*" | ✋ ON HOLD (RECURRING from 2026-07-03 v2.1.199; not yet on official page) |
+| 4 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 52+ consecutive runs; entry annotated "*(in v2.1.85 changelog, not yet on official env-vars page)*" | ✋ ON HOLD (RECURRING from 2026-04-14 v2.1.107; 52+ consecutive runs) |
+
+---
+
+## [2026-07-11 10:43 AM PKT] Claude Code v2.1.207
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Bump | Update report version badge from v2.1.205 → v2.1.207 and header "As of v2.1.205" → "As of v2.1.207" | ✅ COMPLETE (badge and header updated in Phase 2.6) — NEW |
+| 2 | HIGH | New Setting | Add `browserExternalPageTools` to Managed-only policy keys table. Managed-only string setting; set to `"disabled"` to prevent Claude from using tools to read or act on external pages in the desktop app's Browser pane. Users can still navigate externally; local dev server previews are unaffected. Confirmed on official settings page | ✅ COMPLETE (added to Managed-only policy keys table after `requiredMaximumVersion`) — NEW |
+| 3 | MED | Behavioral Change | Update `autoMode` description: v2.1.207 removed `.claude/settings.local.json` scope to prevent repo injection. Now only available in user (`~/.claude/settings.json`) and managed settings | ✅ COMPLETE (updated scope note in autoMode row) — NEW |
+| 4 | MED | Model Alias Change | Update `"opus"` alias description: Bedrock, Vertex, and Claude Platform on AWS now default to Opus 4.8 (was 4.6). Confirmed in v2.1.207 changelog: "Changed default model across Bedrock, Vertex, and Claude Platform on AWS to Claude Opus 4.8" | ✅ COMPLETE (opus alias description updated) — NEW |
+| 5 | MED | Stale Annotation | Remove "*(in JSON schema, not on official settings page)*" annotation from `spinnerTipsEnabled` — confirmed on official /en/settings page | ✅ COMPLETE (annotation removed from Display Settings table) — NEW |
+| 6 | MED | Env Var Update | Update `CLAUDE_CODE_ENABLE_AUTO_MODE`: v2.1.207 makes auto mode available on Bedrock/Vertex/Foundry by default — opt-in no longer required. Note: official /en/permission-modes docs page still shows opt-in as required (likely not updated for v2.1.207 yet); updated per raw changelog which is authoritative for version-specific changes | ✅ COMPLETE (env var entry updated with v2.1.207 note) — NEW |
+| 7 | MED | Example Update | Remove `CLAUDE_CODE_ENABLE_AUTO_MODE: "1"` from Quick Reference complete example — no longer needed as of v2.1.207 | ✅ COMPLETE (removed from env block in Quick Reference example) — NEW |
+| 8 | LOW | Suspect Key Recurrence | `CLAUDE_CODE_RETRY_WATCHDOG` — still NOT on official /en/env-vars page; entry annotated "*(in v2.1.199 changelog, not on official env-vars page)*" | ✋ ON HOLD (RECURRING from 2026-07-03 v2.1.199; not yet on official page) |
+| 9 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 53+ consecutive runs; entry annotated "*(in v2.1.85 changelog, not yet on official env-vars page)*" | ✋ ON HOLD (RECURRING from 2026-04-14 v2.1.107; 53+ consecutive runs) |
+
+---
+
+## [2026-07-12 10:45 AM PKT] Claude Code v2.1.207
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Missing Env Var | Add `ANTHROPIC_FOUNDRY_AUTH_TOKEN` to env vars table — Azure authentication token for Foundry (alternative to service principal auth, v2.1.203+). Confirmed on official /en/env-vars page. Inserted after `ANTHROPIC_FOUNDRY_RESOURCE` | ✅ COMPLETE (added to env vars table) — NEW |
+| 2 | MED | Behavioral Change | Update `pluginConfigs` description: as of v2.1.207, no longer read from project-level `.claude/settings.json` or `.claude/settings.local.json`; only user, `--settings`, and managed settings honored. Mirrors `autoMode` project-scope restriction from previous run | ✅ COMPLETE (description updated with v2.1.207 restriction note) — NEW |
+| 3 | LOW | Suspect Key Recurrence | `CLAUDE_CODE_RETRY_WATCHDOG` — still NOT on official /en/env-vars page; entry annotated "*(in v2.1.199 changelog, not on official env-vars page)*" | ✋ ON HOLD (RECURRING from 2026-07-03 v2.1.199; not yet on official page) |
+| 4 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 54+ consecutive runs; entry annotated "*(in v2.1.85 changelog, not yet on official env-vars page)*" | ✋ ON HOLD (RECURRING from 2026-04-14 v2.1.107; 54+ consecutive runs) |
+
+---
+
+## [2026-07-13 10:46 AM PKT] Claude Code v2.1.207
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | MED | Changed Type | Fix `strictKnownMarketplaces` type: `array` → `boolean`; update description to "When `true`, only the official Anthropic marketplace is permitted; no additional or custom marketplaces may be installed". Confirmed boolean on official settings page by two independent sources (workflow agent + direct doc fetch) | ✅ COMPLETE (type and description updated in Plugin Settings table) — NEW |
+| 2 | LOW | Suspect Key Recurrence | `CLAUDE_CODE_RETRY_WATCHDOG` — still NOT on official /en/env-vars page; entry annotated "*(in v2.1.199 changelog, not on official env-vars page)*" | ✋ ON HOLD (RECURRING from 2026-07-03 v2.1.199; 10 consecutive runs) |
+| 3 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 55+ consecutive runs; entry annotated "*(in v2.1.85 changelog, not yet on official env-vars page)*" | ✋ ON HOLD (RECURRING from 2026-04-14 v2.1.107; 55+ consecutive runs) |
+
+---
+
+## [2026-07-15 10:45 AM PKT] Claude Code v2.1.210
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Missing Setting | Add `fastMode` (boolean, default `false`) to Core Configuration table after `fastModePerSessionOptIn`. Confirmed on official settings page | ✅ COMPLETE (added to Core Configuration table) — NEW |
+| 2 | HIGH | Missing Setting | Add `vimInsertModeRemaps` (object, v2.1.208) to Display & UX table after `editorMode`. Confirmed in v2.1.208 changelog | ✅ COMPLETE (added to Display Settings table) — NEW |
+| 3 | HIGH | Missing Env Var | Add `CLAUDE_CODE_PROCESS_WRAPPER` to env vars table after `CLAUDE_CODE_PERFORCE_MODE`. Confirmed in v2.1.208 changelog (not yet on official env-vars page) | ✅ COMPLETE (added with "not yet on official env-vars page" annotation) — NEW |
+| 4 | MED | Behavioral Note | Add v2.1.210 startup warning note for `Write(path)`, `NotebookEdit(path)`, `Glob(path)` permission rules suggesting `Edit(path)`/`Read(path)` alternatives. Confirmed in v2.1.210 changelog | ✅ COMPLETE (added blockquote note after Tool Permission Syntax table) — NEW |
+| 5 | LOW | Suspect Key Recurrence | `CLAUDE_CODE_RETRY_WATCHDOG` — still NOT on official /en/env-vars page; entry annotated "*(in v2.1.199 changelog, not on official env-vars page)*" | ✋ ON HOLD (RECURRING from 2026-07-03 v2.1.199; 11 consecutive runs) |
+| 6 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 56+ consecutive runs; entry annotated "*(in v2.1.85 changelog, not yet on official env-vars page)*" | ✋ ON HOLD (RECURRING from 2026-04-14 v2.1.107; 56+ consecutive runs) |
+
+---
+
+## [2026-07-19 10:44 AM PKT] Claude Code v2.1.215
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Missing Env Var | Add `CLAUDE_CODE_AWS_CHAIN_RESOLVE_TIMEOUT_MS` (Bedrock credential chain timeout, default 60000ms, v2.1.207). Confirmed on official env-vars page | ✅ COMPLETE (added to env vars table after `CLAUDE_CODE_SKIP_BEDROCK_AUTH`) — NEW |
+| 2 | HIGH | Missing Env Var | Add `CLAUDE_CODE_DISABLE_BEDROCK_CONTENT_TYPE_GUARD` (disable Bedrock content-type guard, v2.1.208). Confirmed on official env-vars page | ✅ COMPLETE (added to env vars table after `CLAUDE_CODE_AWS_CHAIN_RESOLVE_TIMEOUT_MS`) — NEW |
+| 3 | HIGH | Missing Env Var | Add `CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION` (per-session web search limit, default 200, v2.1.212). In v2.1.212 changelog, not yet on official env-vars page | ✅ COMPLETE (added with changelog annotation after `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY`) — NEW |
+| 4 | HIGH | Missing Env Var | Add `CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION` (per-session subagent limit, default 200, v2.1.212). In v2.1.212 changelog, not yet on official env-vars page | ✅ COMPLETE (added with changelog annotation after `CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION`) — NEW |
+| 5 | HIGH | Missing Env Var | Add `CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS` (auto-background slow MCP calls >2min, v2.1.212). In v2.1.212 changelog, not yet on official env-vars page | ✅ COMPLETE (added with changelog annotation after `MCP_CONNECTION_NONBLOCKING`) — NEW |
+| 6 | HIGH | Missing Env Var | Add `CLAUDE_CODE_FORWARD_SUBAGENT_TEXT` (forward subagent text to parent session, v2.1.211). In v2.1.211 changelog, not yet on official env-vars page | ✅ COMPLETE (added with changelog annotation after `CLAUDE_CODE_SUBAGENT_MODEL`) — NEW |
+| 7 | HIGH | Missing Env Var | Add `CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH` (OTel payload max size, default 60KB, v2.1.215). In v2.1.215 changelog, not yet on official env-vars page | ✅ COMPLETE (added with changelog annotation after `OTEL_LOG_TOOL_DETAILS`) — NEW |
+| 8 | MED | Changed Behavior | Update `sandbox.credentials` description to mention `mode` field: `"deny"` blocks entirely, `"mask"` with `injectHosts` selectively exposes credentials to trusted hosts (v2.1.199) | ✅ COMPLETE (description updated in Sandbox Settings table) — NEW |
+| 9 | MED | Missing Commands | Add `claude auto-mode reset` (reset auto-mode classification, `--yes` to skip confirmation, v2.1.212), `/fork` (fork session into isolated subagent, v2.1.212), and `/subtask` (launch isolated subtask, v2.1.212) to Useful Commands | ✅ COMPLETE (all three added to Useful Commands table) — NEW |
+| 10 | LOW | Suspect Key Recurrence | `CLAUDE_CODE_RETRY_WATCHDOG` — still NOT on official /en/env-vars page; entry annotated "*(in v2.1.199 changelog, not on official env-vars page)*" | ✋ ON HOLD (RECURRING from 2026-07-03 v2.1.199; 12 consecutive runs) |
+| 11 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 57+ consecutive runs; entry annotated "*(in v2.1.85 changelog, not yet on official env-vars page)*" | ✋ ON HOLD (RECURRING from 2026-04-14 v2.1.107; 57+ consecutive runs) |
+
+---
+
+## [2026-07-27 10:47 AM PKT] Claude Code v2.1.220
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Model Update | Add Opus 5 (`claude-opus-5`) to Model Aliases table; update `"opus"` alias description to show Opus 5 as default on Anthropic API as of v2.1.219 (1M context native, $10/$50 per Mtok). Confirmed in v2.1.219 changelog | ✅ COMPLETE (opus alias updated, opus alias description updated to show Opus 5) — NEW |
+| 2 | HIGH | Missing Setting | Add `emojiCompletionEnabled` (boolean, default `true`, v2.1.217) to Display Settings. Verified on official settings page with `min-version: 2.1.217` marker and in v2.1.217 changelog | ✅ COMPLETE (added to Display Settings table and Quick Reference example) — NEW |
+| 3 | HIGH | Missing Setting | Add `sandbox.network.strictAllowlist` (boolean, default `false`, v2.1.219) to Sandbox Settings. Confirmed in v2.1.219 changelog | ✅ COMPLETE (added to Sandbox Settings table) — NEW |
+| 4 | HIGH | Missing Setting | Add `sandbox.filesystem.disabled` (boolean, default `false`, v2.1.216) to Sandbox Settings. Confirmed in v2.1.216 changelog | ✅ COMPLETE (added to Sandbox Settings table) — NEW |
+| 5 | HIGH | Missing Setting | Add `disableBrowserExternalNavigation` (managed only, boolean, JSON boolean `true` only) to Managed-only policy keys. Verified on official settings page | ✅ COMPLETE (added to Managed-only policy keys table) — NEW |
+| 6 | HIGH | Missing Setting | Add `disableMobileSimulatorTools` (managed only, boolean, JSON boolean `true` only) to Managed-only policy keys. Verified on official settings page | ✅ COMPLETE (added to Managed-only policy keys table) — NEW |
+| 7 | HIGH | Missing Setting | Add `workflowSizeGuideline` (string, default `"medium"`, v2.1.219) to General Settings. Confirmed in v2.1.219 changelog: "Added `workflowSizeGuideline` settings key so the advisory Dynamic workflow size guideline can be set from any settings file" | ✅ COMPLETE (added to General Settings table and Quick Reference example) — NEW |
+| 8 | HIGH | Broken Example | Fix Quick Reference example: `"advisorModel": "fable"` silently attaches no advisor as of v2.1.210+. Changed to `"opus"`. Confirmed via CLI reference and v2.1.210 changelog | ✅ COMPLETE (changed fable → opus in Quick Reference) — NEW |
+| 9 | HIGH | Deprecated Env Var | Mark `CLAUDE_CODE_CONNECT_TIMEOUT_MS` as REMOVED in v2.1.186. Official env-vars page lists it under deprecated/legacy. Use `API_TIMEOUT_MS` instead | ✅ COMPLETE (updated to show REMOVED status with replacement pointer) — NEW |
+| 10 | HIGH | Wrong Env Var Name | Rename `CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR` → `CLAUDE_CODE_BASH_MAINTAIN_PROJECT_WORKING_DIR`. Official env-vars page uses the `CLAUDE_CODE_` prefix; old name silently no-ops | ✅ COMPLETE (name corrected) — NEW |
+| 11 | MED | Effort Level Update | Add `Ultracode` row to Effort Level table (v2.1.203+) and update `effortLevel` setting description to include `max` and `ultracode`. Confirmed via CLI reference and v2.1.203 changelog | ✅ COMPLETE (Ultracode row added; effortLevel description and /effort command updated) — NEW |
+| 12 | MED | advisorModel Behavior | Update `advisorModel` description: `"fable"` no longer attaches an advisor as of v2.1.210+. Confirmed in CLI reference ("Cannot use Fable 5 as advisor") | ✅ COMPLETE (description updated with v2.1.210+ caveat) — NEW |
+| 13 | MED | Wrong Attribution | Fix `CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH` annotation: says "v2.1.215 changelog" but was added in v2.1.214. Confirmed in changelog | ✅ COMPLETE (attribution corrected to v2.1.214) — NEW |
+| 14 | MED | Changed Behavior | Update `CLAUDE_CODE_FORWARD_SUBAGENT_TEXT`: v2.1.219 added nested-subagent forwarding at depth 2+. Confirmed in v2.1.219 changelog | ✅ COMPLETE (description updated) — NEW |
+| 15 | MED | Hooks Count | Update hooks section from "25 hook events" to "26" — v2.1.219 added `DirectoryAdded` hook event. Confirmed in v2.1.219 changelog | ✅ COMPLETE (count updated in hooks redirect section) — NEW |
+| 16 | MED | MCP Interpolation | Add note about `${VAR}` interpolation in `allowedMcpServers`/`deniedMcpServers` entries (v2.1.219). Confirmed in v2.1.219 changelog | ✅ COMPLETE (note added to MCP Server Matching section) — NEW |
+| 17 | LOW | Missing Source | Add CLI Reference to Sources section — authoritative for `--permission-mode`, `--effort`, and `--advisor` values | ✅ COMPLETE (CLI reference added to Sources) — NEW |
+| 18 | LOW | Suspect Key Recurrence | `CLAUDE_CODE_RETRY_WATCHDOG` — still NOT on official /en/env-vars page; entry annotated "*(in v2.1.199 changelog, not on official env-vars page)*" | ✋ ON HOLD (RECURRING from 2026-07-03 v2.1.199; 13 consecutive runs) |
+| 19 | LOW | Suspect Key Recurrence | `OTEL_LOG_TOOL_DETAILS` — still NOT on official /en/env-vars page after 58+ consecutive runs; entry annotated "*(in v2.1.85 changelog, not yet on official env-vars page)*" | ✋ ON HOLD (RECURRING from 2026-04-14 v2.1.107; 58+ consecutive runs) |
+
+---
+
+## [2026-07-31 10:58 AM PKT] Claude Code v2.1.220
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Fix Previous Error | Revert wrong env var rename from 2026-07-27 item 10: `CLAUDE_CODE_BASH_MAINTAIN_PROJECT_WORKING_DIR` → back to `CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR` (no `_CODE_` prefix). Previous run also inverted description ("disables" ↔ "maintains"). Both corrected. Confirmed in official env-vars page | ✅ COMPLETE (name reverted, description corrected) — RESOLVED (first wrong in 2026-07-27) |
+| 2 | HIGH | Fix Previous Error | Remove `max` and `ultracode` from `effortLevel` valid persistent values — added wrongly in 2026-07-27 item 11. Official CLI reference confirms these are session-only (`/effort max`, `/fast`) and explicitly rejected if written to settings.json. Also corrected effort level table (Max, XHigh, High rows had wrong descriptions). Added note: "use `/effort max` or `/fast` for session-only max effort" | ✅ COMPLETE (max/ultracode removed from effortLevel, table rows fixed, note added) — RESOLVED (first wrong in 2026-07-27) |
+| 3 | HIGH | Wrong Key Name | `maxSkillDescriptionChars` is a silent no-op key — the correct key is `skillListingMaxDescChars`. Users setting the wrong key would see no effect. Fixed in settings table and Quick Reference example. Confirmed in official settings page | ✅ COMPLETE (key corrected in table and Quick Reference) — NEW |
+| 4 | HIGH | Wrong Permission Behavior | `Tool(param:value)` syntax was listed as valid in allow rules, but official docs confirm it is only valid in deny/ask rules. Fixed description, removed incorrect allow examples, corrected `Tool(input:)` example to use deny context | ✅ COMPLETE (description and examples corrected) — NEW |
+| 5 | HIGH | Missing Settings | Add 4 new settings missing from General Settings table: `theme` (string, light/dark/system, v2.1.200+), `verbose` (boolean, v2.1.191+), `switchModelsOnFlag` (boolean, default `true`), `processWrapper` (string array). Confirmed on official settings page | ✅ COMPLETE (all 4 added to General Settings table) — NEW |
+| 6 | HIGH | Missing Env Var | Add `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` (integer, default 20, v2.1.217) and `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` (integer, default 3, v2.1.219) — both absent from report, confirmed in official env-vars page | ✅ COMPLETE (both added to env vars table) — NEW |
+| 7 | MED | Unverified Key | `dynamicWorkflowSize` is not in official settings docs — only `workflowSizeGuideline` is documented. Marked `dynamicWorkflowSize` as unverified in report | ✅ COMPLETE (marked unverified) — NEW |
+| 8 | MED | Changed Behavior | `workflowSizeGuideline` accepts `"unrestricted"` as a valid value (in addition to `"small"`, `"medium"`, `"large"`). Added to description | ✅ COMPLETE (unrestricted added to valid values) — NEW |
+| 9 | MED | Changed Behavior | `permissions.defaultMode` has `auto` as a valid mode, but it is restricted to organization managed settings only — not user-settable. Added scope restriction note | ✅ COMPLETE (scope restriction note added) — NEW |
+| 10 | MED | Wrong Description | `:*` wildcard suffix was incorrectly labeled "deprecated" — it is NOT deprecated; it is a valid active glob pattern for matching all tools of a type. Corrected description | ✅ COMPLETE (deprecated label removed, correct description added) — NEW |
+| 11 | MED | Wrong Example | Permission allow example used `"mcp__*"` which is invalid in allow rules (only valid in deny/ask); changed to specific `"mcp__memory__*"` pattern. Also fixed in Quick Reference example | ✅ COMPLETE (example corrected in both locations) — NEW |
+| 12 | MED | Wrong Description | `footerLinksRegexes` description incorrectly said "filters URLs in turn output" — actual behavior is filtering text patterns in turn output content. Corrected | ✅ COMPLETE (description corrected) — NEW |
+| 13 | MED | Missing Env Var | Add `CLAUDE_PID` (process ID of the main Claude Code process, set automatically). Confirmed in official env-vars page | ✅ COMPLETE (added to env vars table) — NEW |
+| 14 | MED | Missing Env Vars | Add 4 MCP timeout/batch env vars: `CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT` (v2.1.187), `MCP_CONNECT_TIMEOUT_MS` (default 5000), `MCP_SERVER_CONNECTION_BATCH_SIZE`, `MCP_REMOTE_SERVER_CONNECTION_BATCH_SIZE`. Confirmed in official env-vars page | ✅ COMPLETE (all 4 added) — NEW |
+| 15 | MED | Missing Env Vars | Add 3 resume/safe-mode env vars: `CLAUDE_CODE_RESUME_INTERRUPTED_TURN_MAX_AGE_MS`, `CLAUDE_CODE_RESUME_PROMPT`, `CLAUDE_CODE_SAFE_MODE`. Confirmed in official env-vars page | ✅ COMPLETE (all 3 added) — NEW |
+| 16 | MED | Missing Env Vars | Add 3 skills-sync env vars: `CLAUDE_CODE_SYNC_SKILLS`, `CLAUDE_CODE_SYNC_SKILLS_INSTALL_TIMEOUT_MS`, `CLAUDE_CODE_SYNC_SKILLS_WAIT_TIMEOUT_MS`. Confirmed in official env-vars page | ✅ COMPLETE (all 3 added) — NEW |
+| 17 | MED | Missing Env Var | Add `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` (integer, default 8) — controls maximum number of Stop hook blocking turns. Confirmed in official env-vars page | ✅ COMPLETE (added to env vars table) — NEW |
+| 18 | MED | Missing Env Vars | Add 7 new OTEL env vars: `OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT`, `OTEL_METRICS_INCLUDE_ACCOUNT_UUID`, `OTEL_METRICS_INCLUDE_SESSION_ID`, `OTEL_METRICS_INCLUDE_VERSION`, `OTEL_METRICS_INCLUDE_RESOURCE_ATTRIBUTES`, `CLAUDE_CODE_OTEL_DIAG_STDERR`. Also fixed `OTEL_METRICS_INCLUDE_ENTRYPOINT` annotation. Confirmed in official env-vars page | ✅ COMPLETE (all 7 added, annotation fixed) — NEW |
+| 19 | MED | Missing Env Var | Add `CLAUDE_ENABLE_BYTE_WATCHDOG_BEDROCK` (enables byte-count watchdog for Bedrock responses). Confirmed in official env-vars page | ✅ COMPLETE (added to env vars table) — NEW |
+| 20 | MED | Missing Env Vars | Add 17 misc env vars absent from report: `TASK_MAX_OUTPUT_LENGTH`, `MAX_STRUCTURED_OUTPUT_RETRIES`, `DEBUG`, `FORCE_HYPERLINK`, `DISABLE_GROWTHBOOK`, `DISABLE_PROMPT_CACHING_FABLE`, `CLAUDE_CODE_FORCE_STRIKETHROUGH`, `CLAUDE_DISABLE_ADOPT`, `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS`, `CLAUDE_CODE_TEAM_TEARDOWN_PARK_TIMEOUT_MS`, `CLAUDE_CODE_SIMPLE_SYSTEM_PROMPT`, `CLAUDE_CODE_ENABLE_APPEND_SUBAGENT_PROMPT`, `CLAUDE_CODE_SKIP_FAST_MODE_ORG_CHECK`, `CLAUDE_CODE_USE_ANTHROPIC_AWS`, `CLAUDE_CODE_SKIP_ANTHROPIC_AWS_AUTH`, `CLAUDE_CODE_SKIP_AWS_CRED_CACHE`, `CLAUDE_CODE_USE_NATIVE_FILE_SEARCH`. Confirmed in official env-vars page | ✅ COMPLETE (all 17 added) — NEW |
+| 21 | LOW | Missing Env Vars | Add 11 missing `VERTEX_REGION_*` env vars: `3_5_SONNET`, `4_5_OPUS`, `4_5_SONNET`, `4_6_OPUS`, `4_6_SONNET`, `4_7_OPUS`, `4_8_OPUS`, `5_OPUS`, `5_SONNET`, `FABLE_5`, `HAIKU_4_5`. Confirmed in official env-vars page | ✅ COMPLETE (all 11 added to Vertex table) — NEW |
+| 22 | LOW | Resolved Suspect Key | `CLAUDE_CODE_RETRY_WATCHDOG` — confirmed present on official /en/env-vars page (was ON HOLD for 13 consecutive runs). Removed stale "*(not on official env-vars page)*" annotation | ✅ COMPLETE (annotation removed) — RESOLVED (ON HOLD since 2026-07-03; 13 runs) |
+| 23 | LOW | Resolved Suspect Key | `OTEL_LOG_TOOL_DETAILS` — confirmed present on official /en/env-vars page (was ON HOLD for 58+ consecutive runs). Removed stale "*(not yet on official env-vars page)*" annotation | ✅ COMPLETE (annotation removed) — RESOLVED (ON HOLD since 2026-04-14; 58+ runs) |
+| 24 | LOW | Stale Annotation | `CLAUDE_CODE_FORWARD_SUBAGENT_TEXT` — removed stale "*(not yet on official env-vars page)*" annotation; confirmed in official env-vars page | ✅ COMPLETE (annotation removed) — NEW |
+| 25 | LOW | Missing Sources | Added 3 source links to Sources section: model configuration page, statusline reference, additional env-vars coverage | ✅ COMPLETE (sources added) — NEW |
+
+---
+
+## [2026-08-02 10:59 AM PKT] Claude Code v2.1.220
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Security Fix | Fix `Write(path)`, `NotebookEdit(path)`, `Glob(path)` in allow rules: report said "warning is a nudge, existing settings continue to work" but official docs confirm these are **never consulted** in allow rules — only Edit/Read are checked. Updated note, fixed Write/NotebookEdit rows in syntax table, removed `Write(*)` from both example allow arrays (permissions section and Quick Reference). Confirmed in official permissions docs | ✅ COMPLETE (note corrected, examples fixed) — NEW |
+| 2 | HIGH | Wrong Shape | Fix `sandbox.credentials` shape description: report described a flat parent-object shape but actual API uses per-entry objects — `files: [{path, mode}]` and `envVars: [{name, mode, injectHosts?}]`. Mode and injectHosts are per-entry, not siblings of the top-level arrays. Confirmed in v2.1.191+ changelog and official settings page | ✅ COMPLETE (shape description corrected) — NEW |
+| 3 | HIGH | Wrong Description | Fix `policyHelper` shape and behavior: shape extended from `{path: string}` to `{path, timeoutMs?, refreshIntervalMs?}`. Added note that when configured, policyHelper output is the sole active managed source (other managed-tier sources ignored). Confirmed in official settings page | ✅ COMPLETE (shape and sole-source behavior documented) — NEW |
+| 4 | HIGH | Wrong Description | Fix `language` setting: "terminal tab title" is incorrect — official docs say it sets "auto-generated session titles". Added v2.1.176 note that unset language causes titles to match the conversation language. Confirmed in official settings page | ✅ COMPLETE (description corrected) — NEW |
+| 5 | HIGH | Wrong Description | Fix `viewMode` description: "Ctrl+O" is outdated — the toggle mechanism is the `/focus` command. Confirmed in official settings page | ✅ COMPLETE (Ctrl+O → /focus) — NEW |
+| 6 | MED | Missing Settings | Add `sandbox.network.tlsTerminate` (object, v2.1.199 — TLS termination config for sandbox with `caBundle` and `excludedHosts`) and `sandbox.credentials.allowPlaintextInject` (boolean, v2.1.199 — allows plaintext credential injection without masking) to Sandbox Settings table. Confirmed in v2.1.199 changelog | ✅ COMPLETE (both added to Sandbox Settings table) — NEW |
+| 7 | MED | Missing Setting | Add `remote.defaultEnvironmentId` (string) to General Settings table — default environment ID for remote sessions/background agents when `--remote` is used without explicit environment ID. Confirmed in official settings page | ✅ COMPLETE (added to General Settings table) — NEW |
+| 8 | MED | Missing Settings | Add `diffTool` (string — custom diff tool command) and `permissionExplainerEnabled` (boolean, default `true` — show AI-generated permission explanation) to Global Config Settings table. Confirmed in official settings page | ✅ COMPLETE (both added to Global Config Settings table) — NEW |
+| 9 | MED | Missing Setting | Add `statusLine.hideVimModeIndicator` (boolean) to Status Line Configuration fields table — suppresses built-in vim mode indicator so custom status lines can display it. Confirmed in official statusline docs | ✅ COMPLETE (added to Status Line fields table) — NEW |
+| 10 | MED | Wrong Description | Fix `dontAsk` permission mode: added exemption note — tools marked `requiresUserInteraction` in their MCP server manifest and organization-set-to-ask connector tools still prompt even in `dontAsk` mode. Confirmed in official settings page | ✅ COMPLETE (exemptions documented) — NEW |
+| 11 | MED | Wrong Description | Fix `bypassPermissions` mode: clarified that explicit `permissions.ask` rules still prompt — only the built-in permission checks are bypassed. Confirmed in official permissions docs | ✅ COMPLETE (ask rules exemption noted) — NEW |
+| 12 | MED | Unverified Key | Mark `thinkingBudgetTokens` as `*(not in official settings page — unverified)*` — not found on official settings page; may be a JSON schema-only key. Per Rule 1F | ✅ COMPLETE (caveat added) — NEW |
+| 13 | MED | Wrong Label | Fix `workflowKeywordTriggerEnabled` `/config` label: "Workflow keyword trigger" → "Ultracode keyword trigger" (trigger keyword renamed in v2.1.160). Confirmed in official settings page | ✅ COMPLETE (label corrected) — NEW |
+| 14 | MED | Wrong Label + Scope | Fix `askUserQuestionTimeout`: `/config` label changed from "Ask user question timeout" to "Question auto-continue timeout". Added scope restriction: only honored from project and local settings (managed/user values ignored). Confirmed in official settings page | ✅ COMPLETE (label and scope corrected) — NEW |
+| 15 | MED | Wrong Description | Fix `footerLinksRegexes` allowed schemes: removed `mailto` (not supported); added 11 deep-link schemes: `vscode`, `cursor`, `windsurf`, `zed`, `jetbrains`, `idea`, `slack`, `linear`, `notion`, `figma`, `vscode-insiders`. Confirmed in official settings page | ✅ COMPLETE (schemes list corrected) — NEW |
+| 16 | MED | Wrong Scope + Stale Caveat | Fix `pluginConfigs`: removed stale "(in JSON schema, not on official settings page)" caveat — now confirmed on official settings page. Updated scope from "Any" to "Managed / User / --settings" reflecting v2.1.207 restriction (project/local settings no longer honored). Confirmed in official settings page | ✅ COMPLETE (caveat removed, scope updated) — NEW |
+| 17 | MED | Wrong Description | Fix `vimInsertModeRemaps`: added key constraints — input sequences must be exactly two printable characters; the only valid target value is `<Esc>`. Confirmed in official settings page | ✅ COMPLETE (constraints documented) — NEW |
+| 18 | MED | Wrong Scope | Fix `sshConfigs`: added scope restriction — only honored from managed and user settings; project settings values are ignored. Confirmed in official settings page | ✅ COMPLETE (scope restriction noted) — NEW |
+| 19 | MED | Wrong Description | Fix `sandbox.network.strictAllowlist`: added that effective allowlist includes WebFetch allow rules, and that enforcement only applies to sandboxed bash commands (not Claude Code's own API/WebFetch calls). Confirmed in official settings page | ✅ COMPLETE (effective allowlist and scope clarified) — NEW |
+| 20 | MED | Wrong Description | Fix `sandbox.filesystem.allowRead`: corrected "Takes precedence over denyRead" — exact-path denyRead rules still block; allowRead only overrides matching glob entries. Confirmed in official settings page | ✅ COMPLETE (precedence behavior corrected) — NEW |
+| 21 | MED | Missing Warning | Fix `sandbox.allowAppleEvents`: added security warning — enabling removes code-execution isolation (Apple Events can execute code in other apps). Confirmed in official settings page | ✅ COMPLETE (warning added) — NEW |
+| 22 | MED | Unverified Syntax | Mark `Skill(...)` permission syntax as `*(not in official permissions docs — unverified)*`; mark `MCP(server:tool)` shorthand as unverified (only `mcp__server__tool` form confirmed in official docs). Noted `Task(agent-name)` as legacy alias for `Agent`. Per Rule 1F/3C | ✅ COMPLETE (unverified markers added) — NEW |
+| 23 | LOW | Duplicate Source | Removed duplicate "[Claude Code Environment Variables Reference]" source entry (identical URL appeared twice in Sources section). Confirmed by inspection | ✅ COMPLETE (duplicate removed) — NEW |
+
+---
+
+## [2026-08-07 10:48 AM PKT] Claude Code v2.1.224
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Metadata | Update version badge v2.1.220 → v2.1.224; update counts from "80+ settings / 200+ env vars" to "127+ settings / 311 env vars". Confirmed via official settings docs raw endpoint | COMPLETE (badge and header updated) — NEW |
+| 2 | HIGH | Missing Setting | Add `autoCompactWindow` (number, model-tuned default) to General Settings. Documents the `/autocompact` command, `--autocompact` flag, and token range 100K–1M. Confirmed on official settings docs page | COMPLETE (added to General Settings table and Quick Reference example) — NEW |
+| 3 | HIGH | Wrong Description | Fix `sandbox.network.tlsTerminate` field names: `caBundle`/`excludedHosts` do not exist — correct fields are `caCertPath` and `caKeyPath`. Added scope restriction (user/managed/`--settings` only) and purpose (enables credential masking). Confirmed on official settings docs page | COMPLETE (field names and scope corrected) — NEW |
+| 4 | HIGH | Missing Settings | Add 4 missing `sandbox.credentials.files[]` sub-keys: `extract` (regex for masking), `injectHosts` (per-entry host list), `onExtractNoMatch` (behavior when regex fails), `maskDuplicates` (cascade masking). All introduced in v2.1.221. Confirmed on official settings docs page | COMPLETE (all 4 sub-keys added to Sandbox table) — NEW |
+| 5 | HIGH | Wrong Description | Fix `sandbox.credentials.allowPlaintextInject`: was described as controlling log masking — actually controls whether credential injection applies on **plain HTTP** requests (cleartext gate, not a logging control). Confirmed on official settings docs page | COMPLETE (semantics corrected) — NEW |
+| 6 | HIGH | Wrong Description | Fix `dontAsk` permission mode: `requiresUserInteraction` and org-set-to-ask tools are **denied** (not "still prompt") even when explicitly allowed. Confirmed on official settings docs page | COMPLETE (prompt→deny corrected) — NEW |
+| 7 | HIGH | Incomplete Description | Fix `bypassPermissions` mode: added two missing exception classes — MCP `requiresUserInteraction` tools and org-set-to-ask connector tools. Added command-substitution note for the `rm -rf` circuit breaker. Confirmed on official settings docs page | COMPLETE (exception list completed) — NEW |
+| 8 | HIGH | Missing Rule | Add MCP allow-glob anchoring rule: allow rules only accept tool-name globs after a literal `mcp__<server>__` prefix; unanchored patterns like `"mcp__*"` are silently skipped. Confirmed on official permissions docs page | COMPLETE (anchoring rule documented) — NEW |
+| 9 | HIGH | Wrong Hierarchy | Add array-merge exceptions: `fallbackModel` and `availableModels` do NOT merge across settings files; highest-precedence file wins entirely. Confirmed on official settings docs page | COMPLETE (exceptions added to hierarchy bullet) — NEW |
+| 10 | HIGH | Wrong Hierarchy | Add admin-source union keys exception: `env`, `sandbox.network.allowedDomains`, `sandbox.filesystem.allowRead`, and 5 other keys merge across ALL admin-managed sources (not just the winning one). Confirmed on official settings docs page | COMPLETE (admin-source union documented) — NEW |
+| 11 | HIGH | Missing Scope | Add "user/managed/`--settings` only" restriction to `sandbox.filesystem.disabled`, `sandbox.network.strictAllowlist`, and `sandbox.credentials.envVars` mask mode — project/local settings cannot use these. Confirmed on official settings docs page | COMPLETE (scope restrictions added to 3 keys) — NEW |
+| 12 | HIGH | Missing Env Vars | Add 5 missing env vars from official env-vars page: `CLAUDE_BYTE_STREAM_IDLE_TIMEOUT_MS`, `CLAUDE_CODE_DISABLE_ADMIN_ENV_UNION`, `CLAUDE_CODE_ENABLE_OPUS_4_7_FAST_MODE`, `MCP_DISCOVERY_CACHE`, `USE_BUILTIN_RIPGREP`. Confirmed on official env-vars page | COMPLETE (all 5 added) — NEW |
+| 13 | MED | Missing Feature | Add `archive` marketplace source type (v2.1.224 zip-based install with SHA-256 pinning) and `owner/*` wildcard support for `strictKnownMarketplaces`/`blockedMarketplaces` (v2.1.223). Confirmed in v2.1.223–224 changelog | COMPLETE (archive source and owner wildcard documented) — NEW |
+| 14 | MED | Incomplete Description | Add `Cd` rule allowlist-mode semantics: any allow rule switches `/cd` into allowlist mode; deny Cd disables `/cd`; `*` vs `**` segment matching differs from Read/Edit. Confirmed on official permissions docs page | COMPLETE (Cd semantics added) — NEW |
+| 15 | MED | Wrong Description | Update `CLAUDE_CODE_DISABLE_1M_CONTEXT`: now holds ALL 1M models to 200K via auto-compaction (v2.1.223), not just one. Confirmed in v2.1.223 changelog | COMPLETE (behavior updated) — NEW |
+| 16 | MED | Missing Scope | Fix `disableClaudeAiConnectors`: add restrictive-value exception — `true` applies from any scope even against a managed `false`. Confirmed on official settings docs page | COMPLETE (exception noted) — NEW |
+| 17 | MED | Incomplete Description | Fix `remoteControlAtStartup`: add scope exception — `false` in project/local applies even against managed `true`; only user/`--settings`/managed can set to `true`. Confirmed on official settings docs page | COMPLETE (scope exception noted) — NEW |
+| 18 | MED | Wrong Description | Fix `fallbackModel`: add no-merge note — highest-precedence file supplies entire chain; `"default"` keyword expands to account default; extra entries beyond 3 are silently ignored. Confirmed on official settings docs page | COMPLETE (no-merge behavior documented) — NEW |
+| 19 | LOW | Missing Source | Add [Claude Code Sandbox Reference](https://code.claude.com/docs/en/sandboxing) to Sources section — the sandbox docs page covers mask/credential/network isolation details where significant drift was found | COMPLETE (source added) — NEW |
+| 20 | LOW | New Env Var | Add `ANTHROPIC_BEDROCK_REGION_PREFIX` (v2.1.224 changelog — cross-region inference prefix). Not yet on official env-vars page; annotated as changelog-only | COMPLETE (annotated as changelog-only) — NEW |
+| 21 | LOW | New Settings | `crossSessionInbound` and `dialogExpiry` noted in v2.1.224 changelog. Not yet on official settings page — confidence 0.75 | ✅ COMPLETE (confirmed on official settings-reference page v2.1.252; both added to General Settings table) — RESOLVED (ON HOLD 1 run) |
+| 22 | LOW | Unverified Keys | v2.1.224 JWT masking options (`decode`, `maskClaims`, `awsPairs`/`sigv4`) for `sandbox.credentials.files[]` — not yet on official settings page, changelog-only, confidence 0.70 | ✅ COMPLETE (confirmed on official settings-reference page v2.1.252; all four sub-keys added to Sandbox table) — RESOLVED (ON HOLD 1 run) |
+
+---
+
+## [2026-09-01 10:39 AM PKT] Claude Code v2.1.252
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Metadata | Update version badge v2.1.224 → v2.1.252; update header counts from "127+ settings / 311 env vars" to "140+ settings / 315+ env vars". Confirmed via official settings-reference page | ✅ COMPLETE (badge and header updated) — NEW |
+| 2 | HIGH | Missing Source | Add [Claude Code Settings Reference](https://code.claude.com/docs/en/settings-reference) to Sources — this is now the canonical key index (~180 keys with Scope/Type/Default/Description columns). The `docs/en/settings` page was restructured into a task-oriented guide and no longer contains the key index. Confirmed by fetching both URLs | ✅ COMPLETE (source added) — NEW |
+| 3 | HIGH | Missing Settings | Add 5 new settings keys confirmed on official settings-reference page: `crossSessionInbound` (string, accept/hold/refuse), `dialogExpiry` (string, duration), `autoContinueAtUsageLimit` (boolean), `feedbackDrafts` (boolean, v2.1.247), `desktopSessionCleanupPeriodDays` (number, v2.1.248). All confirmed in settings-reference | ✅ COMPLETE (all 5 added to General Settings table) — NEW |
+| 4 | HIGH | Missing Settings | Add 4 new model configuration keys: `modelSettings` (object, per-model effort — does not merge), `modelPicker` (object, curate /model picker — does not merge), `modelPricing` (object, managed-only contract pricing), `promptCacheTtl` and `subagentPromptCacheTtl` (strings, cache TTL control, v2.1.243+). Confirmed in settings-reference and changelog | ✅ COMPLETE (all 5 added to Model Overrides table) — NEW |
+| 5 | HIGH | Wrong Description | Fix `effortLevel` — as of v2.1.243, `/effort` saves per-model defaults via `modelSettings`; global `effortLevel` is now a fallback. Updated "How to use" step 3. Confirmed in v2.1.243 changelog | ✅ COMPLETE (step 3 updated) — NEW |
+| 6 | HIGH | Wrong Description | Fix `CLAUDE_CODE_SUBAGENT_MODEL` — v2.1.238 breaking change: changed from override to default. Agent definitions and explicit model parameters now take precedence. Confirmed in v2.1.238 changelog | ✅ COMPLETE (description corrected) — NEW |
+| 7 | HIGH | Merge Exceptions | Extend merge-exception list from 2 keys to 4: add `modelPicker` and `modelSettings` alongside existing `fallbackModel` and `availableModels`. Confirmed in settings-reference | ✅ COMPLETE (exceptions extended) — NEW |
+| 8 | HIGH | Missing Settings | Add `keybindingFlavor` (string, readline word-deletion, v2.1.236) and `spellcheck` (object, aspell/hunspell/ispell, v2.1.235) to Display Settings. Confirmed in settings-reference | ✅ COMPLETE (both added to Display Settings) — NEW |
+| 9 | HIGH | Missing Settings | Add `disableCommandPluginSources` (boolean, managed-only, v2.1.229+) to Plugin Settings; add `command` to marketplace source types list with `mode: "link"` documentation. Confirmed in v2.1.229/232 changelog | ✅ COMPLETE (key added and source type documented) — NEW |
+| 10 | HIGH | Missing Settings | Add 5 sandbox credential masking sub-keys: `sandbox.credentials.files[].decode` (jwt), `.maskClaims` (array), `sandbox.credentials.awsPairs` (object), `sandbox.credentials.sigv4` (object). Previously ON HOLD — now confirmed on official settings-reference page | ✅ COMPLETE (all added to Sandbox table) — RESOLVED |
+| 11 | HIGH | Stale Annotation | Remove "not yet on official env-vars page" annotation from `ANTHROPIC_BEDROCK_REGION_PREFIX` — now confirmed on official env-vars page | ✅ COMPLETE (annotation removed) — RESOLVED |
+| 12 | HIGH | Wrong Description | Fix `teammateDefaultModel` (Global Config) — removed in v2.1.251; teammates now inherit the lead's model by default. Marked as removed. Confirmed in v2.1.251 changelog | ✅ COMPLETE (marked removed) — NEW |
+| 13 | HIGH | Hook Count | Update hooks redirect blurb from "26 hook events" to "28 hook events" — `PreModelSwitch` and `PostModelSwitch` added in v2.1.252. Confirmed in v2.1.252 changelog | ✅ COMPLETE (count updated) — NEW |
+| 14 | MED | Missing Env Vars | Add 6 missing env vars: `ANTHROPIC_DEFAULT_MODEL` (v2.1.236+, last-resort model fallback), `CLAUDE_CODE_PROJECT_DIR_NAME` (v2.1.234+, transcript dir name), `CLAUDE_CODE_TOOL_MEMORY_LIMIT` (v2.1.233, Linux cgroup memory cap), `CLAUDE_CODE_WEBFETCH_CACHE_TTL_MS` (v2.1.233, WebFetch cache TTL), `CLAUDE_CODE_ENABLE_TODO_TOOLS` (v2.1.234, legacy todo tools), `CLAUDE_CODE_WORKFLOW_PREFIX_STAGGER_MS` (v2.1.229, agent launch stagger). Confirmed in changelog | ✅ COMPLETE (all 6 added) — NEW |
+
+---
+
+## [2026-10-13 10:55 AM PKT] Claude Code v2.1.296
+
+| # | Priority | Type | Action | Status |
+|---|----------|------|--------|--------|
+| 1 | HIGH | Version Metadata | Update version badge v2.1.252 → v2.1.296; update header counts from "140+ settings / 315+ env vars" to "244+ settings / 396+ env vars" | COMPLETE (badge and header updated) — NEW |
+| 2 | HIGH | Wrong Type | Fix `feedbackDrafts` type: was `boolean` with default `true`; now `string` with values `"notify"/"quiet"/"off"`, default `"notify"`, scope user or managed. Env: `CLAUDE_CODE_SEND_FEEDBACK=0`. Confidence 0.95 | COMPLETE (type and values corrected) — NEW |
+| 3 | HIGH | Wrong Scope | Fix `askUserQuestionTimeout` scope: was "Only honored from project and local settings"; now "Only honored from user and managed settings". Confidence 0.9 | COMPLETE (scope corrected) — NEW |
+| 4 | HIGH | Wrong Values | Fix `dialogExpiry` values: now explicit enum `"60s"/"5m"/"10m"/"never"`, default `"5m"`, scope user or managed. Added env override `CLAUDE_CODE_USER_DIALOG_TIMEOUT_MS` | COMPLETE (values corrected) — NEW |
+| 5 | HIGH | Wrong Semantics | Fix `enableArtifact`: was described as "opt-in that turns the tool on"; officially can only turn off (`false` disables, `true` = unset). Confidence 0.9 | COMPLETE (semantics corrected) — NEW |
+| 6 | HIGH | Wrong Semantics | Fix `alwaysThinkingEnabled`: was "Enable thinking, default false"; officially thinking is on by default, `false` disables, `true` = no-op. No effect on Opus/Sonnet/Haiku 5.5 or Fable. Confidence 0.9 | COMPLETE (semantics corrected) — NEW |
+| 7 | HIGH | Wrong Type | Fix `strictKnownMarketplaces`: was `boolean`; officially an array of marketplace source objects. Empty array blocks everything. Alias: `allowedMarketplaces`. Confidence 0.95 | COMPLETE (type changed to array, description updated) — NEW |
+| 8 | HIGH | Wrong Note | Fix `/model` persistence note: was "current session only, press d for default"; officially saves as persistent default, press `s` for session-only. Confidence 0.85 | COMPLETE (inverted note corrected) — NEW |
+| 9 | HIGH | Wrong Scope | Fix `allowedMcpServers` and `deniedMcpServers`: were "Managed only"; officially any file, with entries merging. Confidence 0.9 | COMPLETE (scope changed to Any) — NEW |
+| 10 | HIGH | Wrong Scope | Fix `enforceAvailableModels`: removed "(Managed only)" — officially any file. Confidence 0.85 | COMPLETE (managed-only restriction removed) — NEW |
+| 11 | HIGH | Wrong Version | Fix `teammateDefaultModel` removal version: was v2.1.251; officially v2.1.234. Confidence 0.9 | COMPLETE (corrected to v2.1.234) — NEW |
+| 12 | HIGH | Wrong Version | Fix `modelSettings` version requirement: was v2.1.243; requires v2.1.251. Also corrected `/effort` history. Added `maxEffortLevel` and `autoCompactWindow` fields. Confidence 0.85 | COMPLETE (version and fields corrected) — NEW |
+| 13 | HIGH | Wrong Semantics | Fix `ultracode`: was "Session-only — not persisted"; officially a persistent boolean settable in any file. Confidence 0.85 | COMPLETE (session-only note removed) — NEW |
+| 14 | HIGH | Missing Settings | Add 3 missing General settings: `syncClaudeAiSkills` (v2.1.275), `syncClaudeAiPlugins` (v2.1.275), `promptSuggestionEnabled`. Confidence 0.9 | COMPLETE (all 3 added) — NEW |
+| 15 | HIGH | Missing Settings | Add 5 missing Display settings: `timeFormat` (v2.1.257), `timeZone` (v2.1.257), `maxProseWidth` (v2.1.282), `subagentStatusLine`, `bashEditDiffEnabled` (v2.1.269). Confidence 0.9 | COMPLETE (all 5 added) — NEW |
+| 16 | HIGH | Missing Settings | Add 2 missing Plugin settings: `prependPlugins` and `appendPlugins` (~v2.1.287, Claude Mods). Confidence 0.85 | COMPLETE (both added) — NEW |
+| 17 | HIGH | Missing Settings | Add 2 missing MCP settings: `allowClaudeInChromeWithManagedMcp` (v2.1.282) and `allowedProviders` (v2.1.285). Confidence 0.95 | COMPLETE (both added) — NEW |
+| 18 | HIGH | Cache TTL | Fix `promptCacheTtl` and `subagentPromptCacheTtl` descriptions: both accept "5m" or "1h"; subagent key covers subagents, workflows, and background/helper requests. Added precedence order. Confidence 0.85 | COMPLETE (descriptions corrected) — NEW |
+| 19 | HIGH | Missing Env Vars | Add 8 new env vars from v2.1.288–296: `CLAUDE_CODE_DISABLE_STRUCTURED_OUTPUTS`, `CLAUDE_CODE_WEB_SEARCH_REFILLS_PER_HOUR`, `CLAUDE_CODE_OVERLOADED_RETRY_BASE_DELAY_MS`, `CLAUDE_CODE_OVERLOADED_RETRY_MAX_DELAY_MS`, `CLAUDE_CODE_RETRY_WATCHDOG_MAX_WAIT_MS`, `CLAUDE_CODE_WORKFLOW_SUBAGENT_MODEL`, `MCP_PROTOCOL_NEGOTIATION`. Confidence 0.9 | COMPLETE (all 8 added) — NEW |
+| 20 | HIGH | Wrong Env Var | Fix `USE_BUILTIN_RIPGREP` description: was inverted ("Set to 1 to use bundled"); officially `0` means use system rg. Confidence 0.9 | COMPLETE (description corrected) — NEW |
+| 21 | HIGH | Removed Env Var | Fix `CLAUDE_CODE_ENABLE_OPUS_4_7_FAST_MODE`: removed in v2.1.142, now a no-op. Confidence 0.9 | COMPLETE (marked removed) — NEW |
+| 22 | HIGH | Wrong Env Var | Fix `CLAUDE_CODE_WEBFETCH_CACHE_TTL_MS`: default is 900000ms (15min); `0` keeps the default, does not disable. Confidence 0.85 | COMPLETE (corrected) — NEW |
+| 23 | HIGH | Stale Annotations | Remove "not yet on official env-vars page" from 14 env vars now confirmed official: `CLAUDE_CODE_SESSION_ID`, `DISABLE_UPDATES`, `CLAUDE_CODE_DISABLE_BG_SHELL_PRESSURE_REAP`, `ENABLE_PROMPT_CACHING_1H`, `FORCE_PROMPT_CACHING_5M`, `CLAUDE_CODE_MAX_TURNS`, `CLAUDE_CODE_PROCESS_WRAPPER`, `CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION`, `CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION`, `MCP_CONNECTION_NONBLOCKING`, `CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS`, `CLAUDE_CODE_DISABLE_MOUSE_CLICKS`, `CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH`, `OTEL_LOG_RAW_API_BODIES`, `OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_ASSISTANT_RESPONSES`, `CLAUDE_CODE_FORK_SUBAGENT`, `DISABLE_AUTO_COMPACT`. Deprecated: `ENABLE_PROMPT_CACHING_1H_BEDROCK` | COMPLETE (annotations removed; deprecated key marked) — NEW |
+| 24 | MED | Wrong Description | Fix `spellcheck` object fields: was `enabled`+`binary`; officially `enabled`, `checker` (aspell/hunspell/ispell/auto), `language`, `color`. Added scope: user or managed. Confidence 0.9 | COMPLETE (fields corrected) — NEW |
+| 25 | MED | Wrong Description | Fix `keybindingFlavor`: add `"classic"` as a valid value. Confidence 0.8 | COMPLETE (value added) — NEW |
+| 26 | MED | Wrong Scope | Fix `axScreenReader`: remove "Only applies at the User scope" — officially any file. Confidence 0.85 | COMPLETE (restriction removed) — NEW |
+| 27 | MED | Wrong Scope | Fix `extraKnownMarketplaces`: was scope "Project"; officially any file, trust-gated in project/local. Added `autoUpdate` field note. Confidence 0.85 | COMPLETE (scope changed to Any) — NEW |
+| 28 | MED | Wrong Scope | Fix `autoMemoryDirectory`: was "Not accepted in project settings"; officially any file, project/local honored after workspace trust. Confidence 0.85 | COMPLETE (corrected) — NEW |
+| 29 | MED | MCP Example | Fix `serverCommand` in allowedMcpServers example: was glob string; officially an array `["npx","-y","@mcp/server"]`. Confidence 0.85 | COMPLETE (example corrected) — NEW |
+| 30 | MED | Hook Events | Update CLAUDE.md hook events list from 15 to 33 events (PostToolBatch, UserPromptExpansion, StopFailure, CwdChanged, DirectoryAdded, FileChanged, WorktreeCreate/Remove, PostCompact, Elicitation/ElicitationResult, InstructionsLoaded, MessageDisplay, PermissionDenied, TaskCreated). Rule 7A | COMPLETE (CLAUDE.md hook list updated) — NEW |
+| 31 | MED | CLAUDE.md | CLAUDE.md subagent effort note omits `xhigh`; model aliases omit `fable` and `best` | ON HOLD (CLAUDE.md references are examples in descriptions, not exhaustive — acceptable gap) |
+| 32 | LOW | effortLevel | Note that Opus 5.5 and later 5.x models ignore top-level `effortLevel` in user settings. Confidence 0.85 | COMPLETE (note added to effortLevel description) — NEW |
+| 33 | LOW | Useful Commands | Update `/model` command description to reflect correct persistence behavior | COMPLETE (updated) — NEW |

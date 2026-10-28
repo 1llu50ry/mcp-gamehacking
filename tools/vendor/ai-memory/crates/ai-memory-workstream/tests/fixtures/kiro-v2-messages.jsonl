@@ -1,0 +1,3 @@
+{"version":"v1","kind":"Prompt","data":{"message_id":"fixture-user","content":[{"kind":"text","data":"sanitized v2 prompt"}],"meta":{"timestamp":1700000000000}}}
+{"version":"v1","kind":"AssistantMessage","data":{"message_id":"fixture-assistant","content":[{"kind":"text","data":"sanitized v2 reply"},{"kind":"toolUse","data":{"name":"fs_read","tool_use_id":"fixture-call","input":{"path":"README.md"}}}]}}
+{"version":"v1","kind":"ToolResults","data":{"message_id":"fixture-result","content":[{"kind":"toolResult","data":{"tool_use_id":"fixture-call","content":[{"kind":"text","data":"sanitized v2 result"}],"is_error":false}}]}}

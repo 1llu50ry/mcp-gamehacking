@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "ai-memory-client"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "MIT"
+description = "Shared ingress privacy contract for ai-memory companions"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[dependencies]
+anyhow = "1"
+regex = "1"
+serde_json = "1"

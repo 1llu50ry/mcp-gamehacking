@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}ai-memory{% endblock %}</title>
+  <link rel="icon" href="static/logo.png" type="image/png">
+  <link rel="stylesheet" href="static/tailwind.css">
+</head>
+<body class="min-h-full bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+  <a id="skip-link" href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-2 focus:z-20 focus:rounded-md focus:bg-white focus:px-3 focus:py-1.5 focus:text-sm focus:font-medium focus:text-blue-700 dark:focus:bg-slate-900 dark:focus:text-blue-400">Skip to content</a>
+  <script>
+  // The injected <base href> would send a bare "#main-content" to the web root.
+  // Build from the absolute URL: a pathname starting with "//" would otherwise
+  // become a link to another host.
+  (function () {
+    var a = document.getElementById("skip-link");
+    if (a) a.setAttribute("href", location.href.split("#")[0] + "#main-content");
+  })();
+  </script>
+  <header class="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 sticky top-0 z-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap items-center gap-x-4 gap-y-2 min-h-14 py-2">
+      <a href="." class="flex items-center gap-2 shrink-0">
+        <img src="static/logo.png" alt="ai-memory logo" class="h-7 w-auto">
+        <span class="font-semibold text-slate-800 dark:text-slate-100 text-sm hidden sm:inline">ai-memory</span>
+      </a>
+      <div class="flex-1"></div>
+      {% block header_actions %}
+      {% block header_search %}
+      <form action="search" method="get" class="flex items-center gap-2">
+        <label for="header-search" class="sr-only">Search pages</label>
+        <input
+          id="header-search"
+          name="q"
+          type="search"
+          placeholder="Search…"
+          class="w-40 sm:w-64 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+      </form>
+      {% endblock %}
+      <nav aria-label="Main" class="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+        <a href="graph" {% block nav_graph_current %}{% endblock %} class="text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400">Graph</a>
+        <a href="workstreams" {% block nav_workstreams_current %}{% endblock %} class="text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400">Workstreams</a>
+        <a href="pending" {% block nav_pending_current %}{% endblock %} class="text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400">Pending</a>
+        <a href="health" {% block nav_health_current %}{% endblock %} class="text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400">Health</a>
+        <button
+          type="button"
+          id="ai-memory-logout"
+          class="text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400"
+        >Log out</button>
+        <script>
+        (function () {
+          var btn = document.getElementById("ai-memory-logout");
+          if (!btn) return;
+          {% include "_js_cookie.html" %}
+          btn.addEventListener("click", function () {
+            var basePath = document
+              .querySelector('meta[name="ai-memory-base-path"]')
+              ?.getAttribute("content") || "";
+            var loginHref = document
+              .querySelector('meta[name="ai-memory-login-path"]')
+              ?.getAttribute("content") || (basePath + "/web/login");
+            fetch(basePath + "/auth/logout", {
+              method: "POST",
+              credentials: "include",
+              headers: {
+                "Accept": "application/json",
+                "X-CSRF-Token": decodeURIComponent(cookie("ai_memory_csrf") || "")
+              }
+            }).finally(function () {
+              location.assign(loginHref);
+            });
+          });
+        })();
+        </script>
+      </nav>
+      {% endblock %}
+    </div>
+  </header>
+
+  <main id="main-content" tabindex="-1" class="focus:outline-none max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="border-t border-slate-200 dark:border-slate-800 mt-16 py-4">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4 text-xs text-slate-500 dark:text-slate-400">
+      <span>ai-memory · read-only</span>
+      {% block footer_version %}<span>v{{ crate::templates::VERSION }}</span>{% endblock %}
+    </div>
+  </footer>
+</body>
+</html>

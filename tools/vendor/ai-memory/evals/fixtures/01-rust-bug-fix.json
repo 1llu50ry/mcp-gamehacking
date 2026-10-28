@@ -1,0 +1,17 @@
+{
+  "name": "rust-bug-fix",
+  "description": "Realistic short session: user fixes a Rust async bug, decides on a pattern, hits one gotcha. Tests whether the model extracts both the decision and the gotcha as separate pages, not just a session log.",
+  "observations": [
+    {"kind": "session-start", "title": "session start", "body": "cwd=/mnt/data/Projects/ai-memory, agent=claude-code"},
+    {"kind": "user-prompt", "title": "user prompt", "body": "the writer actor is panicking when the bounded mpsc channel fills up — fix it without unbounding the channel"},
+    {"kind": "pre-tool-use", "title": "Read", "body": "crates/ai-memory-store/src/writer.rs"},
+    {"kind": "post-tool-use", "title": "Read result", "body": "found send() being called from an async context — current code uses try_send and unwraps the Err on full"},
+    {"kind": "user-prompt", "title": "user prompt", "body": "yes, replace the try_send unwrap with awaiting send and let backpressure propagate; do not silently drop writes"},
+    {"kind": "pre-tool-use", "title": "Edit", "body": "writer.rs: changed try_send().unwrap() to send().await?"},
+    {"kind": "post-tool-use", "title": "cargo test", "body": "1 test failed: writer_panics_on_full — needs updating since panic behavior changed; replaced with assertion on backpressure delay"},
+    {"kind": "pre-tool-use", "title": "Edit", "body": "writer.rs tests: replaced the panic-expectation test with a timing-based backpressure test"},
+    {"kind": "user-prompt", "title": "user prompt", "body": "also note that I want fire-and-forget hook ingress to remain bounded; never block the HTTP handler on the writer"},
+    {"kind": "post-tool-use", "title": "cargo test", "body": "all green"},
+    {"kind": "session-end", "title": "session end", "body": "fixed; committed as ec1a4f0"}
+  ]
+}

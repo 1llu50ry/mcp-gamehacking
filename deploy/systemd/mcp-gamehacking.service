@@ -1,0 +1,50 @@
+[Unit]
+Description=mcp-gamehacking MCP server (HTTP transport)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mcp
+Group=mcp
+WorkingDirectory=/opt/mcp-gamehacking
+Environment=NODE_ENV=production
+Environment=MCP_TRANSPORT=http
+Environment=MCP_HTTP_HOST=127.0.0.1
+Environment=MCP_HTTP_PORT=7777
+# Set this to a long random secret and share it with your clients
+# via Authorization: Bearer <token>. Leave empty to disable auth.
+Environment=MCP_AUTH_TOKEN=
+# Per-user rate limiting (1 = enable). Identity: X-User-Id > auth hash > IP.
+Environment=MCP_RATE_LIMIT_PER_USER=1
+Environment=MCP_RATE_LIMIT_PER_USER_SEC=30
+# Filesystem sandbox — colon-separated allow / deny lists. The server
+# refuses to read / write anything outside of ALLOW (and never inside DENY).
+Environment=MCP_FS_ALLOW=/srv/samples:/srv/reverse-projects
+Environment=MCP_FS_DENY=/etc:/root:/home
+
+ExecStart=/usr/bin/node /opt/mcp-gamehacking/dist/index.js
+Restart=on-failure
+RestartSec=5
+# Give the server a fair budget to decompile large functions.
+TimeoutStopSec=30
+
+# Hardening — mcp-gamehacking only needs to read samples and write to
+# its own .cache / .audit / .agent-mesh directories under WorkingDirectory.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/mcp-gamehacking/.cache /opt/mcp-gamehacking/.audit /opt/mcp-gamehacking/.agent-mesh /opt/mcp-gamehacking/.index-cache
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=yes
+MemoryDenyWriteExecute=no
+RestrictRealtime=yes
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+[Install]
+WantedBy=multi-user.target

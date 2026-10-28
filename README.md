@@ -4,9 +4,11 @@
 
 ### The MCP server that turns Claude, Codex, and Cursor into a reverse-engineering team.
 
-**111 MCP tools · 59 RE/debug backends · 4,200+ skills · multi-agent mesh · zero-dep native parsers**
+**180+ MCP tools · 73 RE/debug backends · 9 host-side plugins · 4,200+ skills · multi-agent mesh · native x86-64 + ARM64 emulators**
 
-[![tests](https://img.shields.io/badge/tests-20%2F20-success)](tests/) [![tools](https://img.shields.io/badge/MCP%20tools-111-blue)](src/) [![backends](https://img.shields.io/badge/RE%20backends-59-blueviolet)](src/retools.ts) [![skills](https://img.shields.io/badge/skills-4%2C200%2B-orange)](skills/) [![docker](https://img.shields.io/badge/docker-multi--arch-informational)](Dockerfile) [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![audit](https://img.shields.io/badge/npm%20audit-0-brightgreen)](package.json)
+[![version](https://img.shields.io/badge/version-5.0.0-blue)](CHANGELOG.md) [![tests](https://img.shields.io/badge/tests-88%2F88-success)](tests/) [![tools](https://img.shields.io/badge/MCP%20tools-180%2B-blue)](src/) [![backends](https://img.shields.io/badge/RE%20backends-73-blueviolet)](src/retools.ts) [![skills](https://img.shields.io/badge/skills-4%2C200%2B-orange)](skills/) [![docker](https://img.shields.io/badge/docker-multi--arch-informational)](Dockerfile) [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![audit](https://img.shields.io/badge/npm%20audit-0-brightgreen)](package.json)
+
+> **v5.0.0 released.** 19 GiB → 3.3 GiB working tree (83% smaller via gzipped source archives), + four feature waves: host plugin build systems, Frida bridge + dynamic analysis, ARM64 emulator + decompile cache + chunking, bindiff / ROP / game-engine metadata / MCP sampling / SVG visualization. See [CHANGELOG](CHANGELOG.md).
 
 [Quickstart](#30-second-quickstart) · [Architecture](docs/architecture.md) · [Comparison](#comparison) · [Agent Mesh](docs/agent-mesh.md) · [MCP Hub](docs/mcp-hub.md) · [Ethics](#ethics--responsible-use)
 

@@ -1,8 +1,0 @@
-Project Path: arc_gmh5225_idasdk-collection_fx0tqm7r
-
-Source Tree:
-
-```txt
-arc_gmh5225_idasdk-collection_fx0tqm7r
-
-```

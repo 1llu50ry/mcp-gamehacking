@@ -1,0 +1,835 @@
+//! A2 extractive tier-down, end to end through a real Store + Wiki.
+//!
+//! The invariants this file guards (docs/design-memory-aging.md §A2):
+//!
+//! 1. **Flag OFF = today's behaviour.** A cold episodic page is EVICTED
+//!    (tombstoned), not compacted — an upgrade surprises no one.
+//! 2. **Flag ON = compaction.** The same page is tiered down: the new latest
+//!    version keeps its L0 abstract, an L1 summary and the L2 keep-tokens, drops
+//!    the prose, sets the V65 `compacted_at` marker and the `compacted: true`
+//!    frontmatter mirror, and is reported under `SweepReport.compacted`, not
+//!    `evicted`.
+//! 3. **Keep-tokens survive.** A file path + error code + URL seeded in the body
+//!    are present in the compacted body.
+//! 4. **Reversible.** The pre-compaction full body stays reachable via the
+//!    supersession chain and is recoverable with `restore_page_from_checkpoint`.
+//! 5. **No re-compaction.** A second sweep does not re-compact an
+//!    already-compacted page, and the curator does not re-report it as cold.
+//! 6. **Only episodic.** Pinned / semantic / procedural pages never compact.
+
+use ai_memory_consolidate::ObservationRetention;
+use ai_memory_consolidate::{
+    CuratorParams, run_curator_report, run_sweep_with_compaction, run_sweep_with_options,
+};
+use ai_memory_core::{ActorContext, PageId, PagePath, ProjectId, Tier, WorkspaceId};
+use ai_memory_store::{DecayParams, Store};
+use ai_memory_wiki::{Wiki, WritePageRequest};
+use rusqlite::params;
+use tempfile::TempDir;
+
+const DAY_US: i64 = 86_400_000_000;
+
+struct Fixture {
+    tmp: TempDir,
+    store: Store,
+    wiki: Wiki,
+    ws: WorkspaceId,
+    proj: ProjectId,
+}
+
+async fn seed_fixture() -> Fixture {
+    let tmp = TempDir::new().unwrap();
+    let store = Store::open(tmp.path()).unwrap();
+    let ws = store
+        .writer
+        .get_or_create_workspace("default")
+        .await
+        .unwrap();
+    let proj = store
+        .writer
+        .get_or_create_project(ws, "scratch", None)
+        .await
+        .unwrap();
+    // The reader is required by the sweep's `evict_page_if_latest` guard; the
+    // compaction path also reads the page body back through the wiki.
+    let wiki = Wiki::new(tmp.path(), store.writer.clone())
+        .unwrap()
+        .with_store_reader(store.reader.clone());
+    Fixture {
+        tmp,
+        store,
+        wiki,
+        ws,
+        proj,
+    }
+}
+
+async fn write(
+    fx: &Fixture,
+    path: &str,
+    title: &str,
+    tier: Tier,
+    pinned: bool,
+    body: &str,
+) -> PageId {
+    fx.wiki
+        .write_page(WritePageRequest {
+            workspace_id: fx.ws,
+            project_id: fx.proj,
+            path: PagePath::new(path).unwrap(),
+            frontmatter: serde_json::json!({"title": title}),
+            body: body.to_string(),
+            tier,
+            pinned,
+            title: Some(title.to_string()),
+            admission_ctx: None,
+            author_id: None,
+            actor: ActorContext::anonymous(),
+            evidence: Vec::new(),
+        })
+        .await
+        .unwrap()
+}
+
+/// Push the current `is_latest` version of `path` back in time so it scores as
+/// cold. Mirrors the aux-connection trick the other sweep/curator tests use.
+fn backdate_latest(fx: &Fixture, path: &str, days: i64) {
+    let conn = rusqlite::Connection::open(fx.tmp.path().join("db/memory.sqlite")).unwrap();
+    conn.pragma_update(None, "busy_timeout", 5_000).unwrap();
+    let updated_at = jiff::Timestamp::now().as_microsecond() - days * DAY_US;
+    conn.execute(
+        "UPDATE pages SET created_at = ?1, updated_at = ?1 \
+         WHERE workspace_id = ?2 AND project_id = ?3 AND path = ?4 AND is_latest = 1",
+        params![updated_at, fx.ws.as_bytes(), fx.proj.as_bytes(), path,],
+    )
+    .unwrap();
+}
+
+fn expire_latest(fx: &Fixture, path: &str) {
+    let conn = rusqlite::Connection::open(fx.tmp.path().join("db/memory.sqlite")).unwrap();
+    conn.pragma_update(None, "busy_timeout", 5_000).unwrap();
+    conn.execute(
+        "UPDATE pages SET expires_at = 1 \
+         WHERE workspace_id = ?1 AND project_id = ?2 AND path = ?3 AND is_latest = 1",
+        params![fx.ws.as_bytes(), fx.proj.as_bytes(), path],
+    )
+    .unwrap();
+}
+
+/// The `compacted_at` marker on the current latest version of `path`, and its
+/// body, straight from SQLite.
+fn latest_marker_and_body(fx: &Fixture, path: &str) -> (Option<i64>, String) {
+    let conn = rusqlite::Connection::open(fx.tmp.path().join("db/memory.sqlite")).unwrap();
+    conn.query_row(
+        "SELECT compacted_at, body FROM pages \
+         WHERE workspace_id = ?1 AND project_id = ?2 AND path = ?3 AND is_latest = 1",
+        params![fx.ws.as_bytes(), fx.proj.as_bytes(), path],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )
+    .unwrap()
+}
+
+/// Every historical (superseded) body for `path`, oldest first — the
+/// supersession chain the reversibility guarantee rests on.
+fn superseded_bodies(fx: &Fixture, path: &str) -> Vec<String> {
+    let conn = rusqlite::Connection::open(fx.tmp.path().join("db/memory.sqlite")).unwrap();
+    let mut stmt = conn
+        .prepare(
+            "SELECT body FROM pages \
+             WHERE workspace_id = ?1 AND project_id = ?2 AND path = ?3 AND is_latest = 0 \
+             ORDER BY created_at",
+        )
+        .unwrap();
+    let rows = stmt
+        .query_map(params![fx.ws.as_bytes(), fx.proj.as_bytes(), path], |row| {
+            row.get::<_, String>(0)
+        })
+        .unwrap();
+    rows.map(Result::unwrap).collect()
+}
+
+const COLD_DAYS: i64 = 400;
+
+#[tokio::test]
+async fn compaction_does_not_supersede_a_concurrent_fresh_write() {
+    use ai_memory_wiki::{AdmissionChain, AdmissionOp, FailurePolicy, WebhookConfig};
+    use std::io::{Read, Write};
+
+    let fx = seed_fixture().await;
+    let path = "sessions/concurrent.md";
+    write(
+        &fx,
+        path,
+        "Old session",
+        Tier::Episodic,
+        false,
+        "Old session body that the sweep is allowed to compact.",
+    )
+    .await;
+    backdate_latest(&fx, path, COLD_DAYS);
+
+    // Pause admission after A2 derived its replacement but before the batch
+    // obtains the page lock. Channels make the interleaving deterministic.
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel();
+    let server = std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
+        let mut bytes = Vec::new();
+        let mut buf = [0_u8; 4096];
+        let header_end = loop {
+            if let Some(pos) = bytes.windows(4).position(|window| window == b"\r\n\r\n") {
+                break pos + 4;
+            }
+            let read = stream.read(&mut buf).unwrap();
+            assert!(read > 0);
+            bytes.extend_from_slice(&buf[..read]);
+        };
+        let headers = String::from_utf8_lossy(&bytes[..header_end]).to_lowercase();
+        let length = headers
+            .lines()
+            .find_map(|line| line.strip_prefix("content-length:"))
+            .unwrap()
+            .trim()
+            .parse::<usize>()
+            .unwrap();
+        while bytes.len() < header_end + length {
+            let read = stream.read(&mut buf).unwrap();
+            assert!(read > 0);
+            bytes.extend_from_slice(&buf[..read]);
+        }
+        started_tx.send(()).unwrap();
+        release_rx
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .unwrap();
+        stream
+            .write_all(b"HTTP/1.1 204 No Content\r\ncontent-length: 0\r\nconnection: close\r\n\r\n")
+            .unwrap();
+    });
+    let sweep_wiki = fx.wiki.clone().with_admission_chain(
+        AdmissionChain::new(vec![WebhookConfig {
+            name: "pause-stale-compaction".into(),
+            url,
+            timeout_ms: 2_000,
+            failure_policy: FailurePolicy::Reject,
+            events: vec![AdmissionOp::WritePage],
+            blocking: true,
+        }])
+        .unwrap(),
+    );
+    let params = DecayParams::default();
+    let sweep = run_sweep_with_compaction(
+        &fx.store.reader,
+        &fx.store.writer,
+        Some(&sweep_wiki),
+        fx.ws,
+        fx.proj,
+        &params,
+        0.0,
+        ObservationRetention::default(),
+        true,
+        false,
+    );
+    let fresh_body = "New user correction: this information is current and must remain latest.";
+    let update = async {
+        tokio::time::timeout(std::time::Duration::from_secs(2), started_rx)
+            .await
+            .unwrap()
+            .unwrap();
+        let fresh_id = write(
+            &fx,
+            path,
+            "Fresh correction",
+            Tier::Semantic,
+            true,
+            fresh_body,
+        )
+        .await;
+        release_tx.send(()).unwrap();
+        fresh_id
+    };
+    let (report, fresh_id) = tokio::join!(sweep, update);
+    server.join().unwrap();
+    let report = report.unwrap();
+    let (marker, latest_body) = latest_marker_and_body(&fx, path);
+    let conn = rusqlite::Connection::open(fx.tmp.path().join("db/memory.sqlite")).unwrap();
+    let metadata: (String, bool) = conn
+        .query_row(
+            "SELECT tier, pinned FROM pages WHERE workspace_id = ?1 \
+             AND project_id = ?2 AND path = ?3 AND is_latest = 1",
+            params![fx.ws.as_bytes(), fx.proj.as_bytes(), path],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap();
+    let disk = fx
+        .wiki
+        .read_page(fx.ws, fx.proj, &PagePath::new(path).unwrap())
+        .unwrap();
+
+    assert_eq!(disk.body, latest_body, "file and DB should still agree");
+    assert_eq!(latest_body, fresh_body);
+    assert_eq!(metadata, ("semantic".to_string(), true));
+    assert!(marker.is_none());
+    assert_eq!(
+        report.compacted.len(),
+        1,
+        "the selected page remains visible as a skipped compaction"
+    );
+    assert!(!report.compacted[0].compacted);
+    assert_eq!(report.compacted[0].new_id, None);
+    assert_eq!(
+        fx.store
+            .reader
+            .latest_page_id_by_ids(fx.ws, fx.proj, path.to_string())
+            .await
+            .unwrap(),
+        Some(fresh_id)
+    );
+    assert_eq!(
+        superseded_bodies(&fx, path),
+        vec!["Old session body that the sweep is allowed to compact."]
+    );
+}
+
+/// Test 1: with the flag OFF the sweep evicts a cold episodic page exactly as it
+/// always has — no compaction, no upgrade surprise.
+#[tokio::test]
+async fn flag_off_evicts_cold_episodic_page_unchanged() {
+    let fx = seed_fixture().await;
+    let id = write(
+        &fx,
+        "sessions/old.md",
+        "Old Session",
+        Tier::Episodic,
+        false,
+        "a long prose body about a debugging session that nobody reopened",
+    )
+    .await;
+    backdate_latest(&fx, "sessions/old.md", COLD_DAYS);
+
+    let report = run_sweep_with_options(
+        &fx.store.reader,
+        &fx.store.writer,
+        Some(&fx.wiki),
+        fx.ws,
+        fx.proj,
+        &DecayParams::default(),
+        0.0,
+        ObservationRetention::default(),
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        report
+            .evicted
+            .iter()
+            .map(|e| e.path.as_str())
+            .collect::<Vec<_>>(),
+        vec!["sessions/old.md"],
+        "flag off must evict the cold page"
+    );
+    assert!(report.evicted[0].deleted, "eviction must have landed");
+    assert!(
+        report.compacted.is_empty(),
+        "nothing is compacted with the flag off"
+    );
+    // The evicted page is a decay tombstone (not is_latest) — same as before A2.
+    let _ = id;
+    assert!(
+        fx.store
+            .reader
+            .decay_candidates(fx.ws, fx.proj)
+            .await
+            .unwrap()
+            .is_empty(),
+        "the evicted page is gone from the live set"
+    );
+}
+
+/// Test 2 + 3: with the flag ON the same page is compacted, not evicted; the
+/// marker and frontmatter mirror are set; keep-tokens survive and prose drops.
+#[tokio::test]
+async fn flag_on_compacts_cold_episodic_and_keeps_durable_facts() {
+    let fx = seed_fixture().await;
+    // First paragraph → L1 summary; the second paragraph is droppable prose,
+    // but its file path / error code / URL are mined as keep-tokens from the
+    // full body and survive.
+    let body = "Fixed the flaky sweep test after an afternoon of chasing it.\n\n\
+         The root cause lived in crates/ai-memory-store/src/ops.rs and surfaced as \
+         E0433 during the build; the server also returned HTTP 500. Details at \
+         https://github.com/akitaonrails/ai-memory/issues/776 which everyone agreed \
+         was worth writing down in careful, unnecessary, easily-forgotten prose.";
+    write(
+        &fx,
+        "sessions/fix.md",
+        "The Fix",
+        Tier::Episodic,
+        false,
+        body,
+    )
+    .await;
+    backdate_latest(&fx, "sessions/fix.md", COLD_DAYS);
+
+    let report = run_sweep_with_compaction(
+        &fx.store.reader,
+        &fx.store.writer,
+        Some(&fx.wiki),
+        fx.ws,
+        fx.proj,
+        &DecayParams::default(),
+        0.0,
+        ObservationRetention::default(),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert!(
+        report.evicted.is_empty(),
+        "the flag redirects the cold page from eviction to compaction: {:?}",
+        report.evicted
+    );
+    assert_eq!(
+        report
+            .compacted
+            .iter()
+            .map(|c| c.path.as_str())
+            .collect::<Vec<_>>(),
+        vec!["sessions/fix.md"],
+        "the cold page is reported as compacted"
+    );
+    assert!(
+        report.compacted[0].compacted,
+        "the rewrite must have landed"
+    );
+    assert!(
+        report.compacted[0].new_id.is_some(),
+        "new version id reported"
+    );
+
+    let (marker, compacted_body) = latest_marker_and_body(&fx, "sessions/fix.md");
+    assert!(marker.is_some(), "V65 compacted_at marker is set");
+
+    // Keep-tokens (L2) survive.
+    assert!(
+        compacted_body.contains("crates/ai-memory-store/src/ops.rs"),
+        "file path survives: {compacted_body}"
+    );
+    assert!(compacted_body.contains("E0433"), "error code survives");
+    assert!(
+        compacted_body.contains("github.com/akitaonrails/ai-memory"),
+        "URL survives"
+    );
+    // Prose (the low-signal tail) is dropped.
+    assert!(
+        !compacted_body.contains("easily-forgotten prose"),
+        "prose body dropped: {compacted_body}"
+    );
+
+    // Frontmatter mirror on disk.
+    let md = fx
+        .wiki
+        .read_page(fx.ws, fx.proj, &PagePath::new("sessions/fix.md").unwrap())
+        .unwrap();
+    assert_eq!(
+        md.frontmatter.get("compacted").and_then(|v| v.as_bool()),
+        Some(true),
+        "frontmatter carries the compacted: true mirror"
+    );
+}
+
+/// Test 4: the pre-compaction full body stays reachable via the supersession
+/// chain and is recoverable through `restore_page_from_checkpoint`.
+#[tokio::test]
+async fn compaction_is_reversible() {
+    let fx = seed_fixture().await;
+    let original_body = "The original full prose body with a keeper path lib.rs and \
+         plenty of easily-forgotten narrative that compaction is meant to drop.";
+    write(
+        &fx,
+        "sessions/reversible.md",
+        "Reversible",
+        Tier::Episodic,
+        false,
+        original_body,
+    )
+    .await;
+    // Snapshot the original in git before compaction rewrites the working file.
+    let rev = fx.wiki.commit_all("seed").unwrap().unwrap().to_string();
+    backdate_latest(&fx, "sessions/reversible.md", COLD_DAYS);
+
+    run_sweep_with_compaction(
+        &fx.store.reader,
+        &fx.store.writer,
+        Some(&fx.wiki),
+        fx.ws,
+        fx.proj,
+        &DecayParams::default(),
+        0.0,
+        ObservationRetention::default(),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+
+    // (a) The prior full body is still in the store's supersession chain.
+    let prior = superseded_bodies(&fx, "sessions/reversible.md");
+    assert!(
+        prior
+            .iter()
+            .any(|b| b.contains("easily-forgotten narrative")),
+        "the pre-compaction body stays reachable via supersession: {prior:?}"
+    );
+
+    // (b) And it is recoverable through the git checkpoint restore path.
+    fx.wiki
+        .restore_page_from_checkpoint(
+            fx.ws,
+            fx.proj,
+            PagePath::new("sessions/reversible.md").unwrap(),
+            &rev,
+        )
+        .await
+        .unwrap();
+    let (_marker, restored) = latest_marker_and_body(&fx, "sessions/reversible.md");
+    assert!(
+        restored.contains("easily-forgotten narrative"),
+        "restore-page brings the original body back: {restored}"
+    );
+}
+
+/// Test 5: a compacted page is terminal for the decay pass — a second sweep does
+/// not re-compact it, and the curator does not re-report it as cold.
+#[tokio::test]
+async fn no_recompaction_and_curator_skips_compacted_pages() {
+    let fx = seed_fixture().await;
+    write(
+        &fx,
+        "sessions/twice.md",
+        "Twice",
+        Tier::Episodic,
+        false,
+        "a body mentioning ops.rs and E0001 among some throwaway prose",
+    )
+    .await;
+    backdate_latest(&fx, "sessions/twice.md", COLD_DAYS);
+
+    let first = run_sweep_with_compaction(
+        &fx.store.reader,
+        &fx.store.writer,
+        Some(&fx.wiki),
+        fx.ws,
+        fx.proj,
+        &DecayParams::default(),
+        0.0,
+        ObservationRetention::default(),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(first.compacted.len(), 1, "first sweep compacts once");
+
+    // Age the compacted version so it would be cold again if the marker did not
+    // block it.
+    backdate_latest(&fx, "sessions/twice.md", COLD_DAYS);
+    let second = run_sweep_with_compaction(
+        &fx.store.reader,
+        &fx.store.writer,
+        Some(&fx.wiki),
+        fx.ws,
+        fx.proj,
+        &DecayParams::default(),
+        0.0,
+        ObservationRetention::default(),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+    assert!(
+        second.compacted.is_empty(),
+        "the marker blocks re-compaction: {:?}",
+        second.compacted
+    );
+    assert!(
+        second.evicted.is_empty(),
+        "a compacted page is terminal: it is neither re-compacted nor evicted"
+    );
+
+    // The curator (which predicts what the sweep would evict) must not report a
+    // compacted page as cold.
+    let report = run_curator_report(
+        &fx.store.reader,
+        fx.ws,
+        fx.proj,
+        "default",
+        "scratch",
+        CuratorParams::default(),
+    )
+    .await
+    .unwrap();
+    assert!(
+        report.findings.iter().all(|f| f.kind != "cold_episodic"),
+        "curator must skip compacted pages: {:?}",
+        report.findings
+    );
+}
+
+/// Test 6: only episodic pages compact. Pinned episodic, semantic and
+/// procedural pages are never touched, even when cold, with the flag ON.
+#[tokio::test]
+async fn only_unpinned_episodic_pages_compact() {
+    let fx = seed_fixture().await;
+    write(
+        &fx,
+        "sessions/pinned.md",
+        "Pinned",
+        Tier::Episodic,
+        true,
+        "path a.rs prose",
+    )
+    .await;
+    write(
+        &fx,
+        "concepts/sem.md",
+        "Semantic",
+        Tier::Semantic,
+        false,
+        "path b.rs prose",
+    )
+    .await;
+    write(
+        &fx,
+        "runbooks/proc.md",
+        "Procedural",
+        Tier::Procedural,
+        false,
+        "path c.rs prose",
+    )
+    .await;
+    for path in ["sessions/pinned.md", "concepts/sem.md", "runbooks/proc.md"] {
+        backdate_latest(&fx, path, COLD_DAYS);
+    }
+
+    let report = run_sweep_with_compaction(
+        &fx.store.reader,
+        &fx.store.writer,
+        Some(&fx.wiki),
+        fx.ws,
+        fx.proj,
+        &DecayParams::default(),
+        0.0,
+        ObservationRetention::default(),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert!(
+        report.compacted.is_empty(),
+        "pinned/semantic/procedural pages must never compact: {:?}",
+        report.compacted
+    );
+    for path in ["sessions/pinned.md", "concepts/sem.md", "runbooks/proc.md"] {
+        let (marker, _body) = latest_marker_and_body(&fx, path);
+        assert!(marker.is_none(), "{path} must not be marked compacted");
+    }
+}
+
+/// The curator (which predicts what the sweep would evict) must not report an
+/// expired page as cold, nor flag expired slots as stale, nor include expired
+/// pages in duplicate title findings.
+#[tokio::test]
+async fn curator_skips_expired_pages() {
+    let fx = seed_fixture().await;
+    write(
+        &fx,
+        "sessions/expired.md",
+        "Common Title",
+        Tier::Episodic,
+        false,
+        "an expired episodic note",
+    )
+    .await;
+    backdate_latest(&fx, "sessions/expired.md", COLD_DAYS);
+    expire_latest(&fx, "sessions/expired.md");
+
+    write(
+        &fx,
+        "concepts/live.md",
+        "Common Title",
+        Tier::Semantic,
+        false,
+        "a live semantic note",
+    )
+    .await;
+
+    write(
+        &fx,
+        "_slots/expired-focus.md",
+        "Focus",
+        Tier::Semantic,
+        false,
+        "an expired slot",
+    )
+    .await;
+    backdate_latest(&fx, "_slots/expired-focus.md", COLD_DAYS);
+    expire_latest(&fx, "_slots/expired-focus.md");
+
+    let report = run_curator_report(
+        &fx.store.reader,
+        fx.ws,
+        fx.proj,
+        "default",
+        "scratch",
+        CuratorParams::default(),
+    )
+    .await
+    .unwrap();
+
+    assert!(
+        report.findings.iter().all(|f| f.kind != "cold_episodic"),
+        "curator must not flag expired pages as cold episodic: {:?}",
+        report.findings
+    );
+    assert!(
+        report.findings.iter().all(|f| f.kind != "stale_slot"),
+        "curator must not flag expired slots as stale: {:?}",
+        report.findings
+    );
+    assert!(
+        report.findings.iter().all(|f| f.kind != "duplicate_title"),
+        "curator must not flag duplicate titles against expired pages: {:?}",
+        report.findings
+    );
+}
+
+/// Test 7: a page that is ALREADY compacted stays terminal with the A2 flag
+/// OFF — the default everywhere.
+///
+/// The V65 marker is not A2's alone: the A3 cold-cluster dedup merge-note stub
+/// and the B2 dream pass both stamp `compacted: true` on their loser stubs
+/// under their OWN flags, and `compacted_at` is derived from that mirror at the
+/// single write choke point. So a durable residue exists in corpora where
+/// `compact_cold_episodic` was never turned on, and the terminality promise
+/// ("neither re-compacted nor evicted") has to hold on the eviction arm too —
+/// otherwise the sweep tombstones and then hard-deletes exactly what the merge
+/// chose to keep.
+///
+/// The control page in the same sweep is cold and NOT compacted: it must still
+/// be evicted, so the guard cannot make the sweep inert.
+#[tokio::test]
+async fn flag_off_keeps_an_already_compacted_residue_terminal() {
+    let fx = seed_fixture().await;
+
+    // The residue: the shape an A3/B2 merge-note stub lands in — a short body
+    // plus the `compacted: true` frontmatter mirror the store derives
+    // `compacted_at` from. A2 is never switched on in this test.
+    fx.wiki
+        .write_page(WritePageRequest {
+            workspace_id: fx.ws,
+            project_id: fx.proj,
+            path: PagePath::new("sessions/residue.md").unwrap(),
+            frontmatter: serde_json::json!({
+                "title": "Residue",
+                "compacted": true,
+                "merged_into": "sessions/survivor.md",
+            }),
+            body: "This page was merged into [[sessions/survivor.md]].\n".to_string(),
+            tier: Tier::Episodic,
+            pinned: false,
+            title: Some("Residue".to_string()),
+            admission_ctx: None,
+            author_id: None,
+            actor: ActorContext::anonymous(),
+            evidence: Vec::new(),
+        })
+        .await
+        .unwrap();
+    // The control: cold, episodic, no marker.
+    write(
+        &fx,
+        "sessions/plain.md",
+        "Plain Session",
+        Tier::Episodic,
+        false,
+        "a long prose body about a debugging session that nobody reopened",
+    )
+    .await;
+    backdate_latest(&fx, "sessions/residue.md", COLD_DAYS);
+    backdate_latest(&fx, "sessions/plain.md", COLD_DAYS);
+
+    // Pre-condition: the marker really is set, so a pass that ignores it would
+    // have something to ignore.
+    let (marker_before, _) = latest_marker_and_body(&fx, "sessions/residue.md");
+    assert!(
+        marker_before.is_some(),
+        "the frontmatter mirror set the V65 compacted_at marker"
+    );
+
+    let report = run_sweep_with_options(
+        &fx.store.reader,
+        &fx.store.writer,
+        Some(&fx.wiki),
+        fx.ws,
+        fx.proj,
+        &DecayParams::default(),
+        0.0,
+        ObservationRetention::default(),
+        false,
+    )
+    .await
+    .unwrap();
+
+    // Not tombstoned: the residue is absent from `evicted`, and the control is
+    // there — the sweep still does its job.
+    assert_eq!(
+        report
+            .evicted
+            .iter()
+            .map(|e| e.path.as_str())
+            .collect::<Vec<_>>(),
+        vec!["sessions/plain.md"],
+        "only the non-compacted cold page is evicted: {:?}",
+        report.evicted
+    );
+    assert!(report.evicted[0].deleted, "the control eviction landed");
+    assert!(
+        report.compacted.is_empty(),
+        "nothing compacts with the flag off: {:?}",
+        report.compacted
+    );
+
+    // Not hard-deleted: the residue is still the live latest version, with its
+    // body and marker intact. (`DecayParams::default()` purges aged tombstones
+    // in the same pass, which is what would have destroyed it.)
+    let (marker_after, body_after) = latest_marker_and_body(&fx, "sessions/residue.md");
+    assert!(
+        marker_after.is_some(),
+        "the residue keeps its V65 marker after the sweep"
+    );
+    assert!(
+        body_after.contains("sessions/survivor.md"),
+        "the residue body survives: {body_after}"
+    );
+    assert!(
+        fx.store
+            .reader
+            .decay_candidates(fx.ws, fx.proj)
+            .await
+            .unwrap()
+            .iter()
+            .any(|c| c.path.as_str() == "sessions/residue.md"),
+        "the residue is still in the live set"
+    );
+}

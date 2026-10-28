@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Per-user LaunchAgent for ai-memory, the macOS counterpart of
+  packaging/systemd/ai-memory-user.service.
+
+  launchd expands nothing: it has no systemd-style home specifier and no
+  EnvironmentFile, so both placeholders below must be substituted before the
+  file is installed into the user's LaunchAgents directory. See docs/macos.md
+  for the render command.
+
+    __AI_MEMORY_BIN__  absolute path to the ai-memory binary
+    __HOME__           absolute path to the user's home directory
+
+  The data dir and its config file are deliberately not passed: on macOS the
+  binary already defaults to Library/Application Support/ai-memory under the
+  user's home, so spelling them out would only add two more paths to
+  substitute.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.github.akitaonrails.ai-memory</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>__AI_MEMORY_BIN__</string>
+    <string>serve</string>
+    <string>--transport</string>
+    <string>http</string>
+    <string>--enable-web</string>
+  </array>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+
+  <!-- Left unset, launchd throttles the job's CPU and I/O bandwidth, which the
+       hook ingress budget cannot absorb. Adaptive keys off XPC transactions
+       ai-memory never opens, so it would decay to Background. -->
+  <key>ProcessType</key>
+  <string>Interactive</string>
+
+  <!-- launchd creates these files but not their parent directory. -->
+  <key>StandardOutPath</key>
+  <string>__HOME__/Library/Logs/ai-memory/stdout.log</string>
+  <key>StandardErrorPath</key>
+  <string>__HOME__/Library/Logs/ai-memory/stderr.log</string>
+</dict>
+</plist>

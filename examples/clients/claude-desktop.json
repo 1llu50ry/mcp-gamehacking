@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "mcp-gamehacking": {
+      "command": "node",
+      "args": ["C:\\path\\to\\mcp-gamehacking\\dist\\index.js"],
+      "env": {
+        "MCP_FS_ALLOW": "C:\\samples;C:\\reverse-projects",
+        "MCP_RATE_LIMIT": "1",
+        "MCP_RATE_LIMIT_DEFAULT": "10"
+      }
+    }
+  }
+}

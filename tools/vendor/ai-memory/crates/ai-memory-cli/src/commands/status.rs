@@ -1,0 +1,830 @@
+//! `ai-memory status` — report runtime config and persisted counts.
+//!
+//! Thin HTTP client. Calls `GET /admin/status` on the configured
+//! server; renders the response as human text or JSON. Never opens
+//! the store directly — the server is the source of truth.
+
+mod presentation;
+
+use ai_memory_core::fix_lines;
+use ai_memory_llm::{ProviderHealthSnapshot, ProviderHealthStatus, ProviderRoleHealthSnapshot};
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
+
+use super::hook_spool::{SpoolHealth, spool_dir, spool_health};
+use crate::cli::StatusArgs;
+use crate::config::Config;
+use crate::http_client::{ServerEndpoint, get_json};
+
+/// Server-side hook-ingestion counters. `Option` at the call site so a
+/// newer CLI pointed at an older server renders the rest of `status`
+/// instead of failing to deserialise the whole report.
+#[derive(Debug, Deserialize, Serialize)]
+struct IngestReport {
+    accepted: u64,
+    #[serde(default)]
+    dropped_unauthorized: u64,
+    #[serde(default)]
+    stored: u64,
+    #[serde(default)]
+    replayed: u64,
+    #[serde(default)]
+    resumed: u64,
+    #[serde(default)]
+    ignored_end: u64,
+    #[serde(default)]
+    dropped_collision: u64,
+    #[serde(default)]
+    dropped_invalid: u64,
+    #[serde(default)]
+    failed: u64,
+
+    dropped_by_policy: u64,
+    shed_saturated: u64,
+    shed_rate_limited: u64,
+    last_persisted_ms: Option<u64>,
+}
+
+/// Server-shaped response. Mirrors `ai_memory_mcp::admin::StatusReport`.
+#[derive(Debug, Deserialize, Serialize)]
+struct Report {
+    /// Server binary version.
+    version: String,
+    /// Server-side data directory path.
+    data_dir: String,
+    /// Server bind address.
+    bind: String,
+    /// Server-side SQLite path.
+    db_path: String,
+    /// Lifetime counts.
+    counts: Counts,
+    /// Derived-index diagnostics.
+    #[serde(default)]
+    derived: Derived,
+    /// Physical storage figures (absent from pre-#549 servers).
+    #[serde(default)]
+    storage: Storage,
+    /// Hook-ingestion counters from the server process.
+    #[serde(default)]
+    ingest: Option<IngestReport>,
+    /// Passive process-scoped provider health.
+    #[serde(default)]
+    providers: ProviderHealthSnapshot,
+    /// Write-queue depth `(queued, capacity)` (2.0 servers).
+    #[serde(default)]
+    write_queue: Option<(usize, usize)>,
+    /// Wiki-format state (2.0 servers).
+    #[serde(default)]
+    wiki_format: Option<WikiFormatReport>,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+struct WikiFormatReport {
+    #[serde(default)]
+    okf_migrated: bool,
+    #[serde(default)]
+    backup_archive: Option<String>,
+    #[serde(default)]
+    backup_archive_bytes: Option<u64>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct Counts {
+    pages_latest: u64,
+    pages_all: u64,
+    sessions: u64,
+    observations: u64,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+struct Derived {
+    pages_rows: u64,
+    pages_fts_rows: u64,
+    observations_rows: u64,
+    observations_fts_rows: u64,
+    latest_pages_missing_embeddings: u64,
+    #[serde(default)]
+    latest_pages_unembeddable: u64,
+    #[serde(default)]
+    typed_links_from_latest_pages: Vec<(String, u64)>,
+    #[serde(default)]
+    embed_failures_unresolved: u64,
+    #[serde(default)]
+    embed_failures_recovered: u64,
+    embedding_rows: u64,
+    embedding_triples: Vec<EmbeddingTriple>,
+    links_from_latest_pages: u64,
+    unresolved_links_from_latest_pages: u64,
+    stale_links_from_latest_pages: u64,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+struct Storage {
+    page_size: u64,
+    page_count: u64,
+    freelist_count: u64,
+    database_bytes: u64,
+    reclaimable_bytes: u64,
+    /// Free space on the filesystem holding the database (absent from
+    /// pre-#629 servers).
+    #[serde(default)]
+    data_dir_free_bytes: Option<u64>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct EmbeddingTriple {
+    provider: String,
+    model: String,
+    dim: u32,
+    count: u64,
+}
+
+/// Run the `status` subcommand.
+///
+/// # Errors
+/// Print local spool state when the server could not be reached.
+///
+/// Goes to stderr so it cannot corrupt `--json` consumers, which expect a
+/// single object on stdout and get a non-zero exit here anyway. The
+/// unreachable-server error still propagates unchanged; this only adds the
+/// local half of the picture that the caller can actually act on.
+/// Render the last-persisted stamp as an age, or `-` when this server
+/// process has not written an event yet.
+///
+/// An age rather than a wall-clock time: the useful question is "how long
+/// since anything landed", and the server may be in another timezone.
+fn last_write_line(unix_ms: Option<u64>) -> String {
+    let Some(ms) = unix_ms else {
+        return "-".to_string();
+    };
+    let now = jiff::Timestamp::now().as_millisecond();
+    let now_ms = u64::try_from(now).unwrap_or(0);
+    spool_age_line(Some(now_ms.saturating_sub(ms)))
+}
+
+fn report_offline_spool(spool: &SpoolHealth, json: bool) {
+    if json {
+        if let Ok(rendered) = serde_json::to_string(spool) {
+            eprintln!("local spool (server unreachable): {rendered}");
+        }
+        return;
+    }
+    eprintln!("local spool (server unreachable):");
+    eprintln!("  pending:    {}", spool.pending);
+    eprintln!("  oldest:     {}", spool_age_line(spool.oldest_age_ms));
+    eprintln!("  retries:    {}", spool.retries_total);
+    if spool.at_capacity() {
+        eprintln!(
+            "  The spool is full ({} events): newly captured events are dropped until \
+             space is available. Bring the server back to stop the loss.",
+            spool.capacity
+        );
+    } else if spool.pending > 0 {
+        eprintln!(
+            "  {} event(s) are queued locally and will be delivered once the \
+             server is reachable again.",
+            spool.pending
+        );
+    }
+}
+
+/// One line pointing at `ai-memory recover` while the server is down, when
+/// there is actually something waiting: queued hook events or journaled
+/// outage runs. Goes to stderr like the spool block above, so `--json`
+/// consumers' stdout stays a single object.
+fn report_offline_recovery_hint(config: &Config, spool: &SpoolHealth, json: bool) {
+    for line in offline_recovery_hint_lines(config, spool, json) {
+        eprintln!("{line}");
+    }
+}
+
+/// The hint's lines, or empty when there is nothing to say. Split out from
+/// the `eprintln!` wrapper so both renderings are assertable without a
+/// running server.
+///
+/// An unreadable journal is reported in BOTH renderings. It is what opens
+/// this gate in the first place (it defeats the early return), and a journal
+/// we cannot parse reports `0` pending: staying silent about the error turned
+/// the human line into `repair unrecorded runs (0 journaled)` and the
+/// `--json` object into an all-clear, for a journal that is actually broken.
+/// The online path at `status/presentation.rs` and `journal_error` in
+/// [`json_report`] already treat it as reportable; this matches their label
+/// and key.
+fn offline_recovery_hint_lines(config: &Config, spool: &SpoolHealth, json: bool) -> Vec<String> {
+    let (journal_pending, _, _, journal_error) = super::recovery::journal_summary(&config.data_dir);
+    if spool.pending == 0 && journal_pending == 0 && journal_error.is_none() {
+        return Vec::new();
+    }
+    if json {
+        let rendered = serde_json::json!({
+            "journal_pending": journal_pending,
+            "journal_error": journal_error,
+            "spool_pending": spool.pending,
+        });
+        return vec![format!("recovery hint (server unreachable): {rendered}")];
+    }
+    let mut lines = Vec::new();
+    if let Some(error) = &journal_error {
+        lines.push(format!("  error:      {error}"));
+    }
+    lines.push(format!(
+        "  run `{}` once the server is back to deliver queued events and \
+         repair unrecorded runs ({journal_pending} journaled)",
+        fix_lines::RECOVER
+    ));
+    lines
+}
+
+/// The missing logon binary while the server is down, on stderr like the
+/// spool block, so `--json` consumers' stdout stays a single object.
+fn report_offline_logon_binary(
+    problem: Option<&super::user_service::MissingLogonBinary>,
+    json: bool,
+) {
+    let Some(problem) = problem else {
+        return;
+    };
+    if json {
+        if let Ok(rendered) = serde_json::to_string(problem) {
+            eprintln!("windows logon (server unreachable): {rendered}");
+        }
+        return;
+    }
+    eprint!("{}", problem.render_human());
+}
+
+/// Which capture mode the hook would enforce for this install (#446).
+///
+/// Reads the same file the hook reads rather than keeping a second source of
+/// truth that could drift from the one actually gating events. Anything
+/// unreadable or unrecognised reports the historical default, matching the
+/// hook's own fallback.
+fn resolve_capture_mode(data_dir: &std::path::Path) -> &'static str {
+    match std::fs::read_to_string(data_dir.join(crate::commands::hook::CAPTURE_MODE_FILE)) {
+        Ok(text) if text.trim().eq_ignore_ascii_case("allowlist") => "allowlist",
+        _ => "denylist",
+    }
+}
+
+/// Returns an error if the server is unreachable, returns non-2xx, or
+/// the response can't be parsed.
+pub async fn run(config: &Config, args: StatusArgs) -> Result<()> {
+    let ep = ServerEndpoint::from_config_resolving_auth(config).await;
+    let capture_mode = resolve_capture_mode(&config.data_dir);
+
+    // Read the spool BEFORE contacting the server, and surface it even when
+    // that call fails.
+    //
+    // The spool exists to buffer hook events while the server is
+    // unreachable, so "how much is queued locally?" is most worth answering
+    // precisely when the server is down. Computing it after `get_json` meant
+    // the one question this section exists for could not be asked in the one
+    // situation that prompts it.
+    let spool = spool_health(&spool_dir(&config.data_dir));
+    // Also local, and for the same reason: a quarantined binary (#1280)
+    // usually means nothing is listening.
+    let windows_logon = super::user_service::check_logon_binary(&config.data_dir);
+
+    let report: Report = match get_json::<Report>(&ep, "/admin/status", &[]).await {
+        Ok(report) => report,
+        Err(err) => {
+            report_offline_spool(&spool, args.json);
+            report_offline_recovery_hint(config, &spool, args.json);
+            report_offline_logon_binary(windows_logon.as_ref(), args.json);
+            return Err(err);
+        }
+    };
+    let (journal_pending, journal_degraded, journal_finish_failed, journal_error) =
+        super::recovery::journal_summary(&config.data_dir);
+    // `/admin/status` answered. Without a credential that can only mean the
+    // server does not require one.
+    let auth_posture = crate::local_auth::AuthPosture::classify(ep.auth_token.is_none(), &ep.url);
+
+    if args.json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&json_report(
+                report,
+                spool,
+                journal_pending,
+                journal_degraded,
+                journal_finish_failed,
+                journal_error,
+                capture_mode,
+                &ep,
+                auth_posture,
+                windows_logon.as_ref(),
+            ))?
+        );
+    } else {
+        presentation::render(
+            &crate::terminal::Terminal::stdout(&config.runtime_env),
+            presentation::View {
+                report: &report,
+                ep: &ep,
+                spool: &spool,
+                journal_pending,
+                journal_degraded,
+                journal_finish_failed,
+                journal_error: journal_error.as_deref(),
+                capture_mode,
+                auth_posture,
+                windows_logon: windows_logon.as_ref(),
+            },
+        );
+    }
+    Ok(())
+}
+
+/// One line per `llm_candidates` entry: label, whether it answered the last
+/// completed call, and its most notable state (an open circuit takes
+/// priority over a stale last-error status).
+fn fallback_candidate_line(candidate: &ai_memory_llm::CandidateHealth) -> String {
+    let mut line = format!("{}/{}", candidate.provider, candidate.model);
+    if candidate.last_selected {
+        line.push_str(" (last selected)");
+    }
+    if let Some(until) = &candidate.circuit_open_until {
+        line.push_str(&format!(" — circuit open until {until}"));
+    } else if let Some(status) = candidate.last_error_status {
+        line.push_str(&format!(" — last error: status {status}"));
+    } else if let Some(class) = &candidate.last_error_class {
+        line.push_str(&format!(" — last error: {class}"));
+    }
+    line
+}
+
+/// Render a spool age (ms) as a compact human duration, or `-` when the spool
+/// holds no events. Allowed to saturate: an operator reading a stuck-spool
+/// diagnosis wants the magnitude, not sub-second precision.
+pub(super) fn spool_age_line(age_ms: Option<u64>) -> String {
+    let Some(ms) = age_ms else {
+        return "-".to_string();
+    };
+    let secs = ms / 1000;
+    if secs < 60 {
+        format!("{secs}s")
+    } else if secs < 3600 {
+        format!("{}m {}s", secs / 60, secs % 60)
+    } else if secs < 86_400 {
+        format!("{}h {}m", secs / 3600, (secs % 3600) / 60)
+    } else {
+        format!("{}d {}h", secs / 86_400, (secs % 86_400) / 3600)
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn json_report(
+    report: Report,
+    spool: SpoolHealth,
+    journal_pending: usize,
+    journal_degraded: usize,
+    journal_finish_failed: usize,
+    journal_error: Option<String>,
+    capture_mode: &str,
+    endpoint: &ServerEndpoint,
+    auth_posture: crate::local_auth::AuthPosture,
+    windows_logon: Option<&super::user_service::MissingLogonBinary>,
+) -> serde_json::Value {
+    let mut value = serde_json::json!({
+        "version": report.version,
+        "data_dir": report.data_dir,
+        "bind": report.bind,
+        "db_path": report.db_path,
+        "counts": {
+            "pages_latest": report.counts.pages_latest,
+            "pages_all": report.counts.pages_all,
+            "sessions": report.counts.sessions,
+            "observations": report.counts.observations,
+        },
+        "derived": report.derived,
+        "storage": report.storage,
+        "providers": report.providers,
+        "spool": spool,
+        "recovery": {
+            "journal_pending": journal_pending,
+            "degraded_runs": journal_degraded,
+            "finish_failed_runs": journal_finish_failed,
+            "journal_error": journal_error,
+        },
+        "capture_mode": capture_mode,
+        "ingest": report.ingest,
+        "client": { "server_url": endpoint.url, "auth": endpoint.auth_token.is_some() },
+        "auth_posture": { "posture": auth_posture, "fix": auth_posture.fix() },
+    });
+    // Absent when there is nothing to say, so the shape consumers read is
+    // unchanged.
+    if let Some(problem) = windows_logon {
+        value["windows_logon"] = serde_json::json!(problem);
+    }
+    value
+}
+
+fn provider_health_line(role: &ProviderRoleHealthSnapshot) -> String {
+    match role.status {
+        ProviderHealthStatus::Disabled => "disabled".to_string(),
+        ProviderHealthStatus::Unknown => {
+            format!("{} unknown (no calls yet)", provider_label(role))
+        }
+        ProviderHealthStatus::Ok => {
+            let when = role
+                .last_call_at
+                .as_ref()
+                .map(ToString::to_string)
+                .unwrap_or_else(|| "unknown time".to_string());
+            format!("{} ok (last call: {when})", provider_label(role))
+        }
+        ProviderHealthStatus::Error => {
+            let detail = error_detail(role);
+            format!("{} error ({detail})", provider_label(role))
+        }
+    }
+}
+
+fn provider_label(role: &ProviderRoleHealthSnapshot) -> String {
+    match (&role.provider, &role.model, role.dim) {
+        (Some(provider), Some(model), Some(dim)) => format!("{provider}/{model} ({dim}d)"),
+        (Some(provider), Some(model), None) => format!("{provider}/{model}"),
+        (Some(provider), None, _) => provider.clone(),
+        _ => "provider".to_string(),
+    }
+}
+
+fn error_detail(role: &ProviderRoleHealthSnapshot) -> String {
+    let mut parts = Vec::new();
+    if let Some(status) = role.last_error_status {
+        parts.push(format!("status {status}"));
+    }
+    if let Some(message) = &role.last_error_message
+        && !message.is_empty()
+    {
+        parts.push(message.clone());
+    }
+    if let Some(when) = &role.last_error_at {
+        parts.push(format!("last error: {when}"));
+    }
+    if parts.is_empty() {
+        "last call failed".to_string()
+    } else {
+        parts.join("; ")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn status_json_keeps_existing_fields_and_adds_recovery_compatibly() {
+        let report_json = serde_json::json!({
+            "version": "2.6.0",
+            "data_dir": "/data",
+            "bind": "127.0.0.1:49374",
+            "db_path": "/data/db/memory.sqlite",
+            "counts": {"pages_latest": 1, "pages_all": 2, "sessions": 3, "observations": 4},
+            "derived": {
+                "pages_rows": 0, "pages_fts_rows": 0,
+                "observations_rows": 0, "observations_fts_rows": 0,
+                "latest_pages_missing_embeddings": 0,
+                "embedding_rows": 0, "embedding_triples": [],
+                "links_from_latest_pages": 0,
+                "unresolved_links_from_latest_pages": 0,
+                "stale_links_from_latest_pages": 0
+            },
+            "storage": {
+                "page_size": 0, "page_count": 0, "freelist_count": 0,
+                "database_bytes": 0, "reclaimable_bytes": 0
+            },
+            "providers": ProviderHealthSnapshot::default(),
+            "ingest": null,
+            "write_queue": null,
+            "wiki_format": null
+        });
+        let report: Report = serde_json::from_value(report_json.clone()).unwrap();
+        let endpoint = ServerEndpoint::from_pair(Some("http://127.0.0.1:49374".into()), None);
+        let value = json_report(
+            report,
+            SpoolHealth::default(),
+            2,
+            1,
+            1,
+            None,
+            "denylist",
+            &endpoint,
+            crate::local_auth::AuthPosture::NoneLoopback,
+            None,
+        );
+        assert!(value.get("windows_logon").is_none(), "{value}");
+        assert_eq!(value["auth_posture"]["posture"], "none_loopback");
+        assert_eq!(value["auth_posture"]["fix"], "ai-memory auth enable");
+        for key in [
+            "version",
+            "data_dir",
+            "bind",
+            "db_path",
+            "counts",
+            "derived",
+            "storage",
+            "providers",
+            "spool",
+            "capture_mode",
+            "ingest",
+            "client",
+        ] {
+            assert!(value.get(key).is_some(), "missing legacy status key {key}");
+        }
+        assert_eq!(value["recovery"]["journal_pending"], 2);
+        assert_eq!(value["counts"]["observations"], 4);
+
+        // A missing logon binary (#1280) adds one key and changes no other.
+        let problem = super::super::user_service::MissingLogonBinary {
+            classification: super::super::user_service::LOGON_BINARY_MISSING,
+            executable: r"C:\bin\ai-memory.exe".into(),
+            detail: "gone".into(),
+            fix: "restore it",
+        };
+        let warned = json_report(
+            serde_json::from_value(report_json).unwrap(),
+            SpoolHealth::default(),
+            2,
+            1,
+            1,
+            None,
+            "denylist",
+            &endpoint,
+            crate::local_auth::AuthPosture::NoneLoopback,
+            Some(&problem),
+        );
+        assert_eq!(
+            warned["windows_logon"]["classification"],
+            "logon_binary_missing"
+        );
+        assert_eq!(
+            warned["windows_logon"]["executable"],
+            r"C:\bin\ai-memory.exe"
+        );
+        assert_eq!(warned["windows_logon"]["fix"], "restore it");
+        let mut without = warned.clone();
+        without.as_object_mut().unwrap().remove("windows_logon");
+        assert_eq!(without, value);
+    }
+
+    #[test]
+    fn ingest_additions_default_for_older_servers_and_roundtrip() {
+        let old = serde_json::json!({"accepted": 2, "dropped_by_policy": 1, "shed_saturated": 0, "shed_rate_limited": 0, "last_persisted_ms": null});
+        let report: IngestReport = serde_json::from_value(old).unwrap();
+        let mut value = serde_json::to_value(report).unwrap();
+        for name in [
+            "stored",
+            "replayed",
+            "resumed",
+            "ignored_end",
+            "dropped_unauthorized",
+            "dropped_collision",
+            "dropped_invalid",
+            "failed",
+        ] {
+            assert_eq!(value[name], 0);
+            value[name] = serde_json::json!(7);
+        }
+        let current: IngestReport = serde_json::from_value(value.clone()).unwrap();
+        assert_eq!(serde_json::to_value(current).unwrap(), value);
+    }
+
+    /// #428's counters and #446's gate compose into a trap: under allowlist
+    /// mode an unmarked repository never sends, so `accepted: 0` with an empty
+    /// spool looks exactly like a broken install. `status` must be able to say
+    /// which of the two it is. Resolved from the same file the hook enforces
+    /// from, so the two cannot drift.
+    #[test]
+    fn capture_mode_defaults_to_denylist_when_unset() {
+        let tmp = tempfile::tempdir().unwrap();
+        assert_eq!(resolve_capture_mode(tmp.path()), "denylist");
+    }
+
+    #[test]
+    fn capture_mode_reports_allowlist_when_the_hook_would_enforce_it() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(
+            tmp.path().join(crate::commands::hook::CAPTURE_MODE_FILE),
+            "allowlist\n",
+        )
+        .unwrap();
+        assert_eq!(resolve_capture_mode(tmp.path()), "allowlist");
+        // The status reader and the hook enforcer must agree.
+        assert_eq!(
+            crate::commands::hook::CAPTURE_MODE_FILE,
+            "capture-mode",
+            "status reads the file the hook enforces from"
+        );
+    }
+    use jiff::Timestamp;
+
+    /// The offline path must be readable and, critically, must not write the
+    /// spool object to stdout in `--json` mode: consumers there expect one
+    /// object and this call exits non-zero anyway.
+    #[test]
+    fn offline_spool_report_is_content_free_and_serialises() {
+        let spool = SpoolHealth {
+            pending: 2,
+            oldest_age_ms: Some(900_000),
+            retries_total: 4,
+            ..SpoolHealth::default()
+        };
+        let rendered = serde_json::to_string(&spool).expect("SpoolHealth serialises");
+        assert_eq!(
+            rendered,
+            r#"{"pending":2,"oldest_age_ms":900000,"retries_total":4,"capacity":3}"#
+        );
+        // The shape is the contract: counts and ages only. If a field
+        // carrying captured text is ever added, this fails loudly.
+        let value: serde_json::Value = serde_json::from_str(&rendered).unwrap();
+        let keys: Vec<_> = value.as_object().unwrap().keys().cloned().collect();
+        assert_eq!(
+            keys,
+            vec!["pending", "oldest_age_ms", "retries_total", "capacity"]
+        );
+
+        // Both render paths must tolerate an empty spool.
+        report_offline_spool(&SpoolHealth::default(), false);
+        report_offline_spool(&SpoolHealth::default(), true);
+        report_offline_spool(&spool, false);
+        report_offline_spool(&spool, true);
+    }
+
+    /// A pre-#629 server's `/admin/status` response has no
+    /// `data_dir_free_bytes` key at all; the field must default to `None`
+    /// rather than fail the whole `storage` object.
+    #[test]
+    fn storage_deserializes_without_free_space_from_an_older_server() {
+        let storage: Storage = serde_json::from_str(
+            r#"{"page_size":4096,"page_count":10,"freelist_count":0,
+                "database_bytes":40960,"reclaimable_bytes":0}"#,
+        )
+        .unwrap();
+        assert_eq!(storage.data_dir_free_bytes, None);
+    }
+
+    /// The signal #629 adds: once a server reports free space, it round-trips
+    /// through the CLI's own struct unchanged.
+    #[test]
+    fn storage_deserializes_free_space_from_a_current_server() {
+        let storage: Storage = serde_json::from_str(
+            r#"{"page_size":4096,"page_count":10,"freelist_count":0,
+                "database_bytes":40960,"reclaimable_bytes":0,
+                "data_dir_free_bytes":80740352}"#,
+        )
+        .unwrap();
+        assert_eq!(storage.data_dir_free_bytes, Some(80_740_352));
+    }
+
+    #[test]
+    fn provider_health_line_renders_unknown_and_disabled() {
+        assert_eq!(
+            provider_health_line(&ProviderRoleHealthSnapshot::default()),
+            "disabled"
+        );
+
+        let role = ProviderRoleHealthSnapshot {
+            status: ProviderHealthStatus::Unknown,
+            provider: Some("openai".to_string()),
+            model: Some("gpt-5.5".to_string()),
+            ..ProviderRoleHealthSnapshot::default()
+        };
+        assert_eq!(
+            provider_health_line(&role),
+            "openai/gpt-5.5 unknown (no calls yet)"
+        );
+    }
+
+    #[test]
+    fn provider_health_line_renders_error_details() {
+        let when = "2026-05-28T12:00:00Z".parse::<Timestamp>().unwrap();
+        let role = ProviderRoleHealthSnapshot {
+            status: ProviderHealthStatus::Error,
+            provider: Some("anthropic-oauth".to_string()),
+            model: Some("claude-sonnet-4-6".to_string()),
+            last_error_at: Some(when),
+            last_error_status: Some(401),
+            last_error_message: Some("bad token".to_string()),
+            ..ProviderRoleHealthSnapshot::default()
+        };
+
+        assert!(provider_health_line(&role).contains("anthropic-oauth/claude-sonnet-4-6 error"));
+        assert!(provider_health_line(&role).contains("status 401"));
+        assert!(provider_health_line(&role).contains("bad token"));
+    }
+
+    #[test]
+    fn fallback_candidate_line_marks_the_last_selected_candidate() {
+        let candidate = ai_memory_llm::CandidateHealth {
+            provider: "gemini".to_string(),
+            model: "gemini-3.5-flash".to_string(),
+            last_selected: true,
+            last_success_at: Some("2026-05-28T12:00:00Z".parse::<Timestamp>().unwrap()),
+            last_error_at: None,
+            last_error_status: None,
+            last_error_class: None,
+            circuit_open_until: None,
+        };
+        let line = fallback_candidate_line(&candidate);
+        assert!(line.contains("gemini/gemini-3.5-flash"));
+        assert!(line.contains("last selected"));
+    }
+
+    #[test]
+    fn fallback_candidate_line_surfaces_an_open_circuit_over_a_stale_error() {
+        let when = "2026-05-28T12:00:30Z".parse::<Timestamp>().unwrap();
+        let candidate = ai_memory_llm::CandidateHealth {
+            provider: "openai-compat".to_string(),
+            model: "local-router".to_string(),
+            last_selected: false,
+            last_success_at: None,
+            last_error_at: Some(when),
+            last_error_status: Some(503),
+            last_error_class: Some("provider".to_string()),
+            circuit_open_until: Some(when),
+        };
+        let line = fallback_candidate_line(&candidate);
+        assert!(line.contains("openai-compat/local-router"));
+        assert!(line.contains("circuit open until"));
+        assert!(!line.contains("last error"));
+    }
+
+    /// A `Config` whose data dir is `dir`, so the journal read under test
+    /// hits a temp dir rather than the developer's real install.
+    fn config_for(dir: &std::path::Path) -> Config {
+        Config {
+            data_dir: dir.to_path_buf(),
+            ..Config::default()
+        }
+    }
+
+    #[test]
+    fn offline_recovery_hint_reports_an_unreadable_journal_to_humans() {
+        let temp = tempfile::tempdir().unwrap();
+        std::fs::write(
+            super::super::recovery::journal_path(temp.path()),
+            b"not json",
+        )
+        .unwrap();
+        let lines =
+            offline_recovery_hint_lines(&config_for(temp.path()), &SpoolHealth::default(), false);
+        let rendered = lines.join("\n");
+        assert!(
+            rendered.contains("error:"),
+            "an unreadable journal must be named, not reported as `0 journaled`: {rendered}"
+        );
+        assert!(
+            rendered.contains("recovery-journal.json"),
+            "the error must say which file failed: {rendered}"
+        );
+    }
+
+    #[test]
+    fn offline_recovery_hint_json_reports_an_unreadable_journal() {
+        let temp = tempfile::tempdir().unwrap();
+        std::fs::write(
+            super::super::recovery::journal_path(temp.path()),
+            b"not json",
+        )
+        .unwrap();
+        let lines =
+            offline_recovery_hint_lines(&config_for(temp.path()), &SpoolHealth::default(), true);
+        assert_eq!(lines.len(), 1, "{lines:?}");
+        let payload = lines[0].split_once(": ").expect("prefix then object").1;
+        let value: serde_json::Value = serde_json::from_str(payload).unwrap();
+        assert_eq!(value["journal_pending"], 0);
+        assert!(
+            value["journal_error"].is_string(),
+            "a monitoring consumer must not read `journal_pending: 0` as an \
+             all-clear while the journal is unreadable: {value}"
+        );
+    }
+
+    #[test]
+    fn offline_recovery_hint_stays_quiet_on_a_healthy_install() {
+        let temp = tempfile::tempdir().unwrap();
+        for json in [false, true] {
+            assert!(
+                offline_recovery_hint_lines(
+                    &config_for(temp.path()),
+                    &SpoolHealth::default(),
+                    json
+                )
+                .is_empty(),
+                "nothing queued and no journal error must print nothing (json={json})"
+            );
+        }
+    }
+
+    #[test]
+    fn spool_age_line_renders_durations_and_empty() {
+        assert_eq!(spool_age_line(None), "-");
+        assert_eq!(spool_age_line(Some(0)), "0s");
+        assert_eq!(spool_age_line(Some(59_999)), "59s");
+        assert_eq!(spool_age_line(Some(60_000)), "1m 0s");
+        assert_eq!(spool_age_line(Some(3_661_000)), "1h 1m");
+        assert_eq!(spool_age_line(Some(172_800_000)), "2d 0h");
+    }
+}

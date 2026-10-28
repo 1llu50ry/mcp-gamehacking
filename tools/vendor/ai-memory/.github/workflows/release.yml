@@ -1,0 +1,769 @@
+name: release
+
+# Triggered when a version tag is pushed, e.g. git push origin v0.3.2.
+# Builds native Linux/macOS release tarballs plus the Windows zip, creates the
+# GitHub Release, and pushes the Docker image to Docker Hub with both the
+# version tag and `latest` when Docker Hub credentials are configured. Docker
+# images reuse the native Linux release artifacts instead of recompiling in
+# Docker.
+#
+# Optional publish secrets (set in repo Settings → Secrets and variables → Actions):
+#   DOCKERHUB_USERNAME  — Docker Hub account name
+#   DOCKERHUB_TOKEN     — Docker Hub access token (read/write)
+#   AUR_SSH_PRIVATE_KEY — private key for an AUR account with maintainer access
+#
+# The CI workflow already validates the binary and package assets
+# (fmt / clippy / test / native-packaging). This workflow assumes CI
+# passed on the same commit and only performs release publication.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: read
+
+jobs:
+  validate-version:
+    name: validate release version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - id: version
+        run: |
+          set -euo pipefail
+          tag_version="${GITHUB_REF_NAME#v}"
+          manifest_version="$(awk -F ' *= *' '
+            /^\[workspace.package\]$/ { in_workspace_package = 1; next }
+            /^\[/ { in_workspace_package = 0 }
+            in_workspace_package && $1 == "version" {
+              gsub(/"/, "", $2);
+              print $2;
+              exit;
+            }
+          ' Cargo.toml)"
+          if [ -z "$manifest_version" ]; then
+            echo "could not read [workspace.package].version from Cargo.toml" >&2
+            exit 1
+          fi
+          if [ "$tag_version" != "$manifest_version" ]; then
+            echo "tag version v${tag_version} does not match Cargo.toml version ${manifest_version}" >&2
+            exit 1
+          fi
+          # bin/release re-renders the marketplace plugins with the bump, so
+          # the tag's catalogs point at the tag itself (#1166).
+          for manifest in plugins/claude-code/.claude-plugin/plugin.json plugins/codex/.codex-plugin/plugin.json; do
+            plugin_version="$(jq -r .version "$manifest")"
+            if [ "$plugin_version" != "$tag_version" ]; then
+              echo "$manifest has version ${plugin_version}, expected ${tag_version}; re-run render-plugins" >&2
+              exit 1
+            fi
+          done
+          for catalog in .claude-plugin/marketplace.json .agents/plugins/marketplace.json; do
+            # A missing catalog or an empty plugin list would leave the loop
+            # below nothing to check, so refuse both before reading refs.
+            if ! jq -e '.plugins | length > 0' "$catalog" >/dev/null; then
+              echo "$catalog is missing or lists no plugins; re-run render-plugins" >&2
+              exit 1
+            fi
+            refs="$(jq -r '.plugins[].source.ref' "$catalog")"
+            for ref in $refs; do
+              if [ "$ref" != "v${tag_version}" ]; then
+                echo "$catalog points at ${ref}, expected v${tag_version}; re-run render-plugins" >&2
+                exit 1
+              fi
+            done
+          done
+          echo "version=${tag_version}" >> "$GITHUB_OUTPUT"
+
+  binary:
+    name: linux ${{ matrix.arch }} binary
+    needs: validate-version
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            artifact: ai-memory-linux-x86_64
+            runner: ubuntu-22.04
+          - arch: aarch64
+            artifact: ai-memory-linux-aarch64
+            runner: ubuntu-22.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # 1.95
+        with:
+          toolchain: "1.95"
+
+      - uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16 # v2
+
+      - name: Build release binary
+        run: cargo build --locked --release -p ai-memory-cli
+
+      - name: Create release tarball
+        env:
+          RELEASE_ARTIFACT: ${{ matrix.artifact }}
+        run: |
+          artifact="$RELEASE_ARTIFACT"
+          mkdir -p "dist/$artifact"
+          cp target/release/ai-memory "dist/$artifact/ai-memory"
+          cp -a hooks "dist/$artifact/hooks"
+          mkdir -p "dist/$artifact/packaging"
+          cp -a packaging/systemd "dist/$artifact/packaging/systemd"
+          cp -a packaging/sysusers "dist/$artifact/packaging/sysusers"
+          cp -a packaging/tmpfiles "dist/$artifact/packaging/tmpfiles"
+          cp -a packaging/env "dist/$artifact/packaging/env"
+          mkdir -p "dist/$artifact/crates/ai-memory-cli/templates"
+          cp crates/ai-memory-cli/templates/config.default.toml \
+            "dist/$artifact/crates/ai-memory-cli/templates/config.default.toml"
+          mkdir -p "dist/$artifact/docs"
+          cp README.md LICENSE "dist/$artifact/"
+          cp docs/install.md "dist/$artifact/docs/install.md"
+          COPYFILE_DISABLE=1 tar -C "dist/$artifact" -czf "$artifact.tar.gz" .
+          sha256sum "$artifact.tar.gz" > "$artifact.tar.gz.sha256"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            ${{ matrix.artifact }}.tar.gz
+            ${{ matrix.artifact }}.tar.gz.sha256
+
+  macos:
+    name: macos ${{ matrix.arch }} binary
+    needs: validate-version
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: aarch64
+            artifact: ai-memory-macos-aarch64
+            runner: macos-15
+          - arch: x86_64
+            artifact: ai-memory-macos-x86_64
+            runner: macos-15-intel
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # 1.95
+        with:
+          toolchain: "1.95"
+
+      - uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16 # v2
+
+      - name: Build release binary
+        run: cargo build --locked --release -p ai-memory-cli
+
+      # Mirrors the Linux tarball, swapping the Linux-only service assets
+      # (packaging/systemd|sysusers|tmpfiles|env) for the macOS-only
+      # packaging/launchd agent. macOS users get the binary, hooks bundle,
+      # default config template, and the docs a macOS user needs
+      # (install.md + macos.md).
+      - name: Create release tarball
+        env:
+          RELEASE_ARTIFACT: ${{ matrix.artifact }}
+        run: |
+          set -euo pipefail
+          artifact="$RELEASE_ARTIFACT"
+          mkdir -p "dist/$artifact"
+          cp target/release/ai-memory "dist/$artifact/ai-memory"
+          cp -a hooks "dist/$artifact/hooks"
+          mkdir -p "dist/$artifact/packaging"
+          cp -a packaging/launchd "dist/$artifact/packaging/launchd"
+          mkdir -p "dist/$artifact/crates/ai-memory-cli/templates"
+          cp crates/ai-memory-cli/templates/config.default.toml \
+            "dist/$artifact/crates/ai-memory-cli/templates/config.default.toml"
+          mkdir -p "dist/$artifact/docs"
+          cp README.md LICENSE "dist/$artifact/"
+          cp docs/install.md "dist/$artifact/docs/install.md"
+          cp docs/macos.md "dist/$artifact/docs/macos.md"
+          COPYFILE_DISABLE=1 tar -C "dist/$artifact" -czf "$artifact.tar.gz" .
+          shasum -a 256 "$artifact.tar.gz" > "$artifact.tar.gz.sha256"
+
+      - name: Smoke test release tarball
+        env:
+          RELEASE_ARTIFACT: ${{ matrix.artifact }}
+        run: |
+          set -euo pipefail
+          artifact="$RELEASE_ARTIFACT"
+          smoke="dist/smoke-$artifact"
+          mkdir -p "$smoke"
+          tar -xzf "$artifact.tar.gz" -C "$smoke"
+          "$smoke/ai-memory" --version
+          for path in \
+            hooks \
+            packaging/launchd/com.github.akitaonrails.ai-memory.plist \
+            crates/ai-memory-cli/templates/config.default.toml \
+            docs/install.md \
+            docs/macos.md \
+            README.md \
+            LICENSE
+          do
+            test -e "$smoke/$path" || { echo "macOS release tarball missing $path" >&2; exit 1; }
+          done
+          grep -Eq "^[0-9a-f]{64}  $artifact\.tar\.gz$" "$artifact.tar.gz.sha256"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            ${{ matrix.artifact }}.tar.gz
+            ${{ matrix.artifact }}.tar.gz.sha256
+
+  windows:
+    name: windows x86_64 binary
+    needs: validate-version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # 1.95
+        with:
+          toolchain: "1.95"
+
+      - uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16 # v2
+
+      - name: Build release binary
+        run: cargo build --locked --release -p ai-memory-cli
+
+      # Mirrors the Linux tarball, minus the Linux-only service assets
+      # (packaging/systemd|sysusers|tmpfiles|env). Ships the `.exe`, the full
+      # hooks bundle (the .ps1 + .sh scripts), the default config template, and
+      # the docs a Windows user needs (install.md + windows.md). Zipped (native
+      # Windows archive) with a sha256sum-format checksum so the release body's
+      # checksums block stays uniform across platforms.
+      - name: Create release zip
+        shell: pwsh
+        env:
+          RELEASE_ARTIFACT: ai-memory-windows-x86_64
+        run: |
+          $artifact = $env:RELEASE_ARTIFACT
+          $stage = "dist/$artifact"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item target/release/ai-memory.exe "$stage/ai-memory.exe"
+          Copy-Item -Recurse hooks "$stage/hooks"
+          New-Item -ItemType Directory -Force -Path "$stage/crates/ai-memory-cli/templates" | Out-Null
+          Copy-Item crates/ai-memory-cli/templates/config.default.toml `
+            "$stage/crates/ai-memory-cli/templates/config.default.toml"
+          New-Item -ItemType Directory -Force -Path "$stage/docs" | Out-Null
+          Copy-Item README.md, LICENSE $stage
+          Copy-Item docs/install.md "$stage/docs/install.md"
+          Copy-Item docs/windows.md "$stage/docs/windows.md"
+          $zip = "$artifact.zip"
+          # Pipe the staged items in (rather than a "$stage/*" glob) so the
+          # archive is rooted at the files themselves — ai-memory.exe, hooks/,
+          # etc. land at the zip root, mirroring the Linux tarball layout.
+          Get-ChildItem $stage | Compress-Archive -DestinationPath $zip
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          # -NoNewline plus an explicit `n, because Out-File's own line
+          # terminator is CRLF on Windows. `sha256sum -c` treats the CR as part
+          # of the filename and fails with "No such file or directory", and the
+          # release body concatenates every platform's file into one block, so
+          # the stray byte shows up there too.
+          "$hash  $zip`n" | Out-File -Encoding ascii -NoNewline "$zip.sha256"
+
+      - name: Smoke test release zip
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $zip = "ai-memory-windows-x86_64.zip"
+          $smoke = "dist/smoke-windows-zip"
+          Expand-Archive $zip -DestinationPath $smoke -Force
+          & "$smoke/ai-memory.exe" --version
+          foreach ($path in @(
+            "hooks",
+            "crates/ai-memory-cli/templates/config.default.toml",
+            "docs/install.md",
+            "docs/windows.md",
+            "README.md",
+            "LICENSE"
+          )) {
+            if (-not (Test-Path "$smoke/$path")) {
+              throw "Windows release zip missing $path"
+            }
+          }
+          $checksum = Get-Content "$zip.sha256" -Raw
+          if ($checksum -cnotmatch '^[0-9a-f]{64}  ai-memory-windows-x86_64\.zip\n$') {
+            throw "Windows release zip checksum is not sha256sum format"
+          }
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ai-memory-windows-x86_64
+          path: |
+            ai-memory-windows-x86_64.zip
+            ai-memory-windows-x86_64.zip.sha256
+
+  # Gate the publish on the Docker Hub secrets actually being present, so a
+  # fresh clone (or a fork) doesn't get a red failing run on every tag. The
+  # docker job activates automatically once DOCKERHUB_USERNAME + _TOKEN are
+  # set in repo Settings → Secrets and variables → Actions. Same idea for AUR:
+  # publishing activates only when AUR_SSH_PRIVATE_KEY is configured.
+  check-secrets:
+    name: check publish credentials
+    runs-on: ubuntu-latest
+    outputs:
+      docker_enabled: ${{ steps.check.outputs.docker_enabled }}
+      aur_enabled: ${{ steps.check.outputs.aur_enabled }}
+    steps:
+      - id: check
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        run: |
+          if [ -n "$DOCKERHUB_TOKEN" ] && [ -n "$DOCKERHUB_USERNAME" ]; then
+            echo "docker_enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "docker_enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::DOCKERHUB_USERNAME / DOCKERHUB_TOKEN not set — skipping image publish. Add them in repo Settings → Secrets and variables → Actions to enable tag-triggered publishing."
+          fi
+
+          if [ -n "$AUR_SSH_PRIVATE_KEY" ]; then
+            echo "aur_enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "aur_enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::AUR_SSH_PRIVATE_KEY not set — skipping AUR publish."
+          fi
+
+  docker-amd64:
+    name: docker amd64 image
+    needs: [binary, check-secrets, validate-version]
+    if: needs.check-secrets.outputs.docker_enabled == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ai-memory-linux-x86_64
+          path: artifacts
+
+      - name: Unpack prebuilt amd64 binary
+        run: |
+          set -euo pipefail
+          mkdir -p dist/docker/ai-memory-linux-x86_64
+          tar -xzf artifacts/ai-memory-linux-x86_64.tar.gz \
+            -C dist/docker/ai-memory-linux-x86_64
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push amd64 image by digest
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: runtime-prebuilt-amd64
+          platforms: linux/amd64
+          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+          provenance: false
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/ai-memory
+
+      - name: Export amd64 digest
+        run: |
+          set -euo pipefail
+          digest="${{ steps.build.outputs.digest }}"
+          if [ -z "$digest" ]; then
+            echo "docker build did not return an amd64 digest" >&2
+            exit 1
+          fi
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: docker-digest-amd64
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  docker-arm64:
+    name: docker arm64 image
+    needs: [binary, check-secrets, validate-version]
+    if: needs.check-secrets.outputs.docker_enabled == 'true'
+    runs-on: ubuntu-22.04-arm
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ai-memory-linux-aarch64
+          path: artifacts
+
+      - name: Unpack prebuilt arm64 binary
+        run: |
+          set -euo pipefail
+          mkdir -p dist/docker/ai-memory-linux-aarch64
+          tar -xzf artifacts/ai-memory-linux-aarch64.tar.gz \
+            -C dist/docker/ai-memory-linux-aarch64
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push arm64 image by digest
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: runtime-prebuilt-arm64
+          platforms: linux/arm64
+          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+          provenance: false
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/ai-memory
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Export arm64 digest
+        run: |
+          set -euo pipefail
+          digest="${{ steps.build.outputs.digest }}"
+          if [ -z "$digest" ]; then
+            echo "docker build did not return an arm64 digest" >&2
+            exit 1
+          fi
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: docker-digest-arm64
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  docker-manifest:
+    name: docker manifest + smoke
+    needs: [check-secrets, docker-amd64, docker-arm64, validate-version]
+    if: needs.check-secrets.outputs.docker_enabled == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: docker-digest-*
+          path: /tmp/digests
+          merge-multiple: true
+
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
+        with:
+          platforms: arm64
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Publish multi-arch manifest
+        run: |
+          set -euo pipefail
+          image="${{ secrets.DOCKERHUB_USERNAME }}/ai-memory"
+          refs=()
+          for digest_file in /tmp/digests/*; do
+            refs+=("${image}@sha256:$(basename "$digest_file")")
+          done
+          if [ "${#refs[@]}" -ne 2 ]; then
+            echo "expected 2 image digests, found ${#refs[@]}" >&2
+            exit 1
+          fi
+          docker buildx imagetools create \
+            -t "${image}:latest" \
+            -t "${image}:${{ needs.validate-version.outputs.version }}" \
+            "${refs[@]}"
+
+      - name: Smoke test the published image
+        run: |
+          set -euo pipefail
+          image="${{ secrets.DOCKERHUB_USERNAME }}/ai-memory:${{ needs.validate-version.outputs.version }}"
+          for platform in linux/amd64 linux/arm64; do
+            docker pull --platform "$platform" "$image"
+            docker run --rm --platform "$platform" "$image" --version
+          done
+
+  github-release:
+    name: github release
+    needs: [binary, macos, windows, rpm, validate-version]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: ai-memory-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Stage checksum-verified wrapper assets
+        run: |
+          set -euo pipefail
+          install -m 0755 bin/ai-memory artifacts/ai-memory-wrapper
+          install -m 0644 bin/ai-memory.ps1 artifacts/ai-memory-wrapper.ps1
+          install -m 0644 bin/ai-memory.cmd artifacts/ai-memory-wrapper.cmd
+          (
+            cd artifacts
+            sha256sum ai-memory-wrapper > ai-memory-wrapper.sha256
+            sha256sum ai-memory-wrapper.ps1 > ai-memory-wrapper.ps1.sha256
+            sha256sum ai-memory-wrapper.cmd > ai-memory-wrapper.cmd.sha256
+          )
+
+      - name: Stage checksum-verified hook installer assets
+        run: |
+          set -euo pipefail
+          install -m 0755 scripts/install-hooks.sh artifacts/ai-memory-install-hooks
+          tar -czf artifacts/ai-memory-hooks.tar.gz hooks
+          (
+            cd artifacts
+            sha256sum ai-memory-install-hooks > ai-memory-install-hooks.sha256
+            sha256sum ai-memory-hooks.tar.gz > ai-memory-hooks.tar.gz.sha256
+          )
+
+      # For Customize > Plugins > Upload plugin in the Claude desktop app and
+      # Cowork: the plugin directory itself, launcher mode included.
+      - name: Stage the Claude Code plugin zip
+        run: |
+          set -euo pipefail
+          (cd plugins/claude-code && zip -qrX "$GITHUB_WORKSPACE/artifacts/ai-memory-claude-plugin.zip" .)
+          (
+            cd artifacts
+            sha256sum ai-memory-claude-plugin.zip > ai-memory-claude-plugin.zip.sha256
+          )
+
+      - name: Stage checksum-verified install scripts
+        run: |
+          set -euo pipefail
+          install -m 0755 install.sh artifacts/install.sh
+          install -m 0644 install.ps1 artifacts/install.ps1
+          (
+            cd artifacts
+            sha256sum install.sh > install.sh.sha256
+            sha256sum install.ps1 > install.ps1.sha256
+          )
+
+      - name: Generate release body
+        run: |
+          echo "## Checksums (SHA256)" > body.md
+          echo '```' >> body.md
+          cat artifacts/*.sha256 >> body.md
+          echo '```' >> body.md
+          echo "" >> body.md
+          echo "## Install" >> body.md
+          echo '```bash' >> body.md
+          echo "# Linux/macOS, no root: checksum-verified release binary under ~/.local, then one-step setup" >> body.md
+          echo "curl -fsSL https://github.com/akitaonrails/ai-memory/releases/download/${GITHUB_REF_NAME}/install.sh | AI_MEMORY_VERSION=${{ needs.validate-version.outputs.version }} sh" >> body.md
+          echo "ai-memory setup" >> body.md
+          echo "" >> body.md
+          echo "# Arch Linux (AUR)" >> body.md
+          echo "yay -S ai-memory-bin      # prebuilt Linux x86_64/aarch64 binary" >> body.md
+          echo "yay -S ai-memory          # builds from source" >> body.md
+          echo "" >> body.md
+          echo "# Fedora: download the matching RPM below, then run sudo dnf install ./ai-memory-<version>-1.<arch>.rpm" >> body.md
+          echo "" >> body.md
+          echo "# Docker" >> body.md
+          echo "docker pull akitaonrails/ai-memory:${{ needs.validate-version.outputs.version }}" >> body.md
+          echo "" >> body.md
+          echo "# macOS aarch64/x86_64 (no toolchain): download the matching ai-memory-macos-<arch>.tar.gz below," >> body.md
+          echo "# extract it, and follow the bundled docs/macos.md." >> body.md
+          echo "" >> body.md
+          echo "# Windows x86_64, no admin (PowerShell): checksum-verified release under %LOCALAPPDATA%\\Programs, then one-step setup" >> body.md
+          echo "\$env:AI_MEMORY_VERSION='${{ needs.validate-version.outputs.version }}'; irm https://github.com/akitaonrails/ai-memory/releases/download/${GITHUB_REF_NAME}/install.ps1 | iex" >> body.md
+          echo "ai-memory setup" >> body.md
+          echo "" >> body.md
+          echo "# From source" >> body.md
+          echo "cargo install --locked --git https://github.com/akitaonrails/ai-memory --tag ${GITHUB_REF_NAME}" >> body.md
+          echo '```' >> body.md
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" artifacts/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file body.md \
+            --latest
+
+  aur:
+    name: aur publish
+    needs: [check-secrets, github-release, validate-version]
+    if: needs.check-secrets.outputs.aur_enabled == 'true'
+    runs-on: ubuntu-latest
+    container: archlinux@sha256:3406a568f45d68f0bef35dc80b3eacec8bda59b0292b2e50d5932ba1667f20cf # latest, 2026-07-27
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: ai-memory-linux-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Install AUR publish tools
+        run: pacman -Syu --noconfirm --needed base-devel curl git openssh
+
+      - name: Publish ai-memory AUR packages
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          VERSION: ${{ needs.validate-version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          version="$VERSION"
+          source_sha="$(curl -fsSL "https://github.com/akitaonrails/ai-memory/archive/refs/tags/v${version}.tar.gz" | sha256sum | awk '{print $1}')"
+          bin_x86_sha="$(sha256sum artifacts/ai-memory-linux-x86_64.tar.gz | awk '{print $1}')"
+          bin_arm_sha="$(sha256sum artifacts/ai-memory-linux-aarch64.tar.gz | awk '{print $1}')"
+
+          useradd -m aurbuild
+          chown -R aurbuild:aurbuild "$GITHUB_WORKSPACE"
+          install -d -m 0700 -o aurbuild -g aurbuild /home/aurbuild/.ssh
+          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > /home/aurbuild/.ssh/aur
+          chmod 0600 /home/aurbuild/.ssh/aur
+          chown aurbuild:aurbuild /home/aurbuild/.ssh/aur
+          ssh-keyscan aur.archlinux.org > /home/aurbuild/.ssh/known_hosts
+          chown aurbuild:aurbuild /home/aurbuild/.ssh/known_hosts
+          cat >/home/aurbuild/.ssh/config <<'EOF'
+          Host aur.archlinux.org
+            HostName aur.archlinux.org
+            User aur
+            IdentityFile /home/aurbuild/.ssh/aur
+            IdentitiesOnly yes
+          EOF
+          chown aurbuild:aurbuild /home/aurbuild/.ssh/config
+          chmod 0600 /home/aurbuild/.ssh/config
+
+          runuser -u aurbuild -- env \
+            HOME=/home/aurbuild \
+            GIT_SSH_COMMAND='ssh -F /home/aurbuild/.ssh/config' \
+            bash -s -- "$version" "$source_sha" "$bin_x86_sha" "$bin_arm_sha" "$GITHUB_WORKSPACE" <<'EOF'
+          set -euo pipefail
+
+          version="$1"
+          source_sha="$2"
+          bin_x86_sha="$3"
+          bin_arm_sha="$4"
+          workspace="$5"
+          workdir="/tmp/ai-memory-aur-publish"
+
+          git config --global user.name "ai-memory release bot"
+          git config --global user.email "actions@github.com"
+
+          rm -rf "$workdir"
+          mkdir -p "$workdir/generated"
+
+          source_pkgbuild="$workdir/generated/PKGBUILD.source"
+          bin_pkgbuild="$workdir/generated/PKGBUILD.bin"
+          cp "$workspace/packaging/aur/PKGBUILD" "$source_pkgbuild"
+          cp "$workspace/packaging/aur/PKGBUILD-bin" "$bin_pkgbuild"
+
+          sed -i \
+            -e "s/^pkgver=.*/pkgver=${version}/" \
+            -e "s/^pkgrel=.*/pkgrel=1/" \
+            -e "s/^sha256sums=('.*')/sha256sums=('${source_sha}')/" \
+            "$source_pkgbuild"
+          sed -i \
+            -e "s/^pkgver=.*/pkgver=${version}/" \
+            -e "s/^pkgrel=.*/pkgrel=1/" \
+            -e "s/^sha256sums_x86_64=('.*')/sha256sums_x86_64=('${bin_x86_sha}')/" \
+            -e "s/^sha256sums_aarch64=('.*')/sha256sums_aarch64=('${bin_arm_sha}')/" \
+            "$bin_pkgbuild"
+
+          publish_pkg() {
+            pkgbase="$1"
+            pkgbuild="$2"
+            repo="$workdir/$pkgbase"
+
+            git clone "ssh://aur@aur.archlinux.org/${pkgbase}.git" "$repo"
+            cp "$pkgbuild" "$repo/PKGBUILD"
+            cp "$workspace/packaging/aur/ai-memory.install" "$repo/ai-memory.install"
+            (cd "$repo" && makepkg --printsrcinfo > .SRCINFO)
+            (cd "$repo" && git add PKGBUILD .SRCINFO ai-memory.install)
+            if (cd "$repo" && git diff --cached --quiet); then
+              echo "${pkgbase}: no AUR changes to publish"
+              return 0
+            fi
+            (cd "$repo" && git commit -m "Update to ${version}")
+            (cd "$repo" && git push)
+          }
+
+          publish_pkg ai-memory "$source_pkgbuild"
+          publish_pkg ai-memory-bin "$bin_pkgbuild"
+          EOF
+
+  rpm:
+    name: Fedora RPM (${{ matrix.arch }})
+    needs: [binary, validate-version]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ai-memory-linux-${{ matrix.arch }}
+          path: artifacts
+
+      - name: Build RPM
+        env:
+          VERSION: ${{ needs.validate-version.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cpio rpm
+          mkdir -p "$HOME/rpmbuild/SOURCES" "$HOME/rpmbuild/SPECS" "$HOME/rpmbuild/RPMS"
+          cp artifacts/ai-memory-linux-${ARCH}.tar.gz "$HOME/rpmbuild/SOURCES/"
+          cp packaging/rpm/ai-memory.spec "$HOME/rpmbuild/SPECS/"
+          sed -i "s/^Version:        .*/Version:        ${VERSION}/" "$HOME/rpmbuild/SPECS/ai-memory.spec"
+          rpmbuild -bb "$HOME/rpmbuild/SPECS/ai-memory.spec"
+          rpm_file="$(find "$HOME/rpmbuild/RPMS" -name '*.rpm' -print -quit)"
+          test -n "$rpm_file"
+          rpm -qp --queryformat '%{VERSION} %{ARCH}\n' "$rpm_file" | grep -Fx "$VERSION $ARCH"
+          rpm -ql "$rpm_file" | grep -Fx /usr/lib/systemd/system/ai-memory.service
+          root="$(mktemp -d)"
+          trap 'rm -rf "$root"' EXIT
+          rpm2cpio "$rpm_file" | (cd "$root" && cpio -idm --quiet)
+          "$root/usr/bin/ai-memory" --version | grep -Fx "ai-memory $VERSION"
+          rpm_name="ai-memory-$(rpm -qp --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}' "$rpm_file").rpm"
+          mv "$rpm_file" "artifacts/$rpm_name"
+          (cd artifacts && sha256sum "$rpm_name" > "$rpm_name.sha256")
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ai-memory-rpm-${{ matrix.arch }}
+          path: artifacts/*.rpm*

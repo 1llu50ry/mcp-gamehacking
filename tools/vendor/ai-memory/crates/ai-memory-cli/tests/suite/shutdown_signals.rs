@@ -1,0 +1,630 @@
+//! Subprocess smoke tests for signal shutdown of `ai-memory serve` (#699).
+//!
+//! Both transports used to be unstoppable in their own way: stdio listened
+//! for no signal at all, and http listened only for SIGINT — so SIGTERM,
+//! what `docker stop` and `systemctl stop` send, reached no handler. As PID 1
+//! in the container the kernel discarded it outright and `docker stop` waited
+//! out its whole grace period before SIGKILL; anywhere else it fell through
+//! to the kernel's default disposition and killed the process instantly, with
+//! no drain. Only a real spawned process can prove the difference: signal
+//! disposition is a property of the process, not of any function these tests
+//! could call in-crate.
+//!
+//! Each test spawns the built binary against a temp data dir, waits for the
+//! transport's own ready line (so a child that died during boot can never
+//! pass vacuously), sends the signal with `kill`, and requires the child to
+//! be gone inside a deadline. `kill` is shelled out to deliberately: sending
+//! a signal from Rust needs either `libc` (a new dependency) or `unsafe`
+//! (forbidden by the workspace lint). The third test completes the MCP
+//! `initialize` handshake before signalling, because the stdio arm takes a
+//! different branch before and after one.
+//!
+//! The exit status is the load-bearing half of each assertion. A test child is
+//! not PID 1, so an unhandled signal still ends it — just by the kernel's
+//! default disposition, which reports as "killed by signal N" rather than a
+//! clean code. Requiring `success()` is therefore what separates a handled
+//! shutdown from no handler at all; the deadline covers the other failure
+//! shape, a handler that runs but leaves the process alive.
+
+#![cfg(unix)]
+
+use std::io::{BufRead, BufReader, Write};
+use std::process::{Child, ChildStdin, Command, ExitStatus, Stdio};
+use std::sync::mpsc::{self, Receiver};
+use std::thread::JoinHandle;
+use std::time::{Duration, Instant};
+use tempfile::TempDir;
+
+/// Boot does migrations, the pre-migration archive and index work; the
+/// autoscope suite budgets 8s for the same startup, and this one runs three
+/// servers in parallel with the rest of the suite. Widened from 20s after one
+/// loaded machine spent 11s of wall clock on what these tests normally finish
+/// in about 1s: a 10x resource-pressure factor, not a logic race. Being
+/// generous is free, because elapsed time is not what any test here
+/// discriminates on — see [`EXIT_TIMEOUT`].
+const READY_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// The shutdown itself is bounded by `SHUTDOWN_GRACE` (5s) in `serve.rs`.
+/// Anything past that plus process teardown means the signal was ignored,
+/// which is the bug.
+///
+/// 30s is 6x that bound, and widening it from 10s weakens no assertion: the
+/// discriminator is the exit status, not the clock. If the handler regresses
+/// away, the child falls back to the kernel's default disposition, dies at
+/// once, and fails `status.success()` immediately however long this deadline
+/// is. The deadline covers only the other failure shape — a handler that runs
+/// but leaves the process alive, #699's PID-1 symptom — and any value past
+/// the grace period catches that one. A tight deadline therefore buys no
+/// sensitivity and costs flakiness on a loaded runner.
+///
+/// The ceiling for both constants is nextest's everyday profile, which kills
+/// a test at 120s (`slow-timeout` 5s x 24): 60 + 10 + 30 keeps even the
+/// handshake test's worst case under it, so a wedged child still fails with
+/// this file's own diagnostic instead of a bare timeout. The tests stay in
+/// that tier — they cost about 0.25s when nothing is wrong.
+const EXIT_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// The handshake is one round trip over a pipe against an already-booted
+/// server; this is slack for a loaded box, not a real budget.
+const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
+
+const HTTP_READY: &str = "MCP HTTP server ready";
+const STDIO_READY: &str = "MCP server ready on stdio";
+/// Logged by `start_watcher` when `serve --no-watcher` is honoured.
+const WATCHER_DISABLED: &str = "watcher disabled by --no-watcher";
+/// Logged by `start_watcher` when it actually installs an FSEvents/inotify
+/// instance. Must not appear in these children: they do not exercise watching.
+const WATCHER_STARTED: &str = "starting wiki watcher";
+/// The stdio arm's post-handshake shutdown log — the branch only
+/// [`stdio_server_exits_on_sigterm_after_initialize`] reaches.
+const STDIO_STOP_AFTER_HANDSHAKE: &str = "stopping the stdio transport";
+/// And the pre-handshake one, from the select that runs before a client
+/// connects. Distinguishing the two is what keeps that test honest.
+const STDIO_STOP_BEFORE_CLIENT: &str = "shutdown signal received before a client connected";
+
+// `script` supplies a real terminal for both stdin and stderr. Pipes skip the
+// native-session chooser entirely, and unit tests cannot catch its stderr lock.
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+mod native_selector {
+    use super::*;
+    use axum::{Json, Router, http::StatusCode, routing::post};
+    use serde_json::json;
+    use std::io::Read;
+    use std::path::PathBuf;
+    use std::sync::{Arc, Mutex};
+
+    struct Terminal {
+        child: Child,
+        pid_file: PathBuf,
+        output: Receiver<String>,
+        seen: String,
+    }
+
+    impl Terminal {
+        fn wait_for(&mut self, needle: &str) {
+            let deadline = Instant::now() + READY_TIMEOUT;
+            while !self.seen.contains(needle) {
+                let timeout = deadline.saturating_duration_since(Instant::now());
+                match self.output.recv_timeout(timeout) {
+                    Ok(chunk) => self.seen.push_str(&chunk),
+                    Err(error) => panic!("missing {needle:?}: {error}; output:\n{}", self.seen),
+                }
+            }
+        }
+    }
+
+    impl Drop for Terminal {
+        fn drop(&mut self) {
+            if self.child.try_wait().ok().flatten().is_none() {
+                // Reap the launcher too if an assertion fails before it exits.
+                if let Ok(pid) = std::fs::read_to_string(&self.pid_file) {
+                    let _ = Command::new("kill").args(["-KILL", pid.trim()]).status();
+                }
+                let _ = self.child.kill();
+            }
+            let _ = self.child.wait();
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn interrupt_releases_native_selector_without_enter() {
+        let fixture = tempfile::tempdir().unwrap();
+        let root = fixture.path().canonicalize().unwrap();
+        let home = root.join("home");
+        let native = home.join(".claude/projects/fixture");
+        std::fs::create_dir_all(&native).unwrap();
+        crate::e2e_support::write_jsonl(
+            &native.join("session.jsonl"),
+            &[json!({"sessionId": "12345678-1234-4234-9234-123456789abc", "cwd": root})],
+        );
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let observed = requests.clone();
+        let app = Router::new().fallback(post(move |uri: axum::http::Uri| {
+            let observed = observed.clone();
+            async move {
+                observed.lock().unwrap().push(uri.path().to_owned());
+                if uri.path() == "/workstream/runs" {
+                    (
+                        StatusCode::OK,
+                        Json(json!({
+                            "workstream_id": "12345678-1234-4234-9234-123456789abd",
+                            "workstream_name": "fixture",
+                            "run_id": "12345678-1234-4234-9234-123456789abe",
+                            "resolved_agent": "claude-code",
+                            "sync_after": 0, "sync_through": 0,
+                            "may_adopt_existing_session": true,
+                        })),
+                    )
+                } else {
+                    (StatusCode::NO_CONTENT, Json(json!(null)))
+                }
+            }
+        }));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let runner = root.join("runner.sh");
+        let pid_file = root.join("launcher.pid");
+        std::fs::write(
+            &runner,
+            concat!(
+                "printf '%s\\n' \"$$\" > \"$PICKER_PID_FILE\"\n",
+                "exec \"$PICKER_BINARY\" run --no-autowire --executable /usr/bin/true claude\n",
+            ),
+        )
+        .unwrap();
+        let mut command = crate::e2e_support::hermetic("script");
+        #[cfg(target_os = "macos")]
+        command.args(["-qe", "/dev/null", "/bin/sh"]).arg(&runner);
+        #[cfg(target_os = "linux")]
+        command.args(["-qec", "exec /bin/sh \"$PICKER_RUNNER\"", "/dev/null"]);
+        command
+            .current_dir(&root)
+            .env("PICKER_RUNNER", &runner)
+            .env("PICKER_PID_FILE", &pid_file)
+            .env("PICKER_BINARY", bin())
+            .env("AI_MEMORY_HOME", &home)
+            .env("CLAUDE_CONFIG_DIR", home.join(".claude"))
+            .env("AI_MEMORY_DATA_DIR", root.join("data"))
+            .env("AI_MEMORY_SERVER_URL", format!("http://{address}"))
+            .env("AI_MEMORY_EMBEDDING_PROVIDER", "none")
+            .env("RUST_LOG", "info")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        let mut child = command
+            .spawn()
+            .expect("script must provide a pseudo-terminal");
+        let mut stdout = child.stdout.take().unwrap();
+        let (tx, output) = mpsc::channel();
+        std::thread::spawn(move || {
+            let mut buffer = [0; 1024];
+            while let Ok(count) = stdout.read(&mut buffer) {
+                if count == 0
+                    || tx
+                        .send(String::from_utf8_lossy(&buffer[..count]).into_owned())
+                        .is_err()
+                {
+                    break;
+                }
+            }
+        });
+        let mut terminal = Terminal {
+            child,
+            pid_file,
+            output,
+            seen: String::new(),
+        };
+        terminal.wait_for("Select [1]: ");
+        let pid = std::fs::read_to_string(&terminal.pid_file).unwrap();
+        assert!(
+            Command::new("kill")
+                .args(["-INT", pid.trim()])
+                .status()
+                .unwrap()
+                .success()
+        );
+
+        // Keep stdin open and send no newline: only the interrupt may unblock it.
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let status = loop {
+            if let Some(status) = terminal.child.try_wait().unwrap() {
+                break status;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "selector ignored SIGINT; output:\n{}",
+                terminal.seen
+            );
+            tokio::time::sleep(Duration::from_millis(25)).await;
+        };
+        terminal.wait_for("managed run interrupted before the agent started");
+        assert_eq!(
+            status.code(),
+            Some(1),
+            "must report cancellation, not die from SIGINT"
+        );
+        assert_eq!(
+            *requests.lock().unwrap(),
+            vec![
+                "/workstream/runs",
+                "/workstream/runs/12345678-1234-4234-9234-123456789abe/cancel",
+            ],
+            "must cancel the acquired lease without linking or starting a session"
+        );
+        server.abort();
+    }
+}
+
+fn bin() -> &'static str {
+    env!("CARGO_BIN_EXE_ai-memory")
+}
+
+/// Pump one of the child's output streams into a channel from a background
+/// thread, so waiting for a line has a wall-clock timeout rather than blocking
+/// on a read syscall. The handle yields everything read, for failure messages.
+fn pump_lines<R>(reader: R, tx: mpsc::Sender<String>) -> JoinHandle<String>
+where
+    R: std::io::Read + Send + 'static,
+{
+    std::thread::spawn(move || {
+        let mut all = String::new();
+        for line in BufReader::new(reader).lines() {
+            let Ok(line) = line else { break };
+            all.push_str(&line);
+            all.push('\n');
+            if tx.send(line).is_err() {
+                break;
+            }
+        }
+        all
+    })
+}
+
+/// A spawned `ai-memory serve` whose stderr is pumped into a channel by a
+/// background thread, so waiting for a log line has a wall-clock timeout
+/// rather than blocking on a read syscall.
+struct Server {
+    child: Child,
+    lines: Receiver<String>,
+    pump: Option<JoinHandle<String>>,
+    /// Held open for stdio: closing it is EOF, which stops the transport on
+    /// its own and would let the test pass without any signal being handled.
+    stdin: Option<ChildStdin>,
+    /// JSON-RPC frames, present only when stdout was piped: the handshake is
+    /// the one thing here that needs to read the transport itself.
+    frames: Option<Receiver<String>>,
+    seen: String,
+    _data_dir: TempDir,
+}
+
+impl Server {
+    /// stdout at `/dev/null`: a test that only signals never reads it.
+    fn spawn(transport: &str) -> Self {
+        Self::spawn_inner(transport, Stdio::null())
+    }
+
+    /// stdout piped, so [`Server::initialize`] can read the response frame.
+    fn spawn_with_stdout(transport: &str) -> Self {
+        Self::spawn_inner(transport, Stdio::piped())
+    }
+
+    fn spawn_inner(transport: &str, stdout: Stdio) -> Self {
+        let data_dir = TempDir::new().expect("tempdir for serve");
+        let mut cmd = Command::new(bin());
+        cmd.args(["serve", "--transport", transport]);
+        if transport == "http" {
+            // Any free port: nothing here talks to the listener, it only has
+            // to exist so the server reaches its ready line.
+            cmd.args(["--bind", "127.0.0.1:0"]);
+        }
+        // None of these tests watch the wiki. The watcher is a machine-global
+        // FSEvents/inotify instance; concurrent serve children can exhaust it
+        // (#745). Opt out so the child never takes one.
+        cmd.arg("--no-watcher");
+        cmd.arg("--data-dir")
+            .arg(data_dir.path())
+            .env("AI_MEMORY_DATA_DIR", data_dir.path())
+            // Hermetic: the default provider would start a model download in
+            // the background of every spawned server.
+            .env("AI_MEMORY_EMBEDDING_PROVIDER", "none")
+            .env("RUST_LOG", "info")
+            .stdin(Stdio::piped())
+            .stdout(stdout)
+            .stderr(Stdio::piped());
+        let mut child = cmd.spawn().expect("spawn ai-memory serve");
+
+        let stderr = child.stderr.take().expect("stderr piped");
+        let stdin = child.stdin.take();
+        let (tx, lines) = mpsc::channel::<String>();
+        let pump = pump_lines(stderr, tx);
+        let frames = child.stdout.take().map(|stdout| {
+            let (tx, frames) = mpsc::channel::<String>();
+            // Detached: only stderr's accumulated copy is used, and the thread
+            // ends at EOF when the child exits.
+            drop(pump_lines(stdout, tx));
+            frames
+        });
+
+        Self {
+            child,
+            lines,
+            pump: Some(pump),
+            stdin,
+            frames,
+            seen: String::new(),
+            _data_dir: data_dir,
+        }
+    }
+
+    /// Drive the MCP `initialize` handshake to completion, returning the
+    /// server's response frame.
+    ///
+    /// `serve` resolves only once a client has initialized, so this is what
+    /// moves the stdio arm out of its pre-handshake select and into the branch
+    /// that owns the service — where every real harness ends up.
+    ///
+    /// The initialize response alone does not prove that: stdout is written
+    /// and flushed on tokio's blocking pool, so its bytes can reach the pipe
+    /// before `serve` returns, and a signal sent in that gap still lands in
+    /// the pre-handshake select. Only the main service loop answers a `ping`,
+    /// so its reply is the proof.
+    fn initialize(&mut self, timeout: Duration) -> String {
+        // `2025-11-25` is `ProtocolVersion::LATEST` in rmcp 1.7 (its
+        // `model.rs`); the server answers with its own version when the
+        // client's is newer, so this only has to parse. `capabilities` and
+        // `clientInfo` are the request's required fields.
+        const INITIALIZE: &str = concat!(
+            r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"#,
+            r#""protocolVersion":"2025-11-25","capabilities":{},"#,
+            r#""clientInfo":{"name":"shutdown-signals-test","version":"0"}}}"#,
+            "\n",
+        );
+        let stdin = self.stdin.as_mut().expect("stdin piped");
+        stdin
+            .write_all(INITIALIZE.as_bytes())
+            .expect("write the initialize request");
+        stdin.flush().expect("flush the initialize request");
+        let response = self.next_frame("initialize response", timeout);
+        const PING: &str = concat!(
+            r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#,
+            "\n",
+            r#"{"jsonrpc":"2.0","id":2,"method":"ping"}"#,
+            "\n",
+        );
+        let stdin = self.stdin.as_mut().expect("stdin piped");
+        stdin.write_all(PING.as_bytes()).expect("write the ping");
+        stdin.flush().expect("flush the ping");
+        let pong = self.next_frame("ping response", timeout);
+        assert!(
+            pong.contains(r#""id":2"#) && pong.contains(r#""result""#),
+            "the ping must be answered by the running service: {pong}"
+        );
+        response
+    }
+
+    fn next_frame(&mut self, what: &str, timeout: Duration) -> String {
+        let frame = self
+            .frames
+            .as_ref()
+            .expect("stdout piped")
+            .recv_timeout(timeout);
+        match frame {
+            Ok(frame) => frame,
+            // Disconnected also lands here: stdout closed means the child died.
+            Err(_) => panic!(
+                "no {what} on stdout within {timeout:?}.\nstderr:\n{}",
+                self.stderr()
+            ),
+        }
+    }
+
+    /// Pin that the spawned binary opted out of the wiki watcher. Ready
+    /// lines are logged after the watcher decision, so `seen` already
+    /// contains that decision once [`Self::wait_for`] has matched one.
+    fn assert_watcher_opted_out(&self) {
+        assert!(
+            self.seen.contains(WATCHER_DISABLED),
+            "spawned serve must log that the watcher was opted out.\nstderr:\n{}",
+            self.seen
+        );
+        assert!(
+            !self.seen.contains(WATCHER_STARTED),
+            "spawned serve must not install a wiki watcher.\nstderr:\n{}",
+            self.seen
+        );
+    }
+
+    /// Block until a stderr line contains `needle`, or the timeout expires.
+    fn wait_for(&mut self, needle: &str, timeout: Duration) -> bool {
+        let deadline = Instant::now() + timeout;
+        loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                return false;
+            }
+            match self.lines.recv_timeout(remaining) {
+                Ok(line) => {
+                    let hit = line.contains(needle);
+                    self.seen.push_str(&line);
+                    self.seen.push('\n');
+                    if hit {
+                        return true;
+                    }
+                }
+                // Disconnected means stderr closed: the child died during boot.
+                Err(_) => return false,
+            }
+        }
+    }
+
+    fn signal(&self, name: &str) {
+        let pid = self.child.id().to_string();
+        let status = Command::new("kill")
+            .arg(format!("-{name}"))
+            .arg(&pid)
+            .status()
+            .expect("run kill");
+        assert!(status.success(), "kill -{name} {pid} failed: {status}");
+    }
+
+    /// Poll for the child's exit, returning `None` if it outlives `timeout`.
+    fn wait_for_exit(&mut self, timeout: Duration) -> Option<ExitStatus> {
+        let deadline = Instant::now() + timeout;
+        loop {
+            match self.child.try_wait() {
+                Ok(Some(status)) => return Some(status),
+                Ok(None) => {
+                    if Instant::now() >= deadline {
+                        return None;
+                    }
+                    std::thread::sleep(Duration::from_millis(25));
+                }
+                Err(error) => panic!("try_wait on the serve child failed: {error}"),
+            }
+        }
+    }
+
+    /// Everything the child wrote to stderr, for a failure message. Kills the
+    /// child first, so the pump thread's read reaches EOF; call it last.
+    fn stderr(&mut self) -> String {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+        self.stdin.take();
+        match self.pump.take() {
+            Some(pump) => pump.join().unwrap_or_else(|_| self.seen.clone()),
+            None => self.seen.clone(),
+        }
+    }
+}
+
+impl Drop for Server {
+    fn drop(&mut self) {
+        // A panicking test must not leave a server holding the temp data
+        // dir's serve lock.
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
+/// `docker stop` and `systemctl stop` both send SIGTERM, which the http arm
+/// never listened for: it handled ctrl-c only, so a stop either burned the
+/// full grace period and ended in SIGKILL (as PID 1, where the kernel
+/// discards an unhandled signal) or killed the server outright, undrained
+/// (#699).
+#[test]
+fn http_server_exits_on_sigterm() {
+    let mut server = Server::spawn("http");
+    if !server.wait_for(HTTP_READY, READY_TIMEOUT) {
+        panic!(
+            "http server never logged {HTTP_READY:?} within {READY_TIMEOUT:?}; \
+             the signal was never sent.\nstderr:\n{}",
+            server.stderr()
+        );
+    }
+    server.assert_watcher_opted_out();
+
+    server.signal("TERM");
+
+    let Some(status) = server.wait_for_exit(EXIT_TIMEOUT) else {
+        panic!(
+            "http server still running {EXIT_TIMEOUT:?} after SIGTERM.\nstderr:\n{}",
+            server.stderr()
+        );
+    };
+    assert!(
+        status.success(),
+        "SIGTERM is a normal stop, so the exit must be clean. Got {status}.\nstderr:\n{}",
+        server.stderr()
+    );
+}
+
+/// The stdio arm awaited the transport and nothing else, so ctrl-c could not
+/// stop it at all — the reported symptom of #699.
+#[test]
+fn stdio_server_exits_on_sigint() {
+    let mut server = Server::spawn("stdio");
+    if !server.wait_for(STDIO_READY, READY_TIMEOUT) {
+        panic!(
+            "stdio server never logged {STDIO_READY:?} within {READY_TIMEOUT:?}; \
+             the signal was never sent.\nstderr:\n{}",
+            server.stderr()
+        );
+    }
+    server.assert_watcher_opted_out();
+    // Precondition for a non-vacuous result: stdin is still open, so the
+    // transport has no reason of its own to stop.
+    assert!(
+        server.stdin.is_some(),
+        "stdin must stay piped and open, or EOF — not the signal — ends the transport"
+    );
+
+    server.signal("INT");
+
+    let Some(status) = server.wait_for_exit(EXIT_TIMEOUT) else {
+        panic!(
+            "stdio server still running {EXIT_TIMEOUT:?} after SIGINT.\nstderr:\n{}",
+            server.stderr()
+        );
+    };
+    assert!(
+        status.success(),
+        "a signal-triggered stop is a normal shutdown. Got {status}.\nstderr:\n{}",
+        server.stderr()
+    );
+}
+
+/// Both tests above signal before any client connects, so on stdio they
+/// resolve in the pre-handshake select and return early. A real harness
+/// completes the MCP `initialize` handshake first, which lands the arm in the
+/// branch that takes the service's cancellation token, cancels it and waits
+/// under the grace period — the code that actually runs in production, and
+/// which nothing else here reaches (#699).
+#[test]
+fn stdio_server_exits_on_sigterm_after_initialize() {
+    let mut server = Server::spawn_with_stdout("stdio");
+    if !server.wait_for(STDIO_READY, READY_TIMEOUT) {
+        panic!(
+            "stdio server never logged {STDIO_READY:?} within {READY_TIMEOUT:?}; \
+             the handshake was never started.\nstderr:\n{}",
+            server.stderr()
+        );
+    }
+    server.assert_watcher_opted_out();
+
+    // Precondition for a non-vacuous result: until the handshake completes,
+    // the signal lands in the pre-handshake select the other tests cover.
+    let response = server.initialize(HANDSHAKE_TIMEOUT);
+    assert!(
+        response.contains(r#""result""#) && response.contains("serverInfo"),
+        "the initialize response must carry a result, or the handshake did not \
+         complete: {response}.\nstderr:\n{}",
+        server.stderr()
+    );
+
+    server.signal("TERM");
+
+    let Some(status) = server.wait_for_exit(EXIT_TIMEOUT) else {
+        panic!(
+            "stdio server still running {EXIT_TIMEOUT:?} after SIGTERM.\nstderr:\n{}",
+            server.stderr()
+        );
+    };
+    let stderr = server.stderr();
+    assert!(
+        status.success(),
+        "a signal-triggered stop is a normal shutdown. Got {status}.\nstderr:\n{stderr}"
+    );
+    // Which line was logged says which branch ran, so this test cannot drift
+    // back into covering the early path it exists to complement.
+    assert!(
+        stderr.contains(STDIO_STOP_AFTER_HANDSHAKE),
+        "expected the post-handshake shutdown log {STDIO_STOP_AFTER_HANDSHAKE:?}.\
+         \nstderr:\n{stderr}"
+    );
+    assert!(
+        !stderr.contains(STDIO_STOP_BEFORE_CLIENT),
+        "the pre-handshake branch handled the signal, so this test covers the \
+         same path as the others.\nstderr:\n{stderr}"
+    );
+}

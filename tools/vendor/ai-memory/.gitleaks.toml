@@ -1,0 +1,74 @@
+# gitleaks configuration for ai-memory.
+#
+# Wired into CI via `.github/workflows/ci.yml` for changed commits and
+# `.github/workflows/secret-scan.yml` for scheduled/manual full-history
+# scans. Both fail if a credential-shaped value is not explicitly reviewed.
+#
+# The default ruleset (Google API keys, Anthropic, OpenAI, Slack, AWS,
+# GitHub PATs, …) covers what ai-memory's own sanitiser covers. We
+# inherit it and only ADD an allowlist for the specific test fixtures
+# we deliberately ship. `.gitleaksignore` contains exact fingerprints for
+# reviewed legacy findings; never add broad commit, path, or rule exclusions.
+#
+# Lesson from M18: a previous iteration of sanitize.rs used a live
+# Gemini key as a test fixture and Google's automated scanner caught
+# it within hours of push. This config exists so the next time a fake
+# fixture is added, it follows the same shape the allowlist accepts —
+# and any DRIFT from those shapes (i.e. a real key showing up) fails
+# CI loudly before push.
+
+title = "ai-memory secret-scan config"
+
+[extend]
+useDefault = true
+
+# Fail-closed: do NOT add any path-based allowlist that would exempt
+# whole directories. Every exemption below is a specific string with a
+# rationale.
+
+[allowlist]
+description = "Deliberate test fixtures + documented placeholders"
+regexes = [
+    # ---- Test fixtures inside `sanitize.rs` ----
+    # Every sanitize-test uses an obvious "0123456789…" / "abcdef…" /
+    # "deadbeefcafebabe" pattern so a reader can tell at a glance
+    # that the value is fake.
+    '''AIzaSy0123456789[A-Za-z0-9_\-]+''',
+    '''sk-or-v1-deadbeefcafebabe[0-9a-f]+''',
+    '''sk-ant-leak-[0-9a-f]+''',
+    '''sk-leak-[0-9a-f]+''',
+    '''ghp_FAKE[A-Z0-9]+''',
+    '''github_pat_FAKE[A-Z0-9_]+''',
+    '''AKIAFAKE[A-Z0-9]+''',
+    '''ASIAFAKE[A-Z0-9]+''',
+    # JWT fixture (P1 typed-redaction tests): three `eyJFAKEfake…`/`FAKEfake…`
+    # segments — obviously fake, never an issued token.
+    '''eyJFAKEfake[A-Za-z0-9_.\-]{10,}''',
+    # Stripe *restricted* key fixture, same FAKE convention as the keys above.
+    '''rk_live_FAKEfake[A-Za-z0-9]+''',
+    # Telegram bot-token fixture: the example Telegram itself publishes in its
+    # Bot API documentation — a shape anyone can look up, not an issued token.
+    # The sanitizer test asserts that exact documented form is redacted.
+    # Listed twice on purpose: gitleaks matches an allowlist against the
+    # secret a rule *extracted*, and `generic-api-key` extracts only the tail
+    # after the colon, so the full-token form alone would not exempt it.
+    '''123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11''',
+    '''ABC-DEF1234ghIkl-zyx57W2v1u123ew11''',
+    '''Bearer abcdef0123456789ABCDEF0123456789''',
+    # Fixtures for the JSON-quoted value, scheme-prefixed header and
+    # unprefixed-assignment tests: a JSON `api_key`, a `client-token`, an
+    # `authorization: Token`, an Azure `AccountKey=` and an npm `_authToken=`.
+    # `generic-api-key` extracts the value alone, so the FAKE marker lives
+    # inside the value rather than in the key.
+    '''FAKEfake0123456789[A-Za-z0-9]*={0,2}''',
+    '''xoxb-1234567890-abcdefghij''',
+
+    # ---- Canary string used by the e2e test in tests/e2e/ ----
+    '''sk-canary-LEAK_ME_PLEASE_[a-z0-9_]+''',
+
+    # ---- Documented placeholders in README/docs/.env.production.example ----
+    '''sk-(ant-|or-v1-|)\.\.\.''',
+    '''sk-or-v1-REPLACE_ME''',
+    '''sk-REPLACE_ME''',
+    '''REPLACE_WITH_OUTPUT_OF_GENERATE_AUTH_TOKEN''',
+]

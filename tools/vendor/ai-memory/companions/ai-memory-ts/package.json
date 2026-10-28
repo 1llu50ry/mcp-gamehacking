@@ -1,0 +1,54 @@
+{
+  "name": "ai-memory-ts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Typed TypeScript client for an ai-memory server: pages, search, handoffs, messages and the read-only /api/v1 routes.",
+  "license": "MIT",
+  "homepage": "https://aimemory.sh",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/akitaonrails/ai-memory.git",
+    "directory": "companions/ai-memory-ts"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./admin": {
+      "types": "./dist/admin.d.ts",
+      "default": "./dist/admin.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "docs",
+    "schema",
+    "CHANGELOG.md",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "build:test": "tsc -p tsconfig.test.json",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit",
+    "test:unit": "npm run build && npm run build:test && node --test \"build/test/unit/**/*.test.js\"",
+    "test:integration": "npm run build && npm run build:test && node --test \"build/test/integration/**/*.test.js\"",
+    "schema:check": "npm run build:test && node build/scripts/schema-check.js",
+    "schema:update": "npm run build:test && node build/scripts/schema-update.js",
+    "docs:generate": "npm run build:test && node build/scripts/generate-docs.js --write",
+    "docs:check": "npm run build:test && node build/scripts/generate-docs.js --check",
+    "docs:api": "typedoc",
+    "check": "npm run typecheck && npm run test:unit && npm run schema:check && npm run docs:check && npm run docs:api"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.4",
+    "typedoc": "0.28.20",
+    "typescript": "6.0.3"
+  }
+}

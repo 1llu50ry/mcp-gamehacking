@@ -1,0 +1,7 @@
+{"id":"fixture-user","timestamp":"2026-08-06T10:00:00Z","payload":{"type":"user","content":"sanitized v3 prompt"}}
+{"id":"fixture-private-hook","timestamp":"2026-08-06T10:00:01Z","payload":{"type":"ContextualHookInvoked","hookName":"fixture"}}
+{"id":"fixture-hidden-operation","timestamp":"2026-08-06T10:00:02Z","payload":{"type":"assistant","operationType":"Think","content":"excluded private operation"}}
+{"id":"fixture-assistant","timestamp":"2026-08-06T10:00:03Z","payload":{"type":"assistant","operationType":"Say","content":"sanitized v3 reply"}}
+{"id":"fixture-tool","timestamp":"2026-08-06T10:00:04Z","payload":{"type":"tool_call","toolCallId":"fixture-call","toolName":"read_file","args":{"path":"README.md"},"status":"completed","kind":"read"}}
+{"id":"fixture-result","timestamp":"2026-08-06T10:00:05Z","payload":{"type":"tool_result","toolCallId":"fixture-call","content":"sanitized v3 result","success":true}}
+{"id":"fixture-usage","timestamp":"2026-08-06T10:00:06Z","payload":{"type":"usage_summary","inputTokens":10,"outputTokens":5}}

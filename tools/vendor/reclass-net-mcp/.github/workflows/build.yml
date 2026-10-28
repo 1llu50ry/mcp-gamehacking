@@ -1,0 +1,146 @@
+name: Build Plugin
+
+on:
+  push:
+    branches: [main, master]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        platform: [x64, x86]
+    outputs:
+      is_act: ${{ steps.check_act.outputs.is_act }}
+
+    steps:
+      - name: Check if running in act
+        id: check_act
+        run: |
+          if ($env:ACT) {
+            echo "is_act=true" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "is_act=false" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Clone ReClass.NET
+        run: git clone --depth 1 https://github.com/ReClassNET/ReClass.NET.git ReClass.NET
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup NuGet
+        uses: nuget/setup-nuget@v2
+
+      - name: Restore NuGet packages
+        run: |
+          nuget restore ReClass.NET\ReClass.NET\ReClass.NET.csproj -PackagesDirectory packages
+          nuget restore ReClassMCP.Plugin\packages.config -PackagesDirectory packages
+
+      - name: Build ReClass.NET
+        run: |
+          msbuild ReClass.NET\ReClass.NET\ReClass.NET.csproj /p:Configuration=Release /p:Platform=${{ matrix.platform }} /t:Build /v:minimal /restore
+
+      - name: Build Plugin
+        run: |
+          msbuild ReClassMCP.Plugin\ReClassMCP.Plugin.csproj /p:Configuration=Release /p:Platform=${{ matrix.platform }} /t:Build /v:minimal
+
+      - name: Prepare artifacts
+        run: |
+          $outDir = "artifacts"
+          New-Item -ItemType Directory -Path $outDir -Force
+
+          # Copy plugin DLL (keep original name)
+          Copy-Item "ReClassMCP.Plugin\bin\${{ matrix.platform }}\Release\ReClassMCP.dll" $outDir
+
+          # Copy Newtonsoft.Json
+          $jsonDll = Get-ChildItem -Path packages -Recurse -Filter "Newtonsoft.Json.dll" | Where-Object { $_.FullName -like "*net45*" } | Select-Object -First 1
+          if ($jsonDll) {
+            Copy-Item $jsonDll.FullName $outDir
+          }
+
+      # Local output for act
+      - name: Copy to dist folder (local)
+        if: ${{ env.ACT }}
+        run: |
+          $distDir = "${{ github.workspace }}\dist\${{ matrix.platform }}"
+          New-Item -ItemType Directory -Path $distDir -Force
+          Copy-Item "artifacts\*" $distDir -Force
+
+          $serverDir = "${{ github.workspace }}\dist\MCP-Server"
+          New-Item -ItemType Directory -Path $serverDir -Force
+          Copy-Item "ReClassMCP.Server\*" $serverDir -Force
+
+          Write-Host "Build output copied to: ${{ github.workspace }}\dist"
+
+      - name: Upload plugin artifact
+        if: ${{ !env.ACT }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ReClassMCP-${{ matrix.platform }}
+          path: artifacts/
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ needs.build.outputs.is_act != 'true' && github.event_name == 'push' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download x64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ReClassMCP-x64
+          path: release/x64/
+
+      - name: Download x86 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ReClassMCP-x86
+          path: release/x86/
+
+      - name: Copy MCP Server
+        run: |
+          mkdir -p release/MCP-Server
+          cp ReClassMCP.Server/reclass_mcp_server.py release/MCP-Server/
+          cp ReClassMCP.Server/requirements.txt release/MCP-Server/
+          cp ReClassMCP.Server/pyproject.toml release/MCP-Server/
+
+      - name: Create release zip
+        run: |
+          cd release
+          zip -r ../ReClassMCP.zip x64/ x86/ MCP-Server/
+
+      - name: Get version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "is_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "version=build-$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+            echo "is_release=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: ${{ steps.version.outputs.is_release == 'true' && format('ReClassMCP {0}', steps.version.outputs.version) || steps.version.outputs.version }}
+          files: ReClassMCP.zip
+          prerelease: ${{ steps.version.outputs.is_release != 'true' }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

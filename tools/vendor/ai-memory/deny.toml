@@ -1,0 +1,54 @@
+# cargo-deny configuration.
+# Goal: reject GPL/AGPL transitive deps (license trap that cost cognee #2807)
+# and pin to the official crates.io registry.
+
+[graph]
+# CI runs cargo-deny with --all-features (see .github/workflows/ci.yml), so build
+# the same graph here. This keeps the documented local gate `cargo deny check`
+# (AGENTS.md, CONTRIBUTING.md) checking the exact feature set CI enforces, instead
+# of the narrower default-features graph.
+all-features = true
+no-default-features = false
+
+[output]
+feature-depth = 1
+
+[advisories]
+version = 2
+ignore = [
+    # RUSTSEC-2024-0436: `paste` is unmaintained. Compile-time
+    # proc-macro helper pulled by the candle ML stack (local
+    # embeddings); no runtime code ships from it. Revisit when candle
+    # replaces it upstream.
+    "RUSTSEC-2024-0436",
+]
+
+[licenses]
+version = 2
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Zlib",
+    "MPL-2.0",
+    "CC0-1.0",
+    "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.9
+exceptions = []
+
+[bans]
+multiple-versions = "allow"
+wildcards = "deny"
+deny = []
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+required-git-spec = "rev"
+allow-git = ["https://github.com/zip-rs/zip2"]

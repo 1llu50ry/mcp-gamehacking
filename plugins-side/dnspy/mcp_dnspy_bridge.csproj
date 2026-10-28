@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <OutputType>Library</OutputType>
+    <AssemblyName>mcp_dnspy_bridge</AssemblyName>
+    <RootNamespace>mcp_dnspy_bridge</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!--
+      Point DNSPY_DIR at your dnSpy / dnSpyEx install:
+        dotnet build /p:DNSPY_DIR="C:\dnSpyEx\bin"
+    -->
+    <DNSPY_DIR Condition="'$(DNSPY_DIR)' == ''">C:\dnSpyEx\bin</DNSPY_DIR>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="dnSpy.Contracts.DnSpy">
+      <HintPath>$(DNSPY_DIR)\dnSpy.Contracts.DnSpy.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="dnSpy.Contracts.Logic">
+      <HintPath>$(DNSPY_DIR)\dnSpy.Contracts.Logic.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="dnlib">
+      <HintPath>$(DNSPY_DIR)\dnlib.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <PackageReference Include="System.ComponentModel.Composition" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="MCPBridgePlugin.cs" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,6 @@
+{
+  "bundle": {
+    "externalBin": ["binaries/ai-memory"],
+    "resources": { "binaries/hooks/": "hooks/" }
+  }
+}

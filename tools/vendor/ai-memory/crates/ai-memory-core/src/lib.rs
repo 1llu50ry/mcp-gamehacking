@@ -1,0 +1,116 @@
+//! Core domain types and errors for ai-memory.
+//!
+//! This crate is the closure of the project's vocabulary: identifiers, agent
+//! kinds, the workspace-wide error type, and the privacy strip (which is
+//! pure-compute, no IO). Nothing in here performs I/O, which keeps it
+//! trivially unit-testable and free of platform concerns.
+
+pub mod active_project;
+pub mod actor;
+pub mod agent_backup;
+pub mod compaction_recap;
+pub mod error;
+pub mod excerpt;
+pub mod fix_lines;
+pub mod handoff;
+pub mod ingest_metrics;
+pub use ingest_metrics::{IngestMetrics, IngestMetricsSnapshot};
+pub mod ids;
+pub mod latency;
+pub use latency::{LATENCY_BUCKET_BOUNDS_US, LatencyHistogram, LatencySnapshot, LatencyTimer};
+pub mod log_ledger;
+pub mod message;
+pub mod observation;
+pub mod okf;
+pub mod page;
+pub mod profile;
+pub mod repository_identity;
+pub use repository_identity::{MARKER_FILENAME, MARKER_FILENAMES};
+pub mod routing_skills;
+pub mod scaffolding;
+pub use scaffolding::{
+    is_codex_memory_agent_cwd, looks_like_codex_instructions, looks_like_codex_memory_agent_prompt,
+    looks_like_markup_block, looks_like_scaffolding,
+};
+pub mod routing_snippet;
+pub mod sanitize;
+pub mod slots;
+pub mod user;
+mod workstream;
+
+/// Default workspace name used by the single-workspace v1 flow.
+pub const DEFAULT_WORKSPACE_NAME: &str = "default";
+
+/// Defensive project fallback used only when no cwd/project is available.
+pub const DEFAULT_PROJECT_NAME: &str = "scratch";
+
+/// Reserved project holding user/team-level standing context — technology
+/// preferences, code style, durable decisions that every project should
+/// inherit (issue #154). Lives in [`DEFAULT_WORKSPACE_NAME`]. Default
+/// `memory_query` reads union this scope with the current project; it is
+/// written only through explicit `scope: "global"` requests. The leading
+/// underscore follows the wiki's reserved-name convention (`_meta.md`,
+/// `_pending/`, `_lint/`) and the hook router refuses to auto-attribute
+/// event capture to it.
+pub const GLOBAL_SCOPE_PROJECT: &str = "_global";
+
+pub use active_project::{
+    ActiveProject, ActiveProjectLookup, ActiveProjectMode, ActorKey, DEFAULT_MAX_ENTRIES,
+    DEFAULT_PER_KEY_TTL, MidSessionRouting, ReadPointer,
+};
+pub use actor::{
+    ActorContext, AuthLevel, AuthorizedViewer, AuthzError, Capability, IdentityKey,
+    LegacyBrowserAuth, OwnerFilter, SKIP_ADMISSION_CHAIN_HEADER, owner_identity, owner_stamp,
+    parse_skip_admission_chain, skip_admission_chain_for,
+};
+pub use agent_backup::{
+    AGENT_BACKUP_SCHEMA_VERSION, AgentAssetKind, AgentAssetScope, AgentBackupEntry,
+    AgentBackupManifest, HostInfo,
+};
+pub use error::{MemoryError, MemoryResult};
+pub use handoff::{
+    Handoff, HandoffAcceptance, HandoffContent, HandoffLifecycle, HandoffOrigin, HandoffScope,
+    HandoffState, NewHandoff,
+};
+pub use ids::{
+    AgentKind, ApiCredentialId, AutoImproveProposalId, AutoImproveRunId, EntityId, HandoffId,
+    ManagedRunId, MessageId, ObservationId, PageFeedbackId, PageId, PagePath, ProjectId, SessionId,
+    UserId, WorkspaceId, WorkstreamId, is_dos_device_name, is_git_reserved_component,
+    portable_page_key,
+};
+pub use message::{
+    AgentMessage, MessageBox, MessageClaim, MessageOrigin, MessageState, NewAgentMessage,
+    UNTRUSTED_MESSAGE_NOTICE,
+};
+pub use observation::{NewObservation, NewSession, Observation, ObservationKind};
+pub use page::{
+    FeedbackKind, LinkTarget, MAX_ENTITIES_PER_PAGE, MAX_ENTITY_LEN, NewPage, Page, PageEvidence,
+    PageEvidenceKind, Relation, Tier, frontmatter_entity_names, normalize_entities,
+    normalize_entity, parse_expires_at_instant,
+};
+pub use routing_snippet::{
+    COMPACT_SNIPPET_BODY, MARKER_END, MARKER_START, SNIPPET_BODY, compact_block, find_marker_line,
+    full_block,
+};
+pub use sanitize::{
+    OBSERVATION_BODY_MAX_BYTES, SanitizeConfig, Sanitized, Sanitizer, truncate_for_title,
+    truncate_utf8_bytes, truncate_utf8_bytes_head_tail,
+};
+pub use slots::{
+    SLOT_PREFIX, SlotPlacement, SlotVisibility, is_slot_named, is_slot_path, slot_owner,
+    slot_placement,
+};
+pub use user::{
+    ApiCredential, EXTERNAL_API_KEY_PREFIX, MAX_EMAIL_LEN, MAX_HUMAN_PASSWORD_BYTES,
+    MAX_USERNAME_LEN, MIN_HUMAN_PASSWORD_BYTES, NATIVE_API_KEY_PREFIX, NewUser,
+    SESSION_SECRET_PREFIX, User, UserRole, validate_email, validate_human_password,
+    validate_username,
+};
+pub use workstream::{
+    FinishManagedRunRequest, FinishManagedRunResponse, LinkManagedRunRequest,
+    ListManagedWorkstreamsRequest, MANAGED_WORKSTREAM_PACKET_MARKER, ManagedNativeSessionReference,
+    ManagedRunContextResponse, ManagedRunStatus, ManagedWorkstreamSummary, NativeSessionIdentity,
+    NewWorkstreamEvent, PrepareManagedRunRequest, PrepareManagedRunResponse,
+    RenameManagedWorkstreamRequest, RenamedManagedWorkstream, UNTRUSTED_MEMORY_NOTICE,
+    WorkstreamCheckpoint, WorkstreamEvent, WorkstreamEventKind, scrub_workstream_provenance,
+};
