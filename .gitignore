@@ -29,3 +29,8 @@ Thumbs.db
 # quota. See RELEASE.md for how users opt into fetching them.
 skills/*/source.txt
 skills/*/source.txt.gz
+
+# SQLite side-car files (WAL + SHM). The main .db is tracked.
+db/*.db-wal
+db/*.db-shm
+db/skills-full.db

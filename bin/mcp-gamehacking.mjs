@@ -173,15 +173,44 @@ async function cmdPack(skillName) {
   console.log(`packed ${n} source archives`);
 }
 
+async function cmdBuildDb() {
+  // Delegate to scripts/build-db.mjs so the slim/full flag is honoured.
+  // The script imports from dist/, so make sure the build is current.
+  const { spawnSync } = await import("node:child_process");
+  const script = join(ROOT, "scripts", "build-db.mjs");
+  const r = spawnSync(process.execPath, [script, ...rest], { stdio: "inherit" });
+  process.exit(r.status ?? 0);
+}
+
+async function cmdDbStats() {
+  const { DatabaseSync } = await import("node:sqlite");
+  const path = process.env.MCP_SKILLS_DB ?? join(ROOT, "db", "skills.db");
+  try { await stat(path); } catch { console.error("no DB at", path); process.exit(1); }
+  const db = new DatabaseSync(path, { readOnly: true });
+  const q = (sql) => db.prepare(sql).get();
+  console.log("db:", path);
+  for (const table of ["skills", "plugins", "agents", "subagents", "prompts"]) {
+    const c = (q(`SELECT COUNT(*) c FROM ${table}`) ?? { c: 0 }).c;
+    console.log(`  ${table}: ${c}`);
+  }
+  const withSrc = (q("SELECT COUNT(*) c FROM skills WHERE source_gz IS NOT NULL") ?? { c: 0 }).c;
+  console.log(`  skills with source: ${withSrc}`);
+  const meta = db.prepare("SELECT key, value FROM meta").all();
+  for (const m of meta) console.log(`  ${m.key}: ${m.value}`);
+  db.close();
+}
+
 switch (cmd) {
-  case "stats":  await cmdStats(); break;
-  case "lookup": await cmdLookup(rest[0] ?? ""); break;
-  case "search": await cmdSearch(rest.join(" ")); break;
-  case "health": await cmdHealth(rest[0]); break;
-  case "tools":  await cmdTools(); break;
-  case "serve":  await cmdServe(); break;
-  case "unpack": await cmdUnpack(rest[0]); break;
-  case "pack":   await cmdPack(rest[0]); break;
+  case "stats":    await cmdStats(); break;
+  case "lookup":   await cmdLookup(rest[0] ?? ""); break;
+  case "search":   await cmdSearch(rest.join(" ")); break;
+  case "health":   await cmdHealth(rest[0]); break;
+  case "tools":    await cmdTools(); break;
+  case "serve":    await cmdServe(); break;
+  case "unpack":   await cmdUnpack(rest[0]); break;
+  case "pack":     await cmdPack(rest[0]); break;
+  case "build-db": await cmdBuildDb(); break;
+  case "db-stats": await cmdDbStats(); break;
   case "-h":
   case "--help":
   case "help":

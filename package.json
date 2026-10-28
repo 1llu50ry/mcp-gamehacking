@@ -24,6 +24,8 @@
     "examples/",
     "deploy/",
     "docs/",
+    "scripts/",
+    "db/skills.db",
     "README.md",
     "LICENSE"
   ],
