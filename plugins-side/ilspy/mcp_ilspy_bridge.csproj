@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <OutputType>Library</OutputType>
+    <AssemblyName>mcp_ilspy_bridge</AssemblyName>
+    <RootNamespace>mcp_ilspy_bridge</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!--
+      Point ILSPY_DIR at your ILSpy install:
+        dotnet build /p:ILSPY_DIR="C:\Program Files\ILSpy"
+    -->
+    <ILSPY_DIR Condition="'$(ILSPY_DIR)' == ''">C:\Program Files\ILSpy</ILSPY_DIR>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="ILSpy">
+      <HintPath>$(ILSPY_DIR)\ILSpy.exe</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="ICSharpCode.Decompiler">
+      <HintPath>$(ILSPY_DIR)\ICSharpCode.Decompiler.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <PackageReference Include="System.ComponentModel.Composition" Version="8.0.0" />
+    <PackageReference Include="System.Reflection.Metadata" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="MCPBridgeAddin.cs" />
+  </ItemGroup>
+
+</Project>

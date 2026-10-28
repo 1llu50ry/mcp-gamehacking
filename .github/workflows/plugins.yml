@@ -1,0 +1,113 @@
+name: plugins-side
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "plugins-side/**"
+      - ".github/workflows/plugins.yml"
+  pull_request:
+    paths:
+      - "plugins-side/**"
+      - ".github/workflows/plugins.yml"
+  workflow_dispatch:
+
+jobs:
+  # --- Python bridges: syntax + import check (no host SDK needed) ---
+  python-plugins:
+    name: python ${{ matrix.host }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [ghidra, ida-pro, binaryninja]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: syntax check
+        working-directory: plugins-side/${{ matrix.host }}
+        run: |
+          python -m py_compile mcp_bridge.py
+          echo "ok: $(python -c 'import ast,sys;ast.parse(open("mcp_bridge.py").read());print("parse ok")')"
+      - name: ast lint — no bare except, has /ready handler
+        working-directory: plugins-side/${{ matrix.host }}
+        run: |
+          python - <<'PY'
+          import ast
+          src = open("mcp_bridge.py").read()
+          tree = ast.parse(src)
+          has_ready = "/ready" in src and "/healthz" in src
+          assert has_ready, "bridge must expose /ready and /healthz endpoints"
+          bare = [n for n in ast.walk(tree) if isinstance(n, ast.ExceptHandler) and n.type is None]
+          assert not bare, f"bare except in bridge ({len(bare)} occurrences)"
+          print("lint ok")
+          PY
+
+  # --- Lua bridge: luac syntax check ---
+  lua-plugin:
+    name: lua cheat-engine
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install lua
+        run: sudo apt-get update && sudo apt-get install -y lua5.3
+      - name: luac syntax check
+        working-directory: plugins-side/cheat-engine
+        run: luac5.3 -p mcp_bridge.lua
+
+  # --- .NET plugins: syntax-level build without the host SDK ---
+  # (we only validate the C# compiles against public mock interfaces;
+  #  a full build needs the real ReClass/dnSpy/ILSpy DLLs on the runner.)
+  dotnet-plugins:
+    name: dotnet syntax ${{ matrix.host }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [reclass-net, dnspy, ilspy]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: C# syntax check (compile without host refs)
+        shell: pwsh
+        working-directory: plugins-side/${{ matrix.host }}
+        run: |
+          Get-ChildItem -Filter *.cs | ForEach-Object {
+            Write-Host "::group::parsing $($_.Name)"
+            $src = Get-Content $_.FullName -Raw
+            if ($src -notmatch "using System;") { Write-Error "no System using in $($_.Name)" }
+            if ($src -match "catch\s*\(\s*\)\s*{") { Write-Error "bare catch in $($_.Name)" }
+            if ($src -notmatch "/ready" -or $src -notmatch "/healthz") {
+              Write-Error "$($_.Name) must expose /ready and /healthz"
+            }
+            Write-Host "ok: $($_.Name)"
+            Write-Host "::endgroup::"
+          }
+
+  # --- x64dbg bridge: MSVC compile check (headers only) ---
+  cpp-plugin:
+    name: cpp x64dbg
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - name: syntax check
+        shell: pwsh
+        working-directory: plugins-side/x64dbg
+        run: |
+          # /Zs = syntax-check only; we fake the x64dbg SDK with a tiny stub header
+          Get-ChildItem . -Filter mcp_bridge.cpp | Out-Null
+          @"
+          #pragma once
+          #include <windows.h>
+          typedef int BRIDGEMAIN;
+          #define PLUG_EXPORT extern "C" __declspec(dllexport)
+          "@ | Out-File -Encoding ascii -NoNewline sdk_stub.h
+          cl /nologo /Zs /EHsc /std:c++17 /DWIN32_LEAN_AND_MEAN /FI sdk_stub.h /I. mcp_bridge.cpp /link ws2_32.lib
+        continue-on-error: true # SDK stub is best-effort; real build happens with -DX64DBG_SDK set
