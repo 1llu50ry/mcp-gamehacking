@@ -1,0 +1,54 @@
+# Everything the Docker build does not need. Smaller build context
+# = faster uploads to the daemon + less fingerprinting churn.
+
+# ---- always-exclude ----
+.git/
+.github/
+.claude/
+.vscode/
+.idea/
+node_modules/
+dist/
+coverage/
+.nyc_output/
+*.log
+npm-debug.log*
+
+# ---- editor cruft / OS metadata ----
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# ---- repo-local scratch (runtime writes these) ----
+.export/
+.agent-mesh/
+.audit/
+.index-cache/
+.cache/
+.docker-data/
+.ghidra-projects/
+
+# ---- upstream mirrors + vendored binaries not needed at runtime ----
+better-options/
+tools/vendor/
+tools/launchers/
+
+# ---- docs / examples: shipped in the npm tarball, not the image ----
+docs/
+examples/
+deploy/
+CHANGELOG.md
+ROADMAP.md
+README-*.md
+plugins-side/
+
+# ---- decompressed source dumps (we only ship the .gz) ----
+skills/*/source.txt
+
+# ---- tests / tooling ----
+tests/
+.devcontainer/
+*.test.mjs
+*.tsbuildinfo

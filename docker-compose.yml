@@ -1,0 +1,43 @@
+# Compose file for running mcp-gamehacking as a long-lived HTTP service.
+# Clients (Claude Desktop, Cursor, etc.) point at http://localhost:7777/mcp
+# with the bearer token below in Authorization: Bearer <token>.
+#
+#   docker compose up -d
+#   docker compose logs -f
+#   docker compose exec mcp-gamehacking node bin/mcp-gamehacking.mjs stats
+
+services:
+  mcp-gamehacking:
+    image: ghcr.io/1llu50ry/mcp-gamehacking:latest
+    # To build locally instead of pulling:
+    #build:
+    #  context: .
+    container_name: mcp-gamehacking
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:7777:7777"
+    environment:
+      # Set a long random secret and share it with your clients.
+      # Leave empty to disable auth entirely.
+      MCP_AUTH_TOKEN: "${MCP_AUTH_TOKEN:-}"
+      MCP_RATE_LIMIT_PER_USER: "1"
+      MCP_RATE_LIMIT_PER_USER_SEC: "30"
+      # The sandbox allowlist controls which host paths the server can
+      # read via its file tools. Mount those paths below and point here.
+      MCP_FS_ALLOW: "/samples"
+    volumes:
+      - ./samples:/samples:ro
+      - mcp-cache:/app/.cache
+      - mcp-audit:/app/.audit
+      - mcp-mesh:/app/.agent-mesh
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('node:http').get('http://127.0.0.1:7777/healthz', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  mcp-cache:
+  mcp-audit:
+  mcp-mesh:

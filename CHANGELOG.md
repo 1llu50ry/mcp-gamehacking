@@ -2,6 +2,52 @@
 
 All notable changes to this project. Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [5.0.0] — 2026-10-28
+
+Major release — four feature waves plus a weight-cut that takes the
+on-disk project from 19 GiB working tree to ~3 GiB (and the npm package
+down to a few MiB).
+
+### Added
+- **Wave 1 — host plugin build systems**: `.csproj` for ReClass.NET /
+  dnSpy / ILSpy, `CMakeLists.txt` for x64dbg with bitness-aware
+  `.dp64` / `.dp32` suffix, `plugins-side/install.ps1` + `install.sh`
+  with host auto-detect, `.github/workflows/plugins.yml` (python
+  `py_compile` + Lua `luac` + C# syntax + MSVC `/Zs`), mock bridge
+  server + 7 integration tests, `docs/cookbook/` with 4 end-to-end
+  recipes.
+- **Wave 2 — dynamic analysis & symbols**: `plugins-side/frida/mcp_bridge.py`
+  (standalone, 12 `frida_*` tools: attach/detach, inject JS, trace
+  exports, dump/replace memory, enumerate modules). Native x86-64
+  emulator (`emu_run` + `emu_decrypt_xor`), DWARFv4/v5 parser
+  (`dwarf_parse`), MSF/PDB parser (`pdb_info`), FLIRT-light signatures
+  (`sig_list` / `sig_match` / `sig_make` with 8 shipping sigs).
+  Prometheus `/metrics` + live `/dashboard` HTML page.
+- **Wave 3 — platform & distribution**: AArch64 emulator
+  (`emu_arm64_run`), content-addressable decompile cache
+  (`cache_stats` / `cache_clear`), large-output chunker
+  (`chunk_fetch` / `chunk_list`), per-request trace-id + per-user
+  HTTP rate limit (`MCP_RATE_LIMIT_PER_USER=1`), MCP handshake now
+  declares `capabilities` + `instructions`. 7 ready-to-paste client
+  configs under `examples/clients/` (Claude Desktop, Cursor, Cline,
+  LM Studio, Zed, Continue.dev, OpenAI Agent SDK). Hardened systemd
+  unit + NSSM Windows service installer.
+- **Wave 4 — RE ops**: `bindiff` (function-level fingerprint diff),
+  `rop_find` + `rop_chain` (gadget search + packed chain builder for
+  x86-64 and aarch64), `unity_il2cpp_metadata` / `unreal_fnames` /
+  `godot_pck` (game-engine metadata), `decompile_summarize` /
+  `struct_name_suggest` / `explain_at_level` (model-aided RE via
+  MCP sampling), `viz_call_graph` / `viz_cfg` (SVG graph rendering).
+
+### Changed
+- **`source.txt` → `source.txt.gz`** for every skill. Working tree
+  drops from 19 GiB → ~3 GiB; new `bin/mcp-gamehacking unpack` /
+  `pack` subcommands manage both layouts. The read helpers in the
+  server (`safeRead`, `fileExists`, `grepFile`) transparently fall
+  back to the `.gz` file, so every existing tool keeps working.
+- `.gitignore` now ignores decompressed `skills/*/source.txt`.
+- Server registers 100+ MCP tools (added 40+ in this release).
+
 ## [4.6.0] — 2026-10-26
 
 ### Added

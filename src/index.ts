@@ -200,7 +200,18 @@ async function safeRead(path: string): Promise<string | null> {
   try {
     return await readFile(path, "utf-8");
   } catch {
-    return null;
+    // Transparent fallback: if `path` is missing but `path.gz` is next
+    // to it on disk, decompress and return. This keeps every tool that
+    // was coded against the uncompressed layout working after we
+    // gzipped the big source.txt files to shrink the repo from 18 GiB
+    // to ~3 GiB. gunzip is in node's zlib — no external deps.
+    try {
+      const { gunzipSync } = await import("node:zlib");
+      const buf = await readFile(path + ".gz");
+      return gunzipSync(buf).toString("utf-8");
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -209,7 +220,9 @@ async function fileExists(path: string): Promise<boolean> {
     await stat(path);
     return true;
   } catch {
-    return false;
+    // Mirror safeRead's gzip fallback: `path` is considered to exist if
+    // `path.gz` is next to it on disk.
+    try { await stat(path + ".gz"); return true; } catch { return false; }
   }
 }
 
@@ -279,14 +292,31 @@ function notFound(kind: string, name: string) {
 // ============================================================
 
 async function grepFile(filePath: string, pattern: RegExp, maxMatches: number, contextLines: number): Promise<{ line: number; text: string }[]> {
-  return new Promise((resolve) => {
+  return new Promise(async (resolve) => {
     const matches: { line: number; text: string }[] = [];
     let lineNum = 0;
     const buffer: string[] = [];
 
     try {
+      // Resolve the live path: prefer the uncompressed source.txt when
+      // it exists; otherwise stream through gunzip from source.txt.gz
+      // transparently so the greps work in both layouts.
+      let readable: NodeJS.ReadableStream;
+      if (await fileExists(filePath) && !filePath.endsWith(".gz")) {
+        // check if uncompressed exists at the exact path
+        try {
+          await stat(filePath);
+          readable = createReadStream(filePath, { encoding: "utf-8", highWaterMark: 64 * 1024 });
+        } catch {
+          const { createGunzip } = await import("node:zlib");
+          readable = createReadStream(filePath + ".gz", { highWaterMark: 64 * 1024 }).pipe(createGunzip()).setEncoding("utf-8");
+        }
+      } else {
+        const { createGunzip } = await import("node:zlib");
+        readable = createReadStream(filePath + ".gz", { highWaterMark: 64 * 1024 }).pipe(createGunzip()).setEncoding("utf-8");
+      }
       const rl = createInterface({
-        input: createReadStream(filePath, { encoding: "utf-8", highWaterMark: 64 * 1024 }),
+        input: readable,
         crlfDelay: Infinity,
       });
 
