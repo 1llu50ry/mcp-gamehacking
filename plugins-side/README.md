@@ -13,7 +13,16 @@ Plugins we ship for the RE tools themselves. Each plugin runs inside its host an
 | `x64dbg/mcp_bridge.cpp` | x64dbg (latest) | 48765 | build .dp64 / .dp32, drop into `<x64dbg>/x64/plugins` |
 | `binaryninja/mcp_bridge.py` | Binary Ninja | 48766 | drop into `<binja>/plugins/` |
 
-Every plugin exposes a stable `/healthz` endpoint — `bridge_health_all` from the client side probes them in parallel and tells you which are up.
+Every plugin exposes two always-on endpoints:
+
+- `GET /healthz` — static readiness (plugin loaded + port bound). `bridge_health_all` from the client side probes them in parallel and tells you which are up.
+- `GET /ready` — host readiness (IDA auto-analysis idle, Ghidra autoAnalysis finished, Binja analysis idle, …). Hit this before firing a decompile request on a cold session so you don't trigger a race with the host's own analysis pass.
+
+Every response also carries CORS headers (`access-control-allow-origin: *`, `-methods: GET,POST,OPTIONS`, `-headers: content-type`) so a browser-based MCP client (claude.ai, Cursor web) can call the plugin directly.
+
+### Thread safety
+
+Hosts that are **not** thread-safe on their SDK (IDA, Ghidra, ReClass.NET) wrap every handler in the host's main-thread dispatcher (`ida_kernwin.execute_sync`, Ghidra's `SwingUtilities.invokeAndWait`-equivalent, ReClass.NET's `MainForm.Invoke`). Binary Ninja's SDK is thread-safe so handlers run directly on the HTTP worker thread.
 
 ## Build notes
 

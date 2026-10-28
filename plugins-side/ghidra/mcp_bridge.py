@@ -120,15 +120,32 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("content-type", "application/json")
         self.send_header("content-length", str(len(payload)))
+        self.send_header("access-control-allow-origin", "*")
+        self.send_header("access-control-allow-methods", "GET,POST,OPTIONS")
+        self.send_header("access-control-allow-headers", "content-type")
         self.end_headers()
         self.wfile.write(payload)
 
     def log_message(self, fmt, *args):
         pass  # silence
 
+    def do_OPTIONS(self):
+        self._write(204, {})
+
     def do_GET(self):
         if self.path == "/healthz":
-            self._write(200, {"ok": True, "program": _program.getName() if _program else None})
+            self._write(200, {"ok": True, "program": _program.getName() if _program else None, "port": MCP_PORT})
+            return
+        if self.path == "/ready":
+            # Ghidra reports autoAnalysisPending via the AutoAnalysisManager
+            ready = True
+            try:
+                from ghidra.app.plugin.core.analysis import AutoAnalysisManager
+                mgr = AutoAnalysisManager.getAnalysisManager(_program)
+                ready = not mgr.isAnalyzing()
+            except Exception:
+                pass
+            self._write(200, {"ready": ready})
             return
         self._write(404, {"error": "unknown path"})
 

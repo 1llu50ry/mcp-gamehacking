@@ -1,56 +1,60 @@
-// mcp-gamehacking :: dnSpy / dnSpyEx plugin
+// mcp-gamehacking :: dnSpy / dnSpyEx extension
 // ---------------------------------------------------------------
-// Build as a dnSpy extension (reference dnSpy.Contracts.DnSpy +
-// dnSpy.Contracts.Decompiler). Drop the resulting
-// mcp_dnspy_bridge.dll into dnSpy's Extensions/ directory.
+// Build as a dnSpy extension (net8-windows for dnSpyEx) and drop
+// mcp_dnspy_bridge.dll into dnSpy's Extensions/ folder, under its
+// own subdirectory with a matching plugin.xml descriptor if your
+// dnSpy build requires it.
 //
-// HTTP MCP on 127.0.0.1:48763.
+// Starts an HTTP server at 127.0.0.1:48763 (override via
+// MCP_DNSPY_PORT env var at process start). Autoload via MEF
+// ExportAutoLoaded so no user action is required.
 //
-//   GET  /healthz        -> {"ok":true,"loaded":<n>}
-//   POST /tool/modules   {}
-//   POST /tool/types     {"module":"..."}
-//   POST /tool/decompile {"type":"<FullName>","method":"<Name>"}
-//   POST /tool/strings   {"module":"..."}
+//   GET  /healthz       -> {"ok":true,"loaded":N}
+//   GET  /ready         -> {"ready":true}
+//   POST /tool/modules  {}
+//   POST /tool/types    {"module":"<name>"}
+//   POST /tool/methods  {"type":"<FullName>"}
+//   POST /tool/decompile{"type":"<FullName>","method":"<Name>?"}
+//   POST /tool/strings  {"module":"<name>"}
+//   POST /tool/il       {"type":"<FullName>","method":"<Name>"}
 
 using System;
-using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using dnlib.DotNet;
+using dnlib.DotNet.Emit;
 using dnSpy.Contracts.Documents;
-using dnSpy.Contracts.Documents.Tabs;
+using dnSpy.Contracts.Documents.TreeView;
 using dnSpy.Contracts.Extension;
+using dnSpy.Contracts.Decompiler;
 
 namespace mcp_dnspy_bridge
 {
-    [ExportExtension]
-    public sealed class McpBridgeExtension : IExtension
+    [ExportAutoLoaded]
+    public sealed class McpBridgeAutoLoader : IAutoLoaded
     {
-        private readonly IDocumentTabService tabs;
+        private const string Host = "127.0.0.1";
+        private static readonly int Port = int.TryParse(
+            Environment.GetEnvironmentVariable("MCP_DNSPY_PORT"), out var p) ? p : 48763;
+
+        private readonly IDocumentTreeView treeView;
+        private readonly IDecompilerService decompilers;
         private HttpListener listener;
         private CancellationTokenSource cts;
 
-        private const string Host = "127.0.0.1";
-        private const int    Port = 48763;
-
         [ImportingConstructor]
-        public McpBridgeExtension(IDocumentTabService tabs)
+        public McpBridgeAutoLoader(IDocumentTreeView treeView, IDecompilerService decompilers)
         {
-            this.tabs = tabs;
+            this.treeView = treeView;
+            this.decompilers = decompilers;
             Start();
         }
-
-        public IEnumerable<string> MergedResourceDictionaries => Array.Empty<string>();
-        public ExtensionInfo ExtensionInfo => new()
-        {
-            ShortDescription = "mcp-gamehacking bridge",
-            Copyright = "MIT"
-        };
 
         private void Start()
         {
@@ -60,18 +64,22 @@ namespace mcp_dnspy_bridge
             try
             {
                 listener.Start();
-                Task.Run(() => AcceptLoop(cts.Token));
+                _ = Task.Run(() => AcceptLoop(cts.Token));
                 Console.WriteLine($"[mcp-bridge] dnSpy MCP on http://{Host}:{Port}");
             }
-            catch (Exception ex) { Console.WriteLine($"[mcp-bridge] dnSpy start failed: {ex.Message}"); }
+            catch (Exception ex) { Console.WriteLine($"[mcp-bridge] dnSpy failed: {ex.Message}"); }
         }
 
         private async Task AcceptLoop(CancellationToken ct)
         {
             while (!ct.IsCancellationRequested)
             {
-                try { var ctx = await listener.GetContextAsync(); _ = Task.Run(() => Handle(ctx), ct); }
-                catch { }
+                try
+                {
+                    var ctx = await listener.GetContextAsync().ConfigureAwait(false);
+                    _ = Task.Run(() => Handle(ctx), ct);
+                }
+                catch { /* shutdown */ }
             }
         }
 
@@ -82,45 +90,52 @@ namespace mcp_dnspy_bridge
                 string body;
                 using (var sr = new StreamReader(ctx.Request.InputStream, Encoding.UTF8))
                     body = sr.ReadToEnd();
-                var path = ctx.Request.Url.AbsolutePath;
-                var (code, payload) = Dispatch(ctx.Request.HttpMethod, path, body);
-                var bytes = Encoding.UTF8.GetBytes(payload);
-                ctx.Response.StatusCode = code;
-                ctx.Response.ContentType = "application/json";
-                ctx.Response.ContentLength64 = bytes.Length;
-                ctx.Response.OutputStream.Write(bytes, 0, bytes.Length);
+                var (code, payload) = Dispatch(ctx.Request.HttpMethod, ctx.Request.Url.AbsolutePath, body);
+                WriteJson(ctx, code, payload);
             }
             catch (Exception ex)
             {
-                ctx.Response.StatusCode = 500;
-                var e = Encoding.UTF8.GetBytes("{\"error\":\"" + ex.Message.Replace("\"","'") + "\"}");
-                ctx.Response.OutputStream.Write(e, 0, e.Length);
+                WriteJson(ctx, 500, "{\"error\":\"" + Json(ex.Message) + "\"}");
             }
+        }
+
+        private static void WriteJson(HttpListenerContext ctx, int code, string payload)
+        {
+            var bytes = Encoding.UTF8.GetBytes(payload);
+            ctx.Response.StatusCode = code;
+            ctx.Response.ContentType = "application/json";
+            ctx.Response.ContentLength64 = bytes.Length;
+            ctx.Response.Headers["access-control-allow-origin"] = "*";
+            ctx.Response.Headers["access-control-allow-methods"] = "GET,POST,OPTIONS";
+            ctx.Response.Headers["access-control-allow-headers"] = "content-type";
+            try { ctx.Response.OutputStream.Write(bytes, 0, bytes.Length); }
             finally { ctx.Response.OutputStream.Close(); }
         }
 
         private (int, string) Dispatch(string method, string path, string body)
         {
-            var docs = tabs.DocumentTreeView.DocumentService.GetDocuments()
-                                                           .OfType<IDsDotNetDocument>().ToList();
+            if (method == "OPTIONS") return (204, "{}");
+            var docs = treeView.DocumentService.GetDocuments()
+                                               .OfType<IDsDotNetDocument>()
+                                               .Where(d => d.ModuleDef != null)
+                                               .ToList();
             if (method == "GET" && path == "/healthz")
                 return (200, "{\"ok\":true,\"loaded\":" + docs.Count + "}");
-            if (method == "POST" && path == "/tool/modules")
-                return (200, ListModules(docs));
-            if (method == "POST" && path == "/tool/types")
-                return (200, ListTypes(docs, Between(body, "\"module\":\"", "\"")));
-            if (method == "POST" && path == "/tool/decompile")
-            {
-                var t = Between(body, "\"type\":\"", "\"");
-                var m = Between(body, "\"method\":\"", "\"");
-                return (200, DecompileMethod(docs, t, m));
-            }
-            if (method == "POST" && path == "/tool/strings")
-                return (200, ListStrings(docs, Between(body, "\"module\":\"", "\"")));
+            if (method == "GET" && path == "/ready")
+                return (200, "{\"ready\":true,\"loaded\":" + docs.Count + "}");
+            if (method != "POST") return (405, "{\"error\":\"method not allowed\"}");
+
+            if (path == "/tool/modules")   return (200, ListModules(docs));
+            if (path == "/tool/types")     return (200, ListTypes(docs, ParseString(body, "module")));
+            if (path == "/tool/methods")   return (200, ListMethods(docs, ParseString(body, "type")));
+            if (path == "/tool/decompile") return (200, Decompile(docs, ParseString(body, "type"), ParseString(body, "method")));
+            if (path == "/tool/il")        return (200, EmitIl(docs, ParseString(body, "type"), ParseString(body, "method")));
+            if (path == "/tool/strings")   return (200, ListStrings(docs, ParseString(body, "module")));
             return (404, "{\"error\":\"unknown path\"}");
         }
 
-        private string ListModules(List<IDsDotNetDocument> docs)
+        // ----- data ------------------------------------------------
+        private static string ListModules(System.Collections.Generic.List<IDsDotNetDocument> docs)
         {
             var sb = new StringBuilder("{\"modules\":[");
             bool first = true;
@@ -128,70 +143,135 @@ namespace mcp_dnspy_bridge
             {
                 if (!first) sb.Append(",");
                 first = false;
-                sb.AppendFormat("{{\"name\":\"{0}\",\"fullName\":\"{1}\"}}",
-                    d.ModuleDef?.Name.String ?? d.Filename, d.ModuleDef?.Assembly?.FullName ?? "");
+                sb.Append("{")
+                  .Append("\"name\":\"").Append(Json(d.ModuleDef.Name)).Append("\",")
+                  .Append("\"fullName\":\"").Append(Json(d.ModuleDef.Assembly?.FullName ?? "")).Append("\",")
+                  .Append("\"path\":\"").Append(Json(d.Filename ?? "")).Append("\"")
+                  .Append("}");
             }
             sb.Append("]}");
             return sb.ToString();
         }
 
-        private string ListTypes(List<IDsDotNetDocument> docs, string moduleName)
+        private static ModuleDef FindModule(System.Collections.Generic.List<IDsDotNetDocument> docs, string name)
         {
-            var mod = docs.FirstOrDefault(d => d.ModuleDef?.Name == moduleName || d.Filename.EndsWith(moduleName));
-            if (mod == null) return "{\"error\":\"module not found\"}";
-            var sb = new StringBuilder("{\"types\":[");
-            bool first = true;
-            foreach (var t in mod.ModuleDef.GetTypes())
-            {
-                if (!first) sb.Append(",");
-                first = false;
-                sb.AppendFormat("{{\"full\":\"{0}\",\"methods\":{1}}}",
-                    t.FullName.Replace("\"", "\\\""), t.Methods.Count);
-            }
-            sb.Append("]}");
-            return sb.ToString();
+            if (string.IsNullOrEmpty(name)) return docs.FirstOrDefault()?.ModuleDef;
+            var d = docs.FirstOrDefault(x =>
+                x.ModuleDef.Name == name ||
+                (x.Filename != null && x.Filename.EndsWith(name, StringComparison.OrdinalIgnoreCase)));
+            return d?.ModuleDef;
         }
 
-        private string DecompileMethod(List<IDsDotNetDocument> docs, string typeName, string methodName)
+        private static TypeDef FindType(System.Collections.Generic.List<IDsDotNetDocument> docs, string full)
         {
             foreach (var d in docs)
             {
-                if (d.ModuleDef == null) continue;
-                var t = d.ModuleDef.GetTypes().FirstOrDefault(ty => ty.FullName == typeName);
-                if (t == null) continue;
-                var m = t.Methods.FirstOrDefault(mm => mm.Name == methodName);
-                if (m == null) continue;
-                // Lightweight: emit the IL body for now; full C# decomp
-                // requires wiring dnSpy's ILLanguageExporter which varies
-                // by dnSpy version. The IL text covers 90% of agent needs.
-                var sb = new StringBuilder("{\"il\":\"");
-                if (m.Body != null)
-                    foreach (var i in m.Body.Instructions)
-                        sb.Append(i.ToString().Replace("\"", "'").Replace("\n", " ").Replace("\\", "\\\\")).Append("\\n");
-                sb.Append("\"}");
-                return sb.ToString();
+                var t = d.ModuleDef.GetTypes().FirstOrDefault(ty => ty.FullName == full);
+                if (t != null) return t;
             }
-            return "{\"error\":\"method not found\"}";
+            return null;
         }
 
-        private string ListStrings(List<IDsDotNetDocument> docs, string moduleName)
+        private static string ListTypes(System.Collections.Generic.List<IDsDotNetDocument> docs, string moduleName)
         {
-            var mod = docs.FirstOrDefault(d => d.ModuleDef?.Name == moduleName || d.Filename.EndsWith(moduleName));
-            if (mod == null) return "{\"error\":\"module not found\"}";
-            var sb = new StringBuilder("{\"strings\":[");
+            var m = FindModule(docs, moduleName);
+            if (m == null) return "{\"error\":\"module not found\"}";
+            var sb = new StringBuilder("{\"types\":[");
             bool first = true;
-            foreach (var t in mod.ModuleDef.GetTypes())
+            foreach (var t in m.GetTypes())
+            {
+                if (!first) sb.Append(",");
+                first = false;
+                sb.Append("{")
+                  .Append("\"full\":\"").Append(Json(t.FullName)).Append("\",")
+                  .Append("\"methods\":").Append(t.Methods.Count).Append(",")
+                  .Append("\"isNested\":").Append(t.IsNested.ToString().ToLowerInvariant())
+                  .Append("}");
+            }
+            sb.Append("]}");
+            return sb.ToString();
+        }
+
+        private static string ListMethods(System.Collections.Generic.List<IDsDotNetDocument> docs, string typeName)
+        {
+            var t = FindType(docs, typeName);
+            if (t == null) return "{\"error\":\"type not found\"}";
+            var sb = new StringBuilder("{\"methods\":[");
+            bool first = true;
             foreach (var m in t.Methods)
             {
-                if (m.Body == null) continue;
-                foreach (var i in m.Body.Instructions)
+                if (!first) sb.Append(",");
+                first = false;
+                sb.Append("{\"name\":\"").Append(Json(m.Name)).Append("\",")
+                  .Append("\"signature\":\"").Append(Json(m.FullName)).Append("\",")
+                  .Append("\"ilInstructions\":").Append(m.Body?.Instructions?.Count ?? 0)
+                  .Append("}");
+            }
+            sb.Append("]}");
+            return sb.ToString();
+        }
+
+        private string Decompile(System.Collections.Generic.List<IDsDotNetDocument> docs, string typeName, string methodName)
+        {
+            var t = FindType(docs, typeName);
+            if (t == null) return "{\"error\":\"type not found\"}";
+            var dec = decompilers.AllDecompilers.FirstOrDefault(d => d.GenericNameUI == "C#") ?? decompilers.AllDecompilers.First();
+            using var ms = new MemoryStream();
+            using var writer = new StreamWriter(ms, Encoding.UTF8);
+            var output = new PlainTextOutput(writer);
+            try
+            {
+                if (string.IsNullOrEmpty(methodName))
+                    dec.Decompile(t, output, new DecompilationContext { CancellationToken = CancellationToken.None });
+                else
                 {
-                    if (i.OpCode.Code == dnlib.DotNet.Emit.Code.Ldstr && i.Operand is string s)
+                    var method = t.Methods.FirstOrDefault(m => m.Name == methodName);
+                    if (method == null) return "{\"error\":\"method not found\"}";
+                    dec.Decompile(method, output, new DecompilationContext { CancellationToken = CancellationToken.None });
+                }
+                writer.Flush();
+                var src = Encoding.UTF8.GetString(ms.ToArray());
+                return "{\"c#\":\"" + Json(src) + "\"}";
+            }
+            catch (Exception ex) { return "{\"error\":\"" + Json(ex.Message) + "\"}"; }
+        }
+
+        private static string EmitIl(System.Collections.Generic.List<IDsDotNetDocument> docs, string typeName, string methodName)
+        {
+            var t = FindType(docs, typeName);
+            if (t == null) return "{\"error\":\"type not found\"}";
+            var m = t.Methods.FirstOrDefault(mm => mm.Name == methodName);
+            if (m == null) return "{\"error\":\"method not found\"}";
+            if (m.Body == null) return "{\"il\":\"\"}";
+            var sb = new StringBuilder("{\"il\":\"");
+            foreach (var ins in m.Body.Instructions)
+            {
+                sb.Append(Json(ins.ToString())).Append("\\n");
+            }
+            sb.Append("\"}");
+            return sb.ToString();
+        }
+
+        private static string ListStrings(System.Collections.Generic.List<IDsDotNetDocument> docs, string moduleName)
+        {
+            var m = FindModule(docs, moduleName);
+            if (m == null) return "{\"error\":\"module not found\"}";
+            var sb = new StringBuilder("{\"strings\":[");
+            bool first = true;
+            foreach (var t in m.GetTypes())
+            foreach (var method in t.Methods)
+            {
+                if (method.Body == null) continue;
+                foreach (var ins in method.Body.Instructions)
+                {
+                    if (ins.OpCode.Code == Code.Ldstr && ins.Operand is string s)
                     {
                         if (!first) sb.Append(",");
                         first = false;
-                        sb.AppendFormat("{{\"method\":\"{0}.{1}\",\"text\":\"{2}\"}}",
-                            t.FullName.Replace("\"","\\\""), m.Name, s.Replace("\\","\\\\").Replace("\"","\\\"").Replace("\n","\\n"));
+                        sb.Append("{")
+                          .Append("\"method\":\"").Append(Json(t.FullName + "." + method.Name)).Append("\",")
+                          .Append("\"text\":\"").Append(Json(s)).Append("\"")
+                          .Append("}");
                     }
                 }
             }
@@ -199,14 +279,14 @@ namespace mcp_dnspy_bridge
             return sb.ToString();
         }
 
-        private static string Between(string s, string a, string b)
+        // ----- parse helpers ---------------------------------------
+        private static string Json(string s) =>
+            (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "").Replace("\n", "\\n").Replace("\t", "\\t");
+
+        private static string ParseString(string body, string key)
         {
-            if (string.IsNullOrEmpty(s)) return "";
-            var i = s.IndexOf(a);
-            if (i < 0) return "";
-            i += a.Length;
-            var j = s.IndexOf(b, i);
-            return j < 0 ? s.Substring(i) : s.Substring(i, j - i);
+            var m = Regex.Match(body ?? "", "\"" + Regex.Escape(key) + "\"\\s*:\\s*\"([^\"]*)\"");
+            return m.Success ? m.Groups[1].Value : "";
         }
     }
 }

@@ -31,10 +31,11 @@
 #pragma comment(lib, "ws2_32.lib")
 
 #define MCP_HOST "127.0.0.1"
-#define MCP_PORT 48765
+#define MCP_PORT_DEFAULT 48765
 
 static std::atomic<bool> g_running{true};
 static int               g_plugin_handle = 0;
+static int               g_port = MCP_PORT_DEFAULT;
 
 static std::string between(const std::string& s, const std::string& a, const std::string& b) {
     auto i = s.find(a); if (i == std::string::npos) return "";
@@ -92,10 +93,16 @@ static std::string json_writemem(duint ea, const std::string& bytes) {
 }
 
 static std::string dispatch(const std::string& method, const std::string& path, const std::string& body) {
+    if (method == "OPTIONS") return "{}";
     if (method == "GET" && path == "/healthz") {
-        return R"({"ok":true,)" + json_state().substr(1);  // merge
+        // merge {"ok":true, ...} with the inner body of json_state()
+        std::string st = json_state();          // e.g. {"state":"paused"}
+        return "{\"ok\":true," + st.substr(1);  // drop leading '{' and reuse the rest
     }
-    if (path == "/tool/state") return R"({"state":")" + json_state().substr(10,8) + R"("})";
+    if (method == "GET" && path == "/ready") {
+        return R"({"ready":true})";
+    }
+    if (path == "/tool/state") return json_state();
     if (path == "/tool/registers") return json_registers();
     if (path == "/tool/bp") {
         auto ea_s = between(body, "\"ea\":\"", "\"");
@@ -149,10 +156,14 @@ static void handle_client(SOCKET s) {
     auto hdr_end = req.find("\r\n\r\n");
     std::string body = (hdr_end != std::string::npos) ? req.substr(hdr_end + 4) : "";
     std::string payload = dispatch(method, path, body);
+    int status = (method == "OPTIONS") ? 204 : 200;
     std::ostringstream resp;
-    resp << "HTTP/1.1 200 OK\r\n"
+    resp << "HTTP/1.1 " << status << " OK\r\n"
          << "content-type: application/json\r\n"
          << "content-length: " << payload.size() << "\r\n"
+         << "access-control-allow-origin: *\r\n"
+         << "access-control-allow-methods: GET,POST,OPTIONS\r\n"
+         << "access-control-allow-headers: content-type\r\n"
          << "connection: close\r\n\r\n" << payload;
     auto s2 = resp.str();
     send(s, s2.c_str(), (int)s2.size(), 0);
@@ -162,11 +173,11 @@ static void handle_client(SOCKET s) {
 static void server_loop() {
     WSADATA wsa; WSAStartup(MAKEWORD(2, 2), &wsa);
     SOCKET srv = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    sockaddr_in a{}; a.sin_family = AF_INET; a.sin_port = htons(MCP_PORT);
+    sockaddr_in a{}; a.sin_family = AF_INET; a.sin_port = htons(g_port);
     inet_pton(AF_INET, MCP_HOST, &a.sin_addr);
     bind(srv, (sockaddr*)&a, sizeof(a));
     listen(srv, 8);
-    _plugin_logprintf("[mcp-bridge] x64dbg MCP on http://" MCP_HOST ":48765\n");
+    _plugin_logprintf("[mcp-bridge] x64dbg MCP on http://%s:%d\n", MCP_HOST, g_port);
     while (g_running) {
         SOCKET c = accept(srv, nullptr, nullptr);
         if (c == INVALID_SOCKET) break;
@@ -181,6 +192,14 @@ extern "C" __declspec(dllexport) bool pluginit(PLUG_INITSTRUCT* initStruct) {
     initStruct->sdkVersion    = PLUG_SDKVERSION;
     strncpy_s(initStruct->pluginName, "mcp-bridge", _TRUNCATE);
     g_plugin_handle = initStruct->pluginHandle;
+
+    // honour MCP_X64DBG_PORT if set
+    char buf[32];
+    if (GetEnvironmentVariableA("MCP_X64DBG_PORT", buf, sizeof(buf)) > 0) {
+        int p = atoi(buf);
+        if (p > 0 && p < 65536) g_port = p;
+    }
+
     std::thread(server_loop).detach();
     return true;
 }

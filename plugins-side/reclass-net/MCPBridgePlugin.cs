@@ -1,26 +1,38 @@
 // mcp-gamehacking :: ReClass.NET plugin
 // ---------------------------------------------------------------
-// Build against ReClass.NET's plugin SDK (reference ReClass.NET.exe).
-// Drop the resulting ReClassNET-MCP.dll into <ReClass.NET>/Plugins/.
-// Exposes HTTP MCP on 127.0.0.1:48762.
+// Build against ReClass.NET's plugin SDK (reference ReClass.NET.exe
+// and ReClass.NET.Core.dll). Drop the resulting ReClassNET-MCP.dll
+// into <ReClass.NET>/Plugins/.
 //
-//   GET  /healthz        -> {"ok":true,"project":"<name>"}
-//   POST /tool/classes   {}                                 — list classes
-//   POST /tool/nodes     {"class":"<name>"}                  — nodes of one class
-//   POST /tool/cpp       {"namespace":"sdk"}                 — emit C++ header
+//   GET  /healthz        -> {"ok":true,"project":"<name>","classes":<n>}
+//   GET  /ready          -> {"ready":true}
+//   POST /tool/classes   {}                            — list classes
+//   POST /tool/nodes     {"class":"<name>"}            — nodes of one class
+//   POST /tool/xml       {}                            — serialise project to XML
+//   POST /tool/pid       {}                            — attached process pid
+//   POST /tool/attach    {"process":"<name|pid>"}      — attach to process
+//   POST /tool/readmem   {"ea":"0x7FF...","size":256}  — process memory read
 //
-// The last two forward through the project's XmlSerializer so we never
-// re-implement reading on this side — ReClass.NET itself owns the model.
+// CORS enabled; HttpListener runs on a background Task. Exceptions are
+// mapped to 500 + {"error": ...}. The ReClass.NET SDK's model is
+// single-threaded on the UI thread; we use ReClassNET's Invoke pattern
+// via `ReClassForm.Invoke` to run the handler on that thread.
 
 using System;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using ReClassNET.Core;              // IPluginHost, Project, Node interfaces
-using ReClassNET.Plugins;
+using System.Xml.Linq;
+
+using ReClassNET;                          // ReClassNET.ReClassNetProject
+using ReClassNET.Core;                     // CoreFunctions, memory helpers
+using ReClassNET.Memory;                   // RemoteProcess
+using ReClassNET.Nodes;                    // ClassNode, BaseNode
+using ReClassNET.Plugins;                  // Plugin, IPluginHost
 
 namespace ReClassNET.MCP
 {
@@ -33,7 +45,7 @@ namespace ReClassNET.MCP
         private CancellationTokenSource cts;
         private IPluginHost host;
 
-        public override Image Icon => null; // optional
+        public override Image Icon => null;
 
         public override bool Initialize(IPluginHost host)
         {
@@ -44,7 +56,7 @@ namespace ReClassNET.MCP
             try
             {
                 listener.Start();
-                Task.Run(() => AcceptLoop(cts.Token));
+                _ = Task.Run(() => AcceptLoop(cts.Token));
                 Console.WriteLine($"[mcp-bridge] ReClass.NET MCP on http://{Host}:{Port}");
                 return true;
             }
@@ -57,9 +69,7 @@ namespace ReClassNET.MCP
 
         public override void Terminate()
         {
-            cts?.Cancel();
-            listener?.Stop();
-            listener?.Close();
+            try { cts?.Cancel(); listener?.Stop(); listener?.Close(); } catch { }
         }
 
         private async Task AcceptLoop(CancellationToken ct)
@@ -68,7 +78,7 @@ namespace ReClassNET.MCP
             {
                 try
                 {
-                    var ctx = await listener.GetContextAsync();
+                    var ctx = await listener.GetContextAsync().ConfigureAwait(false);
                     _ = Task.Run(() => Handle(ctx), ct);
                 }
                 catch { /* shutting down */ }
@@ -82,95 +92,195 @@ namespace ReClassNET.MCP
                 string body;
                 using (var sr = new StreamReader(ctx.Request.InputStream, Encoding.UTF8))
                     body = sr.ReadToEnd();
-                var path = ctx.Request.Url.AbsolutePath;
-                var (code, payload) = Dispatch(ctx.Request.HttpMethod, path, body);
-                var bytes = Encoding.UTF8.GetBytes(payload);
-                ctx.Response.StatusCode = code;
-                ctx.Response.ContentType = "application/json";
-                ctx.Response.ContentLength64 = bytes.Length;
-                ctx.Response.OutputStream.Write(bytes, 0, bytes.Length);
+                var (code, payload) = Dispatch(ctx.Request.HttpMethod, ctx.Request.Url.AbsolutePath, body);
+                WriteJson(ctx, code, payload);
             }
             catch (Exception ex)
             {
-                ctx.Response.StatusCode = 500;
-                var err = Encoding.UTF8.GetBytes("{\"error\":\"" + ex.Message.Replace("\"", "'") + "\"}");
-                ctx.Response.OutputStream.Write(err, 0, err.Length);
+                WriteJson(ctx, 500, "{\"error\":\"" + Json(ex.Message) + "\"}");
             }
+        }
+
+        private static void WriteJson(HttpListenerContext ctx, int code, string payload)
+        {
+            var bytes = Encoding.UTF8.GetBytes(payload);
+            ctx.Response.StatusCode = code;
+            ctx.Response.ContentType = "application/json";
+            ctx.Response.ContentLength64 = bytes.Length;
+            ctx.Response.Headers["access-control-allow-origin"] = "*";
+            ctx.Response.Headers["access-control-allow-methods"] = "GET,POST,OPTIONS";
+            ctx.Response.Headers["access-control-allow-headers"] = "content-type";
+            try { ctx.Response.OutputStream.Write(bytes, 0, bytes.Length); }
             finally { ctx.Response.OutputStream.Close(); }
         }
 
         private (int, string) Dispatch(string method, string path, string body)
         {
-            if (method == "GET" && path == "/healthz")
-                return (200, "{\"ok\":true,\"project\":\"" + (host.ActiveProject?.Name ?? "") + "\"}");
-            if (method == "POST" && path == "/tool/classes")
-                return (200, ListClasses());
-            if (method == "POST" && path == "/tool/nodes")
-                return (200, ListNodes(body));
-            if (method == "POST" && path == "/tool/cpp")
-                return (200, EmitCpp(body));
+            if (method == "OPTIONS") return (204, "{}");
+            if (method == "GET" && path == "/healthz") return (200, Healthz());
+            if (method == "GET" && path == "/ready")   return (200, "{\"ready\":true}");
+            if (method != "POST") return (405, "{\"error\":\"method not allowed\"}");
+
+            if (path == "/tool/classes") return (200, ListClasses());
+            if (path == "/tool/nodes")   return (200, ListNodes(ParseString(body, "class")));
+            if (path == "/tool/xml")     return (200, ExportXml());
+            if (path == "/tool/pid")     return (200, ProcessPid());
+            if (path == "/tool/attach")  return (200, Attach(ParseString(body, "process")));
+            if (path == "/tool/readmem") return (200, ReadMem(ParseString(body, "ea"), ParseLong(body, "size", 256)));
             return (404, "{\"error\":\"unknown path\"}");
+        }
+
+        // ----- data helpers (run on UI thread via Invoke) ----------
+        private T OnUi<T>(Func<T> fn)
+        {
+            if (host.MainForm.InvokeRequired)
+                return (T)host.MainForm.Invoke(fn);
+            return fn();
+        }
+
+        private string Healthz()
+        {
+            return OnUi(() =>
+            {
+                var proj = host.CurrentProject;
+                var count = proj?.Classes?.Count ?? 0;
+                var name  = proj?.Path ?? "";
+                return $"{{\"ok\":true,\"project\":\"{Json(name)}\",\"classes\":{count}}}";
+            });
         }
 
         private string ListClasses()
         {
-            var project = host.ActiveProject;
-            if (project == null) return "{\"classes\":[]}";
-            var sb = new StringBuilder("{\"classes\":[");
-            bool first = true;
-            foreach (var cls in project.Classes)
+            return OnUi(() =>
             {
-                if (!first) sb.Append(",");
-                first = false;
-                sb.AppendFormat("{{\"name\":\"{0}\",\"uuid\":\"{1}\"}}",
-                    cls.Name.Replace("\"", "\\\""), cls.Uuid);
-            }
-            sb.Append("]}");
-            return sb.ToString();
+                var proj = host.CurrentProject;
+                if (proj == null) return "{\"classes\":[]}";
+                var sb = new StringBuilder("{\"classes\":[");
+                bool first = true;
+                foreach (var cls in proj.Classes)
+                {
+                    if (!first) sb.Append(",");
+                    first = false;
+                    sb.Append("{")
+                      .Append("\"name\":\"").Append(Json(cls.Name)).Append("\",")
+                      .Append("\"uuid\":\"").Append(cls.Uuid.ToString()).Append("\",")
+                      .Append("\"size\":").Append(cls.MemorySize)
+                      .Append("}");
+                }
+                sb.Append("]}");
+                return sb.ToString();
+            });
         }
 
-        private string ListNodes(string body)
+        private string ListNodes(string className)
         {
-            // Minimal parse: {"class":"..."} — avoid pulling in a JSON lib
-            var name = Between(body, "\"class\":\"", "\"");
-            var project = host.ActiveProject;
-            var cls = project?.Classes.FirstOrDefault(c => c.Name == name);
-            if (cls == null) return "{\"error\":\"class not found\"}";
-            var sb = new StringBuilder("{\"nodes\":[");
-            bool first = true;
-            foreach (var n in cls.Nodes)
+            return OnUi(() =>
             {
-                if (!first) sb.Append(",");
-                first = false;
-                sb.AppendFormat("{{\"type\":\"{0}\",\"name\":\"{1}\",\"offset\":{2}}}",
-                    n.GetType().Name, n.Name.Replace("\"", "\\\""), n.Offset.ToInt64());
-            }
-            sb.Append("]}");
-            return sb.ToString();
+                var proj = host.CurrentProject;
+                var cls = proj?.Classes.FirstOrDefault(c => c.Name == className);
+                if (cls == null) return "{\"error\":\"class not found\"}";
+                var sb = new StringBuilder("{\"nodes\":[");
+                bool first = true;
+                foreach (var n in cls.Nodes)
+                {
+                    if (!first) sb.Append(",");
+                    first = false;
+                    sb.Append("{")
+                      .Append("\"type\":\"").Append(Json(n.GetType().Name)).Append("\",")
+                      .Append("\"name\":\"").Append(Json(n.Name ?? "")).Append("\",")
+                      .Append("\"offset\":").Append(n.Offset.ToInt64()).Append(",")
+                      .Append("\"size\":").Append(n.MemorySize)
+                      .Append("}");
+                }
+                sb.Append("]}");
+                return sb.ToString();
+            });
         }
 
-        private string EmitCpp(string body)
+        private string ExportXml()
         {
-            // We just forward raw XML — the TS side has reclass_to_cpp
-            // which already does the C++ emission. This endpoint simply
-            // serializes the live project to the same XML format ReClass
-            // writes to disk.
-            var project = host.ActiveProject;
-            if (project == null) return "{\"error\":\"no project\"}";
-            using var ms = new MemoryStream();
-            project.Save(ms); // writes the standard .rcnet XML
-            var xml = Encoding.UTF8.GetString(ms.ToArray()).Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n");
-            return "{\"xml\":\"" + xml + "\"}";
+            return OnUi(() =>
+            {
+                var proj = host.CurrentProject;
+                if (proj == null) return "{\"error\":\"no project\"}";
+                try
+                {
+                    using var ms = new MemoryStream();
+                    proj.Save(ms, host.Logger);
+                    var xml = Encoding.UTF8.GetString(ms.ToArray());
+                    return "{\"xml\":\"" + Json(xml) + "\"}";
+                }
+                catch (Exception ex) { return "{\"error\":\"" + Json(ex.Message) + "\"}"; }
+            });
         }
 
-        private static string Between(string s, string a, string b)
+        private string ProcessPid()
         {
-            if (string.IsNullOrEmpty(s)) return "";
-            var i = s.IndexOf(a);
-            if (i < 0) return "";
-            i += a.Length;
-            var j = s.IndexOf(b, i);
-            return j < 0 ? s.Substring(i) : s.Substring(i, j - i);
+            return OnUi(() =>
+            {
+                var proc = host.Process;
+                if (proc == null || !proc.IsValid) return "{\"pid\":null}";
+                return $"{{\"pid\":{proc.UnderlayingProcess.Id},\"name\":\"{Json(proc.UnderlayingProcess.Name)}\"}}";
+            });
+        }
+
+        private string Attach(string procName)
+        {
+            return OnUi(() =>
+            {
+                try
+                {
+                    // ReClass.NET exposes an attach dialog but no plain name-based
+                    // attach API in all versions. We trigger the attach dialog so
+                    // the user confirms, then report back the current process.
+                    host.MainForm.AttachToProcessPaused(procName);
+                    return ProcessPid();
+                }
+                catch (Exception ex) { return "{\"error\":\"" + Json(ex.Message) + "\"}"; }
+            });
+        }
+
+        private string ReadMem(string eaStr, long size)
+        {
+            return OnUi(() =>
+            {
+                try
+                {
+                    var proc = host.Process;
+                    if (proc == null || !proc.IsValid) return "{\"error\":\"not attached\"}";
+                    var ea = ParseHex(eaStr);
+                    var buf = new byte[Math.Max(1, Math.Min(size, 1 << 20))];
+                    proc.ReadRemoteMemoryIntoBuffer(new IntPtr((long)ea), buf);
+                    var sb = new StringBuilder("{\"hex\":\"");
+                    foreach (var b in buf) sb.Append(b.ToString("X2")).Append(' ');
+                    sb.Append("\"}");
+                    return sb.ToString();
+                }
+                catch (Exception ex) { return "{\"error\":\"" + Json(ex.Message) + "\"}"; }
+            });
+        }
+
+        // ----- parse helpers --------------------------------------
+        private static string Json(string s) =>
+            (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "").Replace("\n", "\\n").Replace("\t", "\\t");
+
+        private static string ParseString(string body, string key)
+        {
+            var m = Regex.Match(body ?? "", "\"" + Regex.Escape(key) + "\"\\s*:\\s*\"([^\"]*)\"");
+            return m.Success ? m.Groups[1].Value : "";
+        }
+
+        private static long ParseLong(string body, string key, long def)
+        {
+            var m = Regex.Match(body ?? "", "\"" + Regex.Escape(key) + "\"\\s*:\\s*(-?\\d+)");
+            return m.Success && long.TryParse(m.Groups[1].Value, out var v) ? v : def;
+        }
+
+        private static ulong ParseHex(string s)
+        {
+            s = (s ?? "").Trim();
+            if (s.StartsWith("0x") || s.StartsWith("0X")) s = s.Substring(2);
+            return ulong.TryParse(s, System.Globalization.NumberStyles.HexNumber, null, out var v) ? v : 0UL;
         }
     }
 }

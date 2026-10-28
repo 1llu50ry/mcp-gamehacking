@@ -133,7 +133,9 @@ end
 local function dispatch(path, body)
   local p = json.decode(body)
   if path == "/healthz" then
-    return 200, { ok = true, ce = getCEVersion and getCEVersion() or "unknown", attached = attached_pid }
+    return 200, { ok = true, ce = getCEVersion and getCEVersion() or "unknown", attached = attached_pid, port = MCP_PORT }
+  elseif path == "/ready" then
+    return 200, { ready = true, attached = attached_pid }
   elseif path == "/tool/attach" then
     local pid, e = do_attach(p.process); if not pid then return 400, { error = e } end
     return 200, { pid = pid }
@@ -179,6 +181,9 @@ local function handle_client(client)
   client:send("HTTP/1.1 " .. status .. " OK\r\n")
   client:send("content-type: application/json\r\n")
   client:send("content-length: " .. #json_body .. "\r\n")
+  client:send("access-control-allow-origin: *\r\n")
+  client:send("access-control-allow-methods: GET,POST,OPTIONS\r\n")
+  client:send("access-control-allow-headers: content-type\r\n")
   client:send("connection: close\r\n\r\n")
   client:send(json_body)
   client:close()
