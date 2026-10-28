@@ -1,0 +1,50 @@
+[
+  {
+    "name": "memcpy_x64_prologue",
+    "module": "libc",
+    "prolog": "48 89 ?? ?? 48 89 ?? ?? 48 89 ??",
+    "length": 11
+  },
+  {
+    "name": "memset_x64_prologue",
+    "module": "libc",
+    "prolog": "48 89 ?? ?? 48 89 ?? ?? 48 85 ??",
+    "length": 11
+  },
+  {
+    "name": "strlen_x64_rep_scasb",
+    "module": "libc",
+    "prolog": "48 83 C9 FF 48 8B C1 F2 AE",
+    "length": 9
+  },
+  {
+    "name": "crt_entry_mainCRTStartup",
+    "module": "msvcrt",
+    "prolog": "48 83 EC ?? 48 8D ?? ?? ?? ?? ?? E8",
+    "length": 12
+  },
+  {
+    "name": "msvc_security_check_cookie",
+    "module": "msvcrt",
+    "prolog": "48 3B 0D ?? ?? ?? ?? 75 ?? C3",
+    "length": 10
+  },
+  {
+    "name": "openssl_EVP_EncryptInit_ex",
+    "module": "openssl",
+    "prolog": "48 89 5C 24 ?? 48 89 74 24 ?? 48 89 7C 24 ?? 41 56 48 83 EC",
+    "length": 20
+  },
+  {
+    "name": "qt_qmetacall_prologue",
+    "module": "qt",
+    "prolog": "48 89 5C 24 ?? 57 48 83 EC 30 83 FA 02",
+    "length": 13
+  },
+  {
+    "name": "unity_IL2CPP_String_New",
+    "module": "unity-il2cpp",
+    "prolog": "48 89 5C 24 ?? 48 89 74 24 ?? 48 83 EC 20 48 8B F2",
+    "length": 17
+  }
+]

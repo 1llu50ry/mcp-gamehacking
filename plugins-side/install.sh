@@ -96,6 +96,22 @@ if should binja; then
   fi
 fi
 
+# -------- Frida (standalone python bridge) --------
+if should frida; then
+  echo
+  echo "[frida] checking python + frida module..."
+  PY="$(command -v python3 || command -v python || true)"
+  if [[ -z "$PY" ]]; then
+    echo "  python not found — install Python 3.9+"
+  else
+    if "$PY" -c 'import frida, sys; print(frida.__version__)' 2>/dev/null; then
+      echo "  python + frida ok; bridge runs standalone with: $PY plugins-side/frida/mcp_bridge.py"
+    else
+      echo "  frida module missing — run:  $PY -m pip install frida frida-tools"
+    fi
+  fi
+fi
+
 # -------- Reminders about Windows-only hosts --------
 echo
 echo "note: Cheat Engine / ReClass.NET / dnSpy / ILSpy / x64dbg are Windows-only."

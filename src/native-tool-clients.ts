@@ -26,6 +26,7 @@ const B = {
   ilspy:  { name: "ILSpy bridge",  port: 48764, hostEnv: "MCP_ILSPY_HOST",  portEnv: "MCP_ILSPY_PORT",  installHint: "plugins-side/ilspy/" },
   x64dbg: { name: "x64dbg bridge", port: 48765, hostEnv: "MCP_X64DBG_HOST", portEnv: "MCP_X64DBG_PORT", installHint: "plugins-side/x64dbg/" },
   binja:  { name: "Binja bridge",  port: 48766, hostEnv: "MCP_BINJA_HOST",  portEnv: "MCP_BINJA_PORT",  installHint: "plugins-side/binaryninja/mcp_bridge.py" },
+  frida:  { name: "Frida bridge",  port: 48767, hostEnv: "MCP_FRIDA_HOST",  portEnv: "MCP_FRIDA_PORT",  installHint: "plugins-side/frida/mcp_bridge.py (pip install frida)" },
 } as const satisfies Record<string, Backend>;
 
 type Bk = keyof typeof B;
@@ -166,6 +167,32 @@ export function registerPluginClients(server: McpServer): void {
     async ({ min }: { min: number }) => run(B.binja, "/tool/strings", { min }, "binja_strings"));
   server.tool("binja_rename", "Rename a function at EA via Binja.", { ea: z.string(), name: z.string() },
     async ({ ea, name }: { ea: string; name: string }) => run(B.binja, "/tool/rename", { ea, name }, `binja_rename ${ea} → ${name}`));
+
+  // -------- Frida (dynamic instrumentation) ---------
+  server.tool("frida_health", "Probe the Frida bridge (plugins-side/frida/mcp_bridge.py).", {},
+    async () => run(B.frida, "/healthz", {}, "frida_health"));
+  server.tool("frida_devices", "List Frida devices (local, usb, remote).", {},
+    async () => run(B.frida, "/tool/devices", {}, "frida_devices"));
+  server.tool("frida_ps", "List processes on a Frida device.", { device: z.string().default("local") },
+    async ({ device }: { device: string }) => run(B.frida, "/tool/ps", { device }, `frida_ps ${device}`));
+  server.tool("frida_spawn", "Spawn a program under Frida.", { program: z.string(), device: z.string().default("local"), args: z.array(z.string()).default([]) },
+    async ({ program, device, args }: { program: string; device: string; args: string[] }) => run(B.frida, "/tool/spawn", { program, device, args }, `frida_spawn ${program}`));
+  server.tool("frida_attach", "Attach to a process by pid or name; returns a session id.", { target: z.string(), device: z.string().default("local") },
+    async ({ target, device }: { target: string; device: string }) => run(B.frida, "/tool/attach", { target: isNaN(Number(target)) ? target : Number(target), device }, `frida_attach ${target}`));
+  server.tool("frida_detach", "Detach a Frida session.", { session: z.string() },
+    async ({ session }: { session: string }) => run(B.frida, "/tool/detach", { session }, `frida_detach ${session}`));
+  server.tool("frida_inject", "Inject a raw Frida JS script into a session.", { session: z.string(), script: z.string() },
+    async ({ session, script }: { session: string; script: string }) => run(B.frida, "/tool/inject", { session, script }, `frida_inject ${session}`));
+  server.tool("frida_trace", "Attach an Interceptor to a target like `exports:kernel32!CreateFileW`.", { session: z.string(), pattern: z.string() },
+    async ({ session, pattern }: { session: string; pattern: string }) => run(B.frida, "/tool/trace", { session, pattern }, `frida_trace ${pattern}`));
+  server.tool("frida_dump", "Read raw memory from a Frida session as hex.", { session: z.string(), addr: z.string(), size: z.number().min(1).max(1 << 24).default(256) },
+    async ({ session, addr, size }: { session: string; addr: string; size: number }) => run(B.frida, "/tool/dump", { session, addr, size }, `frida_dump ${addr}`));
+  server.tool("frida_replace", "Overwrite memory at an address with space-separated hex bytes.", { session: z.string(), addr: z.string(), bytes: z.string() },
+    async ({ session, addr, bytes }: { session: string; addr: string; bytes: string }) => run(B.frida, "/tool/replace", { session, addr, bytes }, `frida_replace ${addr}`));
+  server.tool("frida_exports", "Enumerate exports from a module in a Frida session.", { session: z.string(), module: z.string().optional() },
+    async ({ session, module }: { session: string; module?: string }) => run(B.frida, "/tool/exports", { session, module }, `frida_exports ${module ?? "(main)"}`));
+  server.tool("frida_modules", "Enumerate loaded modules in a Frida session.", { session: z.string() },
+    async ({ session }: { session: string }) => run(B.frida, "/tool/modules", { session }, `frida_modules ${session}`));
 
   // -------- bridge_health_all: one-shot probe of every bridge ---------
   server.tool("bridge_health_all", "Probe every plugins-side bridge in parallel and report which are up.", {},

@@ -148,6 +148,22 @@ if (Should "ilspy") {
   } else { Say "  set `$env:ILSPY_PATH" "DarkYellow" }
 }
 
+# -------- Frida (standalone python bridge) --------
+if (Should "frida") {
+  Say "`n[frida] checking python + frida module..." "Cyan"
+  $py = Pick @((Get-Command python -ErrorAction SilentlyContinue).Source, (Get-Command python3 -ErrorAction SilentlyContinue).Source)
+  if (-not $py) { Say "  python not found — install Python 3.9+" "DarkYellow" }
+  else {
+    $hasFrida = (& $py -c "import frida; print(frida.__version__)" 2>$null)
+    if ($LASTEXITCODE -eq 0) {
+      Say "  python + frida ok (v$hasFrida); bridge runs standalone with: python plugins-side\frida\mcp_bridge.py"
+      Say "  (no copy needed — launch when you need it)"
+    } else {
+      Say "  frida module missing — run:  $py -m pip install frida frida-tools" "DarkYellow"
+    }
+  }
+}
+
 # -------- x64dbg --------
 if (Should "x64dbg") {
   Say "`n[x64dbg] searching for x64dbg..." "Cyan"

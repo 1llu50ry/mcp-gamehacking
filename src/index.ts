@@ -27,6 +27,11 @@ import { registerNativeYara } from "./native-yara.js";
 import { registerNativeReclass } from "./native-reclass.js";
 import { registerCeserverClient } from "./native-ceserver.js";
 import { registerPluginClients } from "./native-tool-clients.js";
+import { registerEmulator } from "./native-emulator.js";
+import { registerNativeDwarf } from "./native-dwarf.js";
+import { registerNativePdb } from "./native-pdb.js";
+import { registerSignatureDb } from "./signature-db.js";
+import { attachObservabilityRoutes, metrics } from "./observability.js";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const DIRS = {
@@ -1681,6 +1686,18 @@ registerCeserverClient(server);
 // localhost. See plugins-side/README.md for install instructions.
 registerPluginClients(server);
 
+// Wave 2 (dynamic analysis + symbols + observability):
+//   emu_run / emu_decrypt_xor — tiny built-in x86-64 emulator for
+//     string-decrypt loops and small decrypt stubs (no external deps)
+//   dwarf_parse — native DWARF v4/v5 compile-unit + subprogram walker
+//   pdb_info    — native MSF/PDB superblock + Info + DBI module list
+//   sig_list / sig_match / sig_make — FLIRT-light signature db
+//     (signatures/common.json ships with the project; extend via sig_make)
+registerEmulator(server);
+registerNativeDwarf(server);
+registerNativePdb(server);
+registerSignatureDb(server, ROOT);
+
 // ============================================================
 // MAIN
 // ============================================================
@@ -1786,8 +1803,9 @@ async function main() {
       res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
       res.end("not found. endpoints: /mcp, /healthz, /metrics");
     });
+    attachObservabilityRoutes(httpServer);
     httpServer.listen(port, host, () => {
-      console.error(`[mcp-gamehacking] HTTP transport on http://${host}:${port}/mcp (health: /healthz, metrics: /metrics)`);
+      console.error(`[mcp-gamehacking] HTTP transport on http://${host}:${port}/mcp (health: /healthz, metrics: /metrics, dashboard: /dashboard)`);
     });
   } else {
     const transport = new StdioServerTransport();
