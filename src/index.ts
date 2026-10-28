@@ -26,6 +26,7 @@ import { registerNativeMemory } from "./native-memory.js";
 import { registerNativeYara } from "./native-yara.js";
 import { registerNativeReclass } from "./native-reclass.js";
 import { registerCeserverClient } from "./native-ceserver.js";
+import { registerPluginClients } from "./native-tool-clients.js";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const DIRS = {
@@ -1671,6 +1672,14 @@ await registerNativeMemory(server, ROOT);
 registerNativeYara(server);
 registerNativeReclass(server);
 registerCeserverClient(server);
+
+// Clients for the host-side plugins under plugins-side/ (Ghidra, IDA,
+// ReClass.NET, dnSpy, ILSpy, x64dbg, Binary Ninja). Each plugin runs
+// inside its host tool and exposes a small HTTP MCP surface; the
+// clients registered here (ghidra_* / ida_* / reclass_*_live / dnspy_*
+// / ilspy_* / x64dbg_* / binja_* / bridge_health_all) call it over
+// localhost. See plugins-side/README.md for install instructions.
+registerPluginClients(server);
 
 // ============================================================
 // MAIN
