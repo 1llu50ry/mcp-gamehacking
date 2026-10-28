@@ -284,6 +284,19 @@ async function fileExists(path: string): Promise<boolean> {
   }
 }
 
+/**
+ * Map a project directory to the SQLite table name. Returns null for
+ * directories we don't mirror in the DB (notably `skills` — that one
+ * has its own SKILL.md round-trip path through safeRead already).
+ */
+function dirToTable(dir: string): "plugins" | "agents" | "subagents" | "prompts" | null {
+  if (dir === DIRS.plugins)   return "plugins";
+  if (dir === DIRS.agents)    return "agents";
+  if (dir === DIRS.subagents) return "subagents";
+  if (dir === DIRS.prompts)   return "prompts";
+  return null;
+}
+
 async function listMdFiles(dir: string, category?: string): Promise<CategorizedFile[]> {
   try {
     const entries = await readdir(dir, { withFileTypes: true });
@@ -300,10 +313,54 @@ async function listMdFiles(dir: string, category?: string): Promise<CategorizedF
         }
       }
     }
-    return results;
+    if (results.length > 0) return results;
+    // Fall through to DB when the directory walk produced nothing.
+    return (await listMdFromDb(dir)) ?? results;
   } catch {
-    return [];
+    // The directory doesn't exist at all — ask the DB directly.
+    return (await listMdFromDb(dir)) ?? [];
   }
+}
+
+async function listMdFromDb(dir: string): Promise<CategorizedFile[] | null> {
+  const table = dirToTable(dir);
+  if (!table) return null;
+  try {
+    const dbMod = await import("./skills-db.js");
+    const h = await dbMod.openDbIfPresent(dbMod.defaultDbPath(ROOT));
+    if (!h) return null;
+    try {
+      if (table === "plugins") {
+        const rows = dbMod.listPlugins(h);
+        const out: CategorizedFile[] = [];
+        for (const r of rows) {
+          const body = dbMod.getPlugin(h, r.category, r.name);
+          if (!body) continue;
+          out.push({ ...parseFrontmatter(body.body), category: r.category });
+        }
+        return out;
+      }
+      if (table === "prompts") {
+        const rows = dbMod.listPrompts(h);
+        const out: CategorizedFile[] = [];
+        for (const r of rows) {
+          const body = dbMod.getPromptBody(h, r.category, r.name);
+          if (!body) continue;
+          out.push({ ...parseFrontmatter(body), category: r.category });
+        }
+        return out;
+      }
+      // agents / subagents (no category)
+      const names = dbMod.listAgents(h, table);
+      const out: CategorizedFile[] = [];
+      for (const n of names) {
+        const body = dbMod.getAgentBody(h, table, n);
+        if (!body) continue;
+        out.push({ ...parseFrontmatter(body) });
+      }
+      return out;
+    } finally { h.close(); }
+  } catch { return null; }
 }
 
 async function findMdByName(dir: string, name: string): Promise<string | null> {
@@ -321,11 +378,48 @@ async function findMdByName(dir: string, name: string): Promise<string | null> {
   return null;
 }
 
+/** DB-side alternative: returns the body text directly if present. */
+async function readBodyFromDb(dir: string, name: string): Promise<string | null> {
+  const table = dirToTable(dir);
+  if (!table) return null;
+  try {
+    const dbMod = await import("./skills-db.js");
+    const h = await dbMod.openDbIfPresent(dbMod.defaultDbPath(ROOT));
+    if (!h) return null;
+    try {
+      if (table === "plugins") {
+        for (const row of dbMod.listPlugins(h)) {
+          if (row.name === name) {
+            const r = dbMod.getPlugin(h, row.category, row.name);
+            if (r) return r.body;
+          }
+        }
+        return null;
+      }
+      if (table === "prompts") {
+        for (const row of dbMod.listPrompts(h)) {
+          if (row.name === name) {
+            return dbMod.getPromptBody(h, row.category, row.name);
+          }
+        }
+        return null;
+      }
+      return dbMod.getAgentBody(h, table, name);
+    } finally { h.close(); }
+  } catch { return null; }
+}
+
 async function readMdByName(dir: string, name: string): Promise<ParsedFile | null> {
   const path = await findMdByName(dir, name);
-  if (!path) return null;
-  const content = await safeRead(path);
-  return content ? parseFrontmatter(content) : null;
+  if (path) {
+    const content = await safeRead(path);
+    if (content) return parseFrontmatter(content);
+  }
+  // DB fallback — for when the plugins/agents/etc. tree has been
+  // reaped and only db/skills.db remains.
+  const body = await readBodyFromDb(dir, name);
+  if (!body) return null;
+  return parseFrontmatter(body);
 }
 
 async function readSkill(name: string): Promise<ParsedFile | null> {

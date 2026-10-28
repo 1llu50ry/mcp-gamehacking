@@ -19,35 +19,84 @@ const ROOT = process.env.MCP_PROJECT_ROOT ?? resolve(__dirname, "..");
 
 const [, , cmd, ...rest] = process.argv;
 
+async function openDb() {
+  const p = process.env.MCP_SKILLS_DB ?? join(ROOT, "db", "skills.db");
+  try { await stat(p); } catch { return null; }
+  const { DatabaseSync } = await import("node:sqlite");
+  return { h: new DatabaseSync(p, { readOnly: true }), path: p };
+}
+
 async function cmdStats() {
-  const names = await readdir(join(ROOT, "skills"));
-  let ags = 0;
-  for (const n of names) if (n.startsWith("ags-")) ags++;
-  console.log(`skills: ${names.length}  (hand-written ${names.length - ags}, archived ags-* ${ags})`);
-  for (const d of ["agents", "subagents", "plugins", "prompts"]) {
-    try {
-      let c = 0;
-      const stack = [join(ROOT, d)];
-      while (stack.length) {
-        const dir = stack.pop();
-        for (const e of await readdir(dir, { withFileTypes: true })) {
-          const p = join(dir, e.name);
-          if (e.isDirectory()) stack.push(p);
-          else if (e.name.endsWith(".md")) c++;
+  // Prefer the SQLite path — one SELECT per table is instant where
+  // the equivalent FS walk is thousands of readdir+open round trips.
+  // Falls back to the filesystem for setups that still have the trees.
+  const db = await openDb();
+  if (db) {
+    const q = (sql) => db.h.prepare(sql).get() ?? { c: 0 };
+    const total = q("SELECT COUNT(*) c FROM skills").c;
+    const ags = q("SELECT COUNT(*) c FROM skills WHERE name LIKE 'ags-%'").c;
+    console.log(`skills: ${total}  (hand-written ${total - ags}, archived ags-* ${ags})`);
+    for (const t of ["agents", "subagents", "plugins", "prompts"]) {
+      console.log(`${t}: ${q(`SELECT COUNT(*) c FROM ${t}`).c}`);
+    }
+    db.h.close();
+    return;
+  }
+  try {
+    const names = await readdir(join(ROOT, "skills"));
+    let ags = 0;
+    for (const n of names) if (n.startsWith("ags-")) ags++;
+    console.log(`skills: ${names.length}  (hand-written ${names.length - ags}, archived ags-* ${ags})`);
+    for (const d of ["agents", "subagents", "plugins", "prompts"]) {
+      try {
+        let c = 0;
+        const stack = [join(ROOT, d)];
+        while (stack.length) {
+          const dir = stack.pop();
+          for (const e of await readdir(dir, { withFileTypes: true })) {
+            const p = join(dir, e.name);
+            if (e.isDirectory()) stack.push(p);
+            else if (e.name.endsWith(".md")) c++;
+          }
         }
-      }
-      console.log(`${d}: ${c}`);
-    } catch { /* ignore */ }
+        console.log(`${d}: ${c}`);
+      } catch { /* ignore */ }
+    }
+  } catch (e) {
+    console.error("no db/skills.db and no skills/ tree — nothing to stat");
+    process.exit(1);
   }
 }
 
 async function cmdLookup(name) {
+  const db = await openDb();
+  if (db) {
+    const row = db.h.prepare("SELECT name, description, type, topics_json, body FROM skills WHERE name = ?").get(name);
+    db.h.close();
+    if (row) {
+      const topics = row.topics_json ? JSON.parse(row.topics_json) : [];
+      process.stdout.write(`---\nname: ${row.name}\ndescription: "${(row.description ?? "").replace(/"/g, '\\"')}"\ntype: ${row.type ?? "reference"}\ntopics: [${topics.map(t => `"${t}"`).join(", ")}]\n---\n\n${row.body}`);
+      return;
+    }
+  }
   const p = join(ROOT, "skills", name, "SKILL.md");
   try { process.stdout.write(await readFile(p, "utf8")); }
-  catch { console.error(`skill not found: ${name}  (looked at ${p})`); process.exit(1); }
+  catch { console.error(`skill not found: ${name}`); process.exit(1); }
 }
 
 async function cmdSearch(q) {
+  const db = await openDb();
+  if (db) {
+    const clean = q.replace(/["();:]/g, " ").trim();
+    const rows = db.h.prepare(
+      "SELECT name, snippet(skills_fts, 3, '[', ']', '…', 8) AS snip, bm25(skills_fts) r FROM skills_fts WHERE skills_fts MATCH ? ORDER BY r LIMIT 50"
+    ).all(clean);
+    db.h.close();
+    if (!rows.length) { console.log("no matches"); process.exit(1); }
+    for (const r of rows) console.log(`${r.name.padEnd(45)}  ${r.snip.replace(/\s+/g, " ").trim().slice(0, 120)}`);
+    return;
+  }
+  // FS fallback — same shape as before.
   const names = await readdir(join(ROOT, "skills"));
   const lc = q.toLowerCase();
   const hits = [];

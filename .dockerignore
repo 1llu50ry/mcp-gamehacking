@@ -44,8 +44,14 @@ ROADMAP.md
 README-*.md
 plugins-side/
 
-# ---- decompressed source dumps (we only ship the .gz) ----
-skills/*/source.txt
+# ---- content library (DB-only in the image) ----
+# The 5 raw directories are the DB's source material; the image
+# only needs db/skills.db at runtime.
+skills/
+plugins/
+agents/
+subagents/
+prompts/
 
 # ---- tests / tooling ----
 tests/

@@ -40,17 +40,16 @@ COPY package.json package-lock.json* ./
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --omit=dev --no-audit --no-fund --ignore-scripts
 
-# Compiled JS + static assets. We ship the gzipped source archives
-# (skills/*/source.txt.gz) under skills/ — the server's safeRead
-# helper decompresses them on demand, so no unpack step at startup.
+# Compiled JS + static assets. All of the content library (skills,
+# plugins, agents, subagents, prompts) lives in a single SQLite file
+# under db/skills.db — the server opens it read-only on boot and
+# every list/search/read goes through FTS5 instead of walking
+# 10,000+ files. ~18 MiB vs the 19 GiB raw tree.
 COPY --from=build /src/dist ./dist
 COPY bin/        ./bin/
-COPY skills/     ./skills/
-COPY agents/     ./agents/
-COPY subagents/  ./subagents/
-COPY plugins/    ./plugins/
-COPY prompts/    ./prompts/
+COPY db/         ./db/
 COPY signatures/ ./signatures/
+COPY scripts/    ./scripts/
 
 # Drop to the non-root `node` user baked into the base image.
 # All of /app is owned by this user already (COPY --chown would
