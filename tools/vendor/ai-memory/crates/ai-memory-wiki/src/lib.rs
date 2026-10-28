@@ -1,0 +1,52 @@
+//! Wiki filesystem layer.
+//!
+//! Owns the markdown-on-disk source of truth: atomic writes, frontmatter
+//! parsing/emission, and write-through to the [`ai_memory_store`] writer
+//! actor so the SQLite index never diverges from the file. The watcher +
+//! git layer arrive in M1-D and M5.
+
+pub mod admission;
+mod atomic;
+pub mod backup;
+mod confinement;
+mod error;
+mod frontmatter_yaml;
+mod git;
+mod ledger;
+mod markdown;
+pub mod migrations;
+mod okf_index;
+mod watcher;
+mod wiki;
+
+pub use admission::{
+    AdmissionChain, AdmissionContext, AdmissionOp, FailurePolicy, MAX_ADMISSION_WEBHOOKS,
+    MAX_RESPONSE_BYTES, WebhookConfig,
+};
+pub use atomic::write_atomic;
+pub use confinement::validate_wiki_tree;
+pub use error::{WikiError, WikiResult};
+pub use git::{COMMIT_AUTHOR_EMAIL, COMMIT_AUTHOR_NAME, GitAdapter};
+pub use ledger::is_rotated_event_ledger;
+pub use markdown::{
+    Markdown, decode_markdown_destination_path, delink_wikilinks, derive_title, emit,
+    extract_links, extract_relation_links, parse, rewrite_local_wikilinks,
+};
+pub use migrations::run_pending as run_wiki_migrations;
+pub use okf_index::okf_directory_listing;
+pub use watcher::{DEBOUNCE_WINDOW, RECONCILE_INTERVAL, WatcherHandle};
+pub use wiki::{
+    ConditionalBatchWrite, ConditionalWrite, EventLedgerFile, MoveSessionOutcome,
+    PAGE_CHECKPOINT_WALK_LIMIT, PurgeSessionOutcome, SessionPageFile, Wiki, WritePageRequest,
+};
+
+// Integration tests compile into this crate's test harness instead of a
+// separate binary: every test binary is another link and, on macOS and
+// Windows, another first-run malware scan. They still exercise only the
+// public API; `extern crate self` lets them keep addressing it by crate name.
+#[cfg(test)]
+extern crate self as ai_memory_wiki;
+#[cfg(test)]
+#[allow(clippy::disallowed_methods)]
+#[path = "../tests/suite/mod.rs"]
+mod integration;

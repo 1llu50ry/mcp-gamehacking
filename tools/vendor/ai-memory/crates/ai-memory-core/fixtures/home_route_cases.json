@@ -1,0 +1,251 @@
+{
+  "_comment": "Portable home-route grammar and selector contract shared by native Rust, POSIX shell, PowerShell, generated TypeScript, and OpenClaw runtime tests. Tokens {{HOME}} and {{LONG_513}} are expanded by each test harness. Generated cases describe bounded expansions without storing oversized fixtures.",
+  "cases": [
+    {
+      "name": "identity_precedes_path",
+      "toml": "workspace = \"wrong\"\nproject = \"wrong\"\nproject_strategy = \"repo-root\"\ndrop_subagent_captures = \"true\"\n[recall]\ndefault_global = true\n[briefing]\ninject_on_session_start = true\nmax_chars = 3210\n[profile]\ncontribute = true\nconsume = false\n[routes.path.\"~/src/api\"]\nroute_workspace = \"path\"\nroute_project = \"path-api\"\n[routes.identity.\"github.com/acme/api\"]\nroute_workspace = \"identity\"\nroute_project = \"identity-api\"\nroute_identity_style = \"path\"\nroute_aliases = [\"main\"]\n[routes.identity.\"gitlab.com/acme/api\"]\nroute_workspace = \"gitlab\"\nroute_project = \"gitlab-api\"\n",
+      "cwd": "{{HOME}}/src/api/lib",
+      "identity": "github.com/acme/api",
+      "status": "valid",
+      "source": "identity",
+      "workspace": "identity",
+      "project": "identity-api",
+      "style": "path",
+      "aliases": "[\"main\"]",
+      "flags": "drop_subagent=true&default_global=true&briefing=true&briefing_budget=3210&profile_contribute=1&profile_consume=0"
+    },
+    {
+      "name": "cross_forge_identity",
+      "toml": "[routes.identity.\"github.com/acme/api\"]\nroute_workspace = \"github\"\nroute_project = \"github-api\"\n[routes.identity.\"gitlab.com/acme/api\"]\nroute_workspace = \"gitlab\"\nroute_project = \"gitlab-api\"\n",
+      "cwd": "{{HOME}}/elsewhere",
+      "identity": "gitlab.com/acme/api",
+      "status": "valid",
+      "source": "identity",
+      "workspace": "gitlab",
+      "project": "gitlab-api"
+    },
+    {
+      "name": "path_longest_match",
+      "toml": "[routes.path.\"~/src\"]\nroute_workspace = \"path\"\nroute_project = \"broad\"\n[routes.path.\"~/src/api\"]\nroute_workspace = \"path\"\nroute_project = \"api\"\n",
+      "cwd": "{{HOME}}/src/api/lib",
+      "status": "valid",
+      "source": "path",
+      "workspace": "path",
+      "project": "api"
+    },
+    {
+      "name": "path_sibling_refusal",
+      "toml": "[routes.path.\"~/src/api\"]\nroute_workspace = \"path\"\nroute_project = \"api\"\n",
+      "cwd": "{{HOME}}/src/api-sibling",
+      "status": "none"
+    },
+    {
+      "name": "path_aliases_without_remote",
+      "toml": "[routes.path.\"~/non-git/api\"]\nroute_workspace = \"path\"\nroute_project = \"api\"\nroute_aliases = [\"old-api\"]\n",
+      "cwd": "{{HOME}}/non-git/api",
+      "status": "valid",
+      "source": "path",
+      "workspace": "path",
+      "project": "api"
+    },
+    {
+      "name": "posix_absolute",
+      "toml": "[routes.path.\"/srv/work/api\"]\nroute_workspace = \"posix\"\nroute_project = \"api\"\n",
+      "cwd": "/srv/work/api/lib",
+      "status": "valid",
+      "source": "path",
+      "workspace": "posix",
+      "project": "api"
+    },
+    {
+      "name": "windows_drive",
+      "toml": "[routes.path.\"C:/Work/API\"]\nroute_workspace = \"windows\"\nroute_project = \"drive\"\n",
+      "cwd": "c:/work/api/lib",
+      "status": "valid",
+      "source": "path",
+      "workspace": "windows",
+      "project": "drive"
+    },
+    {
+      "name": "windows_unc",
+      "toml": "[routes.path.\"//Server/Share/API\"]\nroute_workspace = \"windows\"\nroute_project = \"unc\"\n",
+      "cwd": "//server/share/api/lib",
+      "status": "valid",
+      "source": "path",
+      "workspace": "windows",
+      "project": "unc"
+    },
+    {
+      "name": "tilde_normalization_stays_inside_home",
+      "toml": "[routes.path.\"~/a/../b\"]\nroute_workspace = \"home\"\nroute_project = \"inside\"\n",
+      "cwd": "{{HOME}}/b/lib",
+      "status": "valid",
+      "source": "path",
+      "workspace": "home",
+      "project": "inside"
+    },
+    {
+      "name": "tilde_parent_escape",
+      "toml": "[routes.path.\"~/..\"]\nroute_workspace = \"home\"\nroute_project = \"escape\"\n",
+      "cwd": "{{HOME}}/src",
+      "status": "invalid"
+    },
+    {
+      "name": "tilde_nested_parent_escape",
+      "toml": "[routes.path.\"~/a/../..\"]\nroute_workspace = \"home\"\nroute_project = \"escape\"\n",
+      "cwd": "{{HOME}}/src",
+      "status": "invalid"
+    },
+    {
+      "name": "normalized_duplicate_paths",
+      "toml": "[routes.path.\"~/src/api\"]\nroute_workspace = \"one\"\nroute_project = \"one\"\n[routes.path.\"~/src/./api\"]\nroute_workspace = \"two\"\nroute_project = \"two\"\n",
+      "cwd": "{{HOME}}/src/api",
+      "status": "invalid"
+    },
+    {
+      "name": "duplicate_raw_selector_across_kinds",
+      "toml": "[routes.path.\"github.com/acme/api\"]\nroute_workspace = \"one\"\nroute_project = \"one\"\n[routes.identity.\"github.com/acme/api\"]\nroute_workspace = \"two\"\nroute_project = \"two\"\n",
+      "cwd": "{{HOME}}/src/api",
+      "identity": "github.com/acme/api",
+      "status": "invalid"
+    },
+    {
+      "name": "duplicate_field",
+      "toml": "[routes.path.\"~/src/api\"]\nroute_workspace = \"one\"\nroute_workspace = \"two\"\nroute_project = \"api\"\n",
+      "cwd": "{{HOME}}/src/api",
+      "status": "invalid"
+    },
+    {
+      "name": "unknown_field",
+      "toml": "[routes.path.\"~/src/api\"]\nroute_workspace = \"one\"\nroute_project = \"api\"\nroute_unknown = \"x\"\n",
+      "cwd": "{{HOME}}/src/api",
+      "status": "invalid"
+    },
+    {
+      "name": "malformed_unrelated_toml",
+      "toml": "workspace = [\n[routes.path.\"~/src/api\"]\nroute_workspace = \"one\"\nroute_project = \"api\"\n",
+      "cwd": "{{HOME}}/src/api",
+      "status": "invalid"
+    },
+    {
+      "name": "malformed_routes_assignment",
+      "toml": "routes = \"invalid\"\n",
+      "cwd": "{{HOME}}/src/api",
+      "status": "invalid"
+    },
+    {
+      "name": "malformed_routes_dotted_key",
+      "toml": "routes.path = \"invalid\"\n",
+      "cwd": "{{HOME}}/src/api",
+      "status": "invalid"
+    },
+    {
+      "name": "malformed_root_without_route_syntax",
+      "toml": "workspace = wrong\n",
+      "cwd": "{{HOME}}/src/api",
+      "status": "none"
+    },
+    {
+      "name": "malformed_root_scalar_trailing_junk",
+      "toml": "workspace = \"wrong\" junk \"x\"\n[routes.path.\"~/src/api\"]\nroute_workspace = \"one\"\nroute_project = \"api\"\n",
+      "cwd": "{{HOME}}/src/api",
+      "status": "invalid"
+    },
+    {
+      "name": "orphan_route_assignment",
+      "toml": "route_project = \"x\"\n[routes.path.\"~/src/api\"]\nroute_workspace = \"one\"\nroute_project = \"api\"\n",
+      "cwd": "{{HOME}}/src/api",
+      "status": "invalid"
+    },
+    {
+      "name": "posix_root_selector",
+      "toml": "[routes.path.\"/\"]\nroute_workspace = \"root\"\nroute_project = \"posix\"\n",
+      "cwd": "/child",
+      "status": "invalid"
+    },
+    {
+      "name": "windows_drive_root_selector",
+      "toml": "[routes.path.\"C:/\"]\nroute_workspace = \"root\"\nroute_project = \"drive\"\n",
+      "cwd": "C:/child",
+      "status": "invalid"
+    },
+    {
+      "name": "windows_unc_root_selector",
+      "toml": "[routes.path.\"//server/share\"]\nroute_workspace = \"root\"\nroute_project = \"unc\"\n",
+      "cwd": "//server/share/child",
+      "status": "invalid"
+    },
+    {
+      "name": "identity_host_starts_dot",
+      "toml": "[routes.identity.\".github.com/acme/api\"]\nroute_workspace = \"one\"\nroute_project = \"api\"\n",
+      "cwd": "{{HOME}}/src/api",
+      "identity": ".github.com/acme/api",
+      "status": "invalid"
+    },
+    {
+      "name": "identity_host_ends_dot",
+      "toml": "[routes.identity.\"github.com./acme/api\"]\nroute_workspace = \"one\"\nroute_project = \"api\"\n",
+      "cwd": "{{HOME}}/src/api",
+      "identity": "github.com./acme/api",
+      "status": "invalid"
+    },
+    {
+      "name": "selector_512_bytes",
+      "generate": "selector_512",
+      "cwd_generate": "selector_512_child",
+      "cwd": "/unused",
+      "status": "valid",
+      "source": "path",
+      "workspace": "bounds",
+      "project": "valid"
+    },
+    {
+      "name": "selector_513_bytes",
+      "generate": "selector_513",
+      "cwd": "/selector/target/lib",
+      "status": "invalid"
+    },
+    {
+      "name": "malformed_partial_header",
+      "toml": "workspace = \"wrong\"\nproject = \"wrong\"\n[routes.path.\"~/src/api\"\nroute_workspace = \"one\"\nroute_project = \"api\"\n",
+      "cwd": "{{HOME}}/src/api",
+      "status": "invalid"
+    },
+    {
+      "name": "multiline_aliases",
+      "toml": "[routes.path.\"~/src/api\"]\nroute_workspace = \"one\"\nroute_project = \"api\"\nroute_aliases = [\n  \"old\"\n]\n",
+      "cwd": "{{HOME}}/src/api",
+      "status": "invalid"
+    },
+    {
+      "name": "trailing_comma_aliases",
+      "toml": "[routes.path.\"~/src/api\"]\nroute_workspace = \"one\"\nroute_project = \"api\"\nroute_aliases = [\"old\",]\n",
+      "cwd": "{{HOME}}/src/api",
+      "status": "invalid"
+    },
+    {
+      "name": "escaped_scalar",
+      "toml": "[routes.path.\"~/src/api\"]\nroute_workspace = \"wo\\u0072k\"\nroute_project = \"api\"\n",
+      "cwd": "{{HOME}}/src/api",
+      "status": "invalid"
+    },
+    {
+      "name": "scalar_byte_limit",
+      "toml": "[routes.path.\"~/src/api\"]\nroute_workspace = \"{{LONG_513}}\"\nroute_project = \"api\"\n",
+      "cwd": "{{HOME}}/src/api",
+      "status": "invalid"
+    },
+    {
+      "name": "route_limit",
+      "generate": "65_routes",
+      "cwd": "{{HOME}}/route/64",
+      "status": "invalid"
+    },
+    {
+      "name": "file_limit",
+      "generate": "oversized_file",
+      "cwd": "{{HOME}}/src/api",
+      "status": "invalid"
+    }
+  ]
+}

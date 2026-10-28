@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "reclass-mcp-server"
+version = "1.0.0"
+description = "MCP Server for ReClass.NET integration with Claude Code"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=1.0.0",
+]
+
+[project.scripts]
+reclass-mcp-server = "reclass_mcp_server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]

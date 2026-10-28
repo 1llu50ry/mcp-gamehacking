@@ -1,0 +1,20 @@
+# Every wiki filesystem path crosses one of these typed entry points and then
+# `tree_path`, which rejects absolute, parent, root and prefix components and
+# inspects the in-root directory chain for symbolic links or Windows reparse
+# points before returning the path. Model the entry points as well as the
+# implementation boundary: CodeQL's interprocedural summary can otherwise
+# propagate request taint through a wrapper before it reaches `tree_path`.
+# Treat only the validated success value as safe for filesystem operations;
+# request-derived values that reach any other path construction remain tainted.
+#
+# The CLI test `codeql_model_targets_exist` fails if the modeled function is
+# renamed or moved.
+extensions:
+  - addsTo:
+      pack: codeql/rust-all
+      extensible: barrierModel
+    data:
+      - ["ai_memory_wiki::confinement::project_root", "ReturnValue.Field[core::result::Result::Ok(0)]", "path-injection", "manual"]
+      - ["ai_memory_wiki::confinement::project_path", "ReturnValue.Field[core::result::Result::Ok(0)]", "path-injection", "manual"]
+      - ["ai_memory_wiki::confinement::workspace_path", "ReturnValue.Field[core::result::Result::Ok(0)]", "path-injection", "manual"]
+      - ["ai_memory_wiki::confinement::tree_path", "ReturnValue.Field[core::result::Result::Ok(0)]", "path-injection", "manual"]

@@ -1,0 +1,28 @@
+name: macos-app
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Same rule as ci.yml: a newer push to a pull request cancels its in-flight
+# run; pushes, schedules and dispatches each run to completion.
+concurrency:
+  group: macos-app-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  swift-test:
+    name: swift test (ai-memory-macos)
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'macos') ||
+      contains(github.event.pull_request.labels.*.name, 'full-ci')
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Swift tests
+        run: swift test --package-path companions/ai-memory-macos

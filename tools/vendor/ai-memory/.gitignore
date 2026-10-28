@@ -1,0 +1,53 @@
+# Rust build artefacts.
+/target/
+/companions/*/target/
+/companions/*/.build/
+/companions/*/.swiftpm/
+/companions/*/dist/
+/dist/
+**/*.rs.bk
+**/*.rs.orig
+
+# Local environment overrides.
+.env
+.env.local
+/.local-data/
+
+# Homelab deploy config — committed as .example variants only.
+/bin/deploy.env
+/docker/docker-compose.prod.yml
+/docker/.env.production
+
+# Editor / OS noise.
+.DS_Store
+*.tmp
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Python bytecode from running the docs/examples stdlib tests.
+__pycache__/
+
+# Local debugging.
+*.log
+# Runtime logs are `ai-memory.log.<date>`, so `.log` is not the final
+# extension and `*.log` does not match them. Ignore the directory.
+logs/
+# Runtime spool, created in the CWD when a hook runs without an explicit
+# --data-dir. Same class as logs/: a runtime artifact that is trivially
+# committed by a wide `git add`.
+hook-spool/
+flamegraph.svg
+perf.data*
+
+# Sandbox marker (not project content).
+.ai-jail
+.claude/
+.slim/deepwork/
+evals/runs/
+
+# ai-memory atomic-write backups (apply_atomic in apply_shared.rs)
+*.bak-*
+evals/datasets/
+evals/models/

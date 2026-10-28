@@ -1,0 +1,6 @@
+# Cheat Engine MCP Bridge - TCP transport dependencies
+# Install in the environment running the MCP server, for example:
+#   python3 -m pip install -r MCP_Server/requirements-tcp.txt
+
+# MCP SDK (Model Context Protocol) - Required for AI agent communication
+mcp>=1.28,<2  # v2.0.0 removed mcp.server.fastmcp; pin until code is migrated to the v2 API

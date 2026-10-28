@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "The local loading page needs no Tauri API, and the setup page the window then shows is a remote origin that gets none.",
+  "windows": ["main"],
+  "permissions": []
+}

@@ -1,0 +1,127 @@
+# docker compose template — ai-memory + Caddy TLS-terminating reverse proxy.
+#
+# Three usable variants, all in this one file. Pick one and either:
+#   - Copy this file, prune the variants you don't want, then
+#     `docker compose -f compose.tls.caddy.yml up -d`, or
+#   - Use it verbatim and switch via the `Caddyfile` you put next to
+#     it. The compose service definitions are the same across variants.
+#
+# Adjacent files this compose expects:
+#   ./Caddyfile             — your reverse-proxy config; see variants below
+#   ./.env.production       — AI_MEMORY_AUTH_TOKEN + AI_MEMORY_ALLOWED_HOSTS +
+#                             your LLM provider creds. NOT committed.
+#
+# Walkthrough + variant explanations + client-side install:
+#   docs/https-via-proxy.md
+
+name: ai-memory-tls
+
+services:
+  ai-memory:
+    image: akitaonrails/ai-memory:latest
+    container_name: ai-memory
+    restart: unless-stopped
+    # No host port. Caddy reaches ai-memory over the internal docker
+    # network; the only inbound surface is Caddy's 80/443 below.
+    expose:
+      - "49374"
+    volumes:
+      - ai-memory-data:/data
+    env_file:
+      - .env.production
+    environment:
+      - RUST_LOG=ai_memory=info,ai_memory_store=info,ai_memory_wiki=info,ai_memory_mcp=info,tracing_appender=warn
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ai-memory", "status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: ai-memory-caddy
+    restart: unless-stopped
+    depends_on:
+      - ai-memory
+    ports:
+      # 80 is needed for Let's Encrypt's HTTP-01 challenge during issuance
+      # and renewal. Drop it when using internal-CA mode (Variant B) since
+      # there's no ACME to solve.
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Persist Caddy state across recreates. caddy-data holds the
+      # account key and issued certs — back this up; losing it forces a
+      # re-issuance and (in LE's case) brief unavailability.
+      - caddy-data:/data
+      - caddy-config:/config
+      # Only mount this for Variant C (external certs):
+      # - /your/cert/path:/etc/caddy/certs:ro
+
+volumes:
+  ai-memory-data:
+    name: ai-memory-data
+  caddy-data:
+  caddy-config:
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Variant A — Public domain + Let's Encrypt
+# ──────────────────────────────────────────────────────────────────────
+#
+# Put this in ./Caddyfile next to this compose file:
+#
+#     memory.example.com {
+#         reverse_proxy ai-memory:49374
+#     }
+#
+# Requires:
+#   - A DNS A or AAAA record for memory.example.com → your public IP
+#   - Port 80 + 443 reachable from the internet (for ACME challenges + serving)
+#
+# Caddy issues + auto-renews from Let's Encrypt with no operator
+# action after first start. Browser-trusted by every client out of
+# the box.
+#
+# ──────────────────────────────────────────────────────────────────────
+# Variant B — LAN-only + Caddy's internal CA
+# ──────────────────────────────────────────────────────────────────────
+#
+# Put this in ./Caddyfile:
+#
+#     {
+#         local_certs
+#     }
+#
+#     homelab.local, 192.168.1.50 {
+#         reverse_proxy ai-memory:49374
+#     }
+#
+# List every hostname + IP a client will use in the site address.
+# Caddy puts them all in the cert's SAN.
+#
+# Requires:
+#   - One-time install of Caddy's root cert into each client OS trust
+#     store. Pull it with:
+#         docker compose exec caddy cat /data/caddy/pki/authorities/local/root.crt > caddy-root.crt
+#     Then follow the per-OS install in docs/https-via-proxy.md.
+#
+# Skipping that step gives you security theatre, not security. See
+# the doc for why.
+#
+# ──────────────────────────────────────────────────────────────────────
+# Variant C — External cert files
+# ──────────────────────────────────────────────────────────────────────
+#
+# Put this in ./Caddyfile:
+#
+#     memory.example.com {
+#         tls /etc/caddy/certs/memory.crt /etc/caddy/certs/memory.key
+#         reverse_proxy ai-memory:49374
+#     }
+#
+# Uncomment the cert volume mount in the caddy service above.
+# Caddy hot-reloads certs on file change — no compose restart needed
+# at renewal time.

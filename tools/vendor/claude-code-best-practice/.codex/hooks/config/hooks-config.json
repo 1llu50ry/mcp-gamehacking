@@ -1,0 +1,11 @@
+{
+  "disableSessionStartHook": false,
+  "disablePreToolUseHook": false,
+  "disablePermissionRequestHook": false,
+  "disablePostToolUseHook": false,
+  "disableStopHook": false,
+  "disableUserPromptSubmitHook": false,
+  "disablePreCompactHook": false,
+  "disablePostCompactHook": false,
+  "disableLogging": true
+}

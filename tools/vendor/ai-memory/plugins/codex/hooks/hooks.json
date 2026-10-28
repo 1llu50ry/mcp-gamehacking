@@ -1,0 +1,81 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${PLUGIN_ROOT}/scripts/ai-memory-hook\" codex session-start",
+            "commandWindows": "ai-memory hook --event session-start --agent codex"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${PLUGIN_ROOT}/scripts/ai-memory-hook\" codex user-prompt-submit",
+            "commandWindows": "ai-memory hook --event user-prompt-submit --agent codex"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${PLUGIN_ROOT}/scripts/ai-memory-hook\" codex pre-tool-use",
+            "commandWindows": "ai-memory hook --event pre-tool-use --agent codex"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${PLUGIN_ROOT}/scripts/ai-memory-hook\" codex post-tool-use",
+            "commandWindows": "ai-memory hook --event post-tool-use --agent codex"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${PLUGIN_ROOT}/scripts/ai-memory-hook\" codex pre-compact",
+            "commandWindows": "ai-memory hook --event pre-compact --agent codex"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${PLUGIN_ROOT}/scripts/ai-memory-hook\" codex stop",
+            "commandWindows": "ai-memory hook --event stop --agent codex"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${PLUGIN_ROOT}/scripts/ai-memory-hook\" codex session-end",
+            "commandWindows": "ai-memory hook --event session-end --agent codex"
+          }
+        ]
+      }
+    ]
+  }
+}

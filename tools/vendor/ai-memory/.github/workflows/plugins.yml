@@ -1,0 +1,132 @@
+name: plugins
+
+# The marketplace plugins (#1166): plugins/, the catalogs at the repository
+# root, and everything they are generated from. The CLI suite in ci.yml
+# already proves the committed tree equals `ai-memory render-plugins` and
+# re-proves capture policy, scope routing and de-duplication through the
+# launcher; this workflow adds what needs the real harness CLIs:
+#
+#   * validate: `claude plugin validate --strict` on the catalog and the
+#     Claude Code plugin, with a pinned Claude Code CLI;
+#   * launcher: shellcheck and the POSIX launcher tests;
+#   * e2e: a credential-free `claude -p` that fires the plugin's hooks into a
+#     scratch ai-memory server, and a Codex install + trusted-hook run with
+#     the model provider on a closed port. No secret is used and no request
+#     needs to leave the runner.
+#
+# Every CLI runs in a scratch HOME / CLAUDE_CONFIG_DIR / CODEX_HOME.
+on:
+  pull_request:
+    paths:
+      - "plugins/**"
+      - ".claude-plugin/**"
+      - ".agents/plugins/**"
+      - "crates/ai-memory-cli/templates/plugin/**"
+      - "crates/ai-memory-cli/src/commands/render_plugins.rs"
+      - "crates/ai-memory-cli/src/commands/render_shared.rs"
+      - "crates/ai-memory-cli/src/commands/plugin_origin.rs"
+      - "crates/ai-memory-cli/src/commands/hook.rs"
+      - "crates/ai-memory-core/src/routing_skills/**"
+      - "crates/ai-memory-core/src/routing_skills.rs"
+      - "tests/hooks/test_plugin_launcher.sh"
+      - "tests/e2e/claude_plugin_smoke.py"
+      - "tests/e2e/codex_plugin_smoke.py"
+      - "bin/ai-memory"
+      - "bin/release"
+      - ".github/workflows/plugins.yml"
+  push:
+    branches: [main]
+    paths:
+      - "plugins/**"
+      - ".claude-plugin/**"
+      - ".agents/plugins/**"
+      - ".github/workflows/plugins.yml"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  # Pinned harness CLIs: a new release is adopted deliberately, after its
+  # plugin behaviour is re-checked.
+  CLAUDE_CODE_VERSION: "2.1.296"
+  CODEX_VERSION: "0.162.1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plugins-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  validate:
+    name: claude plugin validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+      - name: Install the pinned Claude Code CLI
+        run: npm install --global --no-fund --no-audit "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+      - name: Validate the catalog and the Claude Code plugin
+        env:
+          DISABLE_AUTOUPDATER: "1"
+          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+        run: |
+          set -euo pipefail
+          export HOME="$RUNNER_TEMP/home" CLAUDE_CONFIG_DIR="$RUNNER_TEMP/home/.claude"
+          mkdir -p "$CLAUDE_CONFIG_DIR"
+          claude plugin validate --strict .
+          claude plugin validate --strict plugins/claude-code
+
+  launcher:
+    name: launcher (shellcheck + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # shellcheck ships on the ubuntu runner image.
+      - run: |
+          shellcheck -s sh \
+            crates/ai-memory-cli/templates/plugin/ai-memory-hook.sh \
+            plugins/claude-code/scripts/ai-memory-hook \
+            plugins/codex/scripts/ai-memory-hook \
+            tests/hooks/test_plugin_launcher.sh
+      - run: sh tests/hooks/test_plugin_launcher.sh
+
+  e2e:
+    name: sandboxed Claude Code and Codex runs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+      - uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16 # v2
+      - run: cargo build --locked --bin ai-memory
+      # The full drift test runs in ci.yml; this cheap check keeps a push to
+      # main (where ci.yml's PR gate did not run) honest too.
+      - name: Committed plugins equal the renderer output
+        run: |
+          set -euo pipefail
+          target/debug/ai-memory render-plugins --out .
+          git status --porcelain -- plugins .claude-plugin .agents
+          test -z "$(git status --porcelain -- plugins .claude-plugin .agents)"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+      - name: Install the pinned Claude Code and Codex CLIs
+        run: |
+          npm install --global --no-fund --no-audit \
+            "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" "@openai/codex@${CODEX_VERSION}"
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: false
+      - name: Claude Code plugin hooks fire into a scratch server
+        run: >
+          uv run --no-project python tests/e2e/claude_plugin_smoke.py
+          --ai-memory-bin "${{ github.workspace }}/target/debug/ai-memory"
+          --plugin-dir plugins/claude-code
+          --repo-root .
+      - name: Codex plugin installs, and trusted hooks fire
+        run: >
+          uv run --no-project python tests/e2e/codex_plugin_smoke.py
+          --ai-memory-bin "${{ github.workspace }}/target/debug/ai-memory"
+          --repo-root .

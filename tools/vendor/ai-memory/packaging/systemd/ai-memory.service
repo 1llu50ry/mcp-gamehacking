@@ -1,0 +1,24 @@
+[Unit]
+Description=ai-memory MCP server
+Documentation=https://github.com/akitaonrails/ai-memory
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ai-memory
+Group=ai-memory
+EnvironmentFile=-/etc/ai-memory/env
+ExecStart=/usr/bin/ai-memory --data-dir /var/lib/ai-memory --config /etc/ai-memory/config.toml serve --transport http --enable-web
+Restart=on-failure
+RestartSec=5s
+StateDirectory=ai-memory
+StateDirectoryMode=0750
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/ai-memory
+
+[Install]
+WantedBy=multi-user.target

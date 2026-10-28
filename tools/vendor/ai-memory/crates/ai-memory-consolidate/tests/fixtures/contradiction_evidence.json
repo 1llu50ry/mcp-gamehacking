@@ -1,0 +1,112 @@
+[
+  {
+    "id": "conflicting_configuration_en",
+    "language": "en",
+    "label": "conflict",
+    "setup": "active",
+    "first": "For the production API in the current deployment, MAX_RETRIES must be exactly 3.",
+    "second": "For the production API in the current deployment, MAX_RETRIES must be exactly 5.",
+    "second_vector": [0.6, 0.8],
+    "expected_findings": 1
+  },
+  {
+    "id": "conflicting_configuration_pt_br",
+    "language": "pt-BR",
+    "label": "conflict",
+    "setup": "active",
+    "first": "Na implantação atual da API de produção, MAX_RETRIES deve ser exatamente 3.",
+    "second": "Na implantação atual da API de produção, MAX_RETRIES deve ser exatamente 5.",
+    "second_vector": [0.6, 0.8],
+    "expected_findings": 1
+  },
+  {
+    "id": "conflicting_configuration_high_similarity_zh",
+    "language": "zh",
+    "label": "conflict",
+    "setup": "active",
+    "first": "在生产 API 的当前部署中，MAX_RETRIES 必须恰好为 3。",
+    "second": "在生产 API 的当前部署中，MAX_RETRIES 必须恰好为 5。",
+    "second_vector": [0.98, 0.199],
+    "expected_findings": 0
+  },
+  {
+    "id": "compatible_same_topic_en",
+    "language": "en",
+    "label": "compatible",
+    "setup": "active",
+    "first": "The API retries failed requests up to three times.",
+    "second": "The API records a metric for each retry attempt.",
+    "second_vector": [0.6, 0.8],
+    "expected_findings": 1
+  },
+  {
+    "id": "compatible_procedures_pt_br",
+    "language": "pt-BR",
+    "label": "compatible",
+    "setup": "active",
+    "first": "A chave SSH da implantação deve ter permissão 0600.",
+    "second": "Remova os diretórios temporários abandonados após concluir a implantação.",
+    "second_vector": [0.6, 0.8],
+    "expected_findings": 1
+  },
+  {
+    "id": "compatible_hub_pages_zh",
+    "language": "zh",
+    "label": "compatible",
+    "setup": "active",
+    "first": "部署索引：服务清单、发布流程、监控指南。",
+    "second": "运维索引：服务清单、备份流程、值班指南。",
+    "second_vector": [0.6, 0.8],
+    "expected_findings": 1
+  },
+  {
+    "id": "compatible_near_duplicate_en",
+    "language": "en",
+    "label": "compatible",
+    "setup": "active",
+    "first": "The production API retry budget is three attempts.",
+    "second": "Production API requests have a retry budget of three attempts.",
+    "second_vector": [0.98, 0.199],
+    "expected_findings": 0
+  },
+  {
+    "id": "declared_contradiction_without_embeddings_en",
+    "language": "en",
+    "label": "conflict",
+    "setup": "declared",
+    "first": "For the current production API, the configured retry budget must be exactly 3.",
+    "second": "For the current production API, the configured retry budget must be exactly 5.",
+    "second_vector": [0.0, 1.0],
+    "expected_findings": 1
+  },
+  {
+    "id": "corrected_superseded_decision_pt_br",
+    "language": "pt-BR",
+    "label": "ineligible",
+    "setup": "superseded",
+    "first": "A decisão anterior da arquitetura usava Redis para a fila.",
+    "second": "Correção da decisão: a arquitetura atual usa PostgreSQL para a fila.",
+    "second_vector": [0.6, 0.8],
+    "expected_findings": 0
+  },
+  {
+    "id": "expired_configuration_zh",
+    "language": "zh",
+    "label": "ineligible",
+    "setup": "expired",
+    "first": "旧部署的 MAX_RETRIES 为 3，此记录已过期。",
+    "second": "当前部署的 MAX_RETRIES 为 5。",
+    "second_vector": [0.6, 0.8],
+    "expected_findings": 0
+  },
+  {
+    "id": "foreign_project_configuration_en",
+    "language": "en",
+    "label": "ineligible",
+    "setup": "foreign_project",
+    "first": "This project's production API requires MAX_RETRIES=3.",
+    "second": "A different project's production API requires MAX_RETRIES=5.",
+    "second_vector": [0.6, 0.8],
+    "expected_findings": 0
+  }
+]

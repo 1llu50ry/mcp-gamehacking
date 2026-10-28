@@ -1,0 +1,2321 @@
+//! Native lifecycle-hook capture helpers.
+//!
+//! Mirrors the POSIX `hooks/lib/_lib.sh` logic so the native
+//! `ai-memory hook` subcommand produces the same HTTP request the shell
+//! scripts do: extract cwd from the payload, walk up for a
+//! `.ai-memory.toml` marker, and build the query-string suffix. The two
+//! request helpers are best-effort with shell-parity timeouts.
+
+use std::io::Read;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+
+use crate::commands::path_util::home_dir;
+use crate::marker::{
+    RoutingSelection, RoutingSource, find_marker, is_truthy, parse_toml_flag, parse_toml_key,
+    repo_root_project, routing_selection,
+};
+use ai_memory_hooks::capture_policy::MAX_MARKER_BYTES;
+use ai_memory_hooks::{
+    CLIENT_MARKER_HEADER, CaptureConfig, CapturePolicy, CaptureSource, PolicyState,
+    describe_invalid_capture_config,
+};
+
+/// Resolve the nearest marker's capture policy without changing routing parsing.
+/// Root-level marker keys are intentionally ignored here; only `[capture]` is strict.
+pub fn capture_policy(cwd: &str) -> CapturePolicy {
+    let Some(marker) = find_marker(cwd) else {
+        let home = home_dir();
+        return CapturePolicy::resolve(
+            CaptureSource::Absent,
+            cwd,
+            home.as_deref().and_then(Path::to_str),
+        );
+    };
+    marker_capture_policy(&marker, cwd)
+}
+
+/// The capture policy one marker file declares; `cwd` stands in for its
+/// directory only when that cannot be read as text.
+pub(crate) fn marker_capture_policy(marker: &Path, cwd: &str) -> CapturePolicy {
+    let home = home_dir();
+    let marker_dir = marker.parent().and_then(Path::to_str).unwrap_or(cwd);
+    match read_capture_config(marker) {
+        Ok(config) => CapturePolicy::resolve(
+            CaptureSource::Parsed(&config),
+            marker_dir,
+            home.as_deref().and_then(Path::to_str),
+        ),
+        Err(()) => CapturePolicy::resolve(
+            CaptureSource::Invalid,
+            marker_dir,
+            home.as_deref().and_then(Path::to_str),
+        ),
+    }
+}
+
+fn read_capture_config(marker: &Path) -> Result<CaptureConfig, ()> {
+    read_capture_config_verbose(marker).map_err(|_reason| ())
+}
+
+/// Same parse as [`read_capture_config`], but keeps the failure reason
+/// instead of collapsing it to `()`. The hot hook path only needs "did this
+/// parse" and discards the reason; diagnostics (`ai-memory doctor`) need it.
+/// Note this only covers the TOML-parse / `[capture]`-shape stage — a config
+/// that parses fine here can still be rejected later at compile time (see
+/// [`ai_memory_hooks::describe_invalid_capture_config`]).
+fn read_capture_config_verbose(marker: &Path) -> Result<CaptureConfig, String> {
+    let mut bytes = Vec::with_capacity(MAX_MARKER_BYTES + 1);
+    std::fs::File::open(marker)
+        .map_err(|e| format!("could not open marker file: {e}"))?
+        .take((MAX_MARKER_BYTES + 1) as u64)
+        .read_to_end(&mut bytes)
+        .map_err(|e| format!("could not read marker file: {e}"))?;
+    if bytes.len() > MAX_MARKER_BYTES {
+        return Err(format!(
+            "marker file is larger than the {MAX_MARKER_BYTES}-byte capture-config limit"
+        ));
+    }
+    let text =
+        String::from_utf8(bytes).map_err(|e| format!("marker file is not valid UTF-8: {e}"))?;
+    let document = text
+        .parse::<toml_edit::DocumentMut>()
+        .map_err(|e| format!("invalid TOML: {e}"))?;
+    let Some(capture) = document.get("capture") else {
+        return Ok(CaptureConfig::default());
+    };
+    let table = capture
+        .as_table()
+        .ok_or_else(|| "`[capture]` must be a table".to_owned())?;
+    if let Some((key, _)) = table.iter().find(|(key, _)| *key != "ignore_paths") {
+        return Err(format!(
+            "`[capture]` has an unsupported key `{key}` (only `ignore_paths` is allowed)"
+        ));
+    }
+    let ignore_paths = match table.get("ignore_paths") {
+        None => Vec::new(),
+        Some(item) => {
+            item.as_array()
+                .ok_or_else(|| "`[capture].ignore_paths` must be an array".to_owned())?
+                .iter()
+                .map(|value| {
+                    value.as_str().map(str::to_owned).ok_or_else(|| {
+                        "`[capture].ignore_paths` must contain only strings".to_owned()
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?
+        }
+    };
+    Ok(CaptureConfig { ignore_paths })
+}
+
+/// Diagnostic for `ai-memory doctor`: does the nearest `.ai-memory.toml`'s
+/// `[capture]` section actually resolve into an active policy?
+///
+/// Bases the check on [`capture_policy`]'s own resolution state -- the exact
+/// state the live hook path uses -- rather than a parse-only check, because a
+/// `[capture]` table can parse as valid TOML and still be rejected later at
+/// compile time (too many patterns, an unsupported glob character, a `~/`
+/// pattern with no home directory to expand it...), which a parse-only check
+/// would miss entirely.
+///
+/// Returns `None` when there is no marker, or the marker's capture config
+/// resolves (absent, empty, or a valid active policy). Returns
+/// `Some((marker_path, reason))` when a marker exists and its `[capture]`
+/// table is [`PolicyState::Invalid`] -- which fails CLOSED (every file and
+/// shell tool event is reduced to metadata until the marker is fixed;
+/// nothing leaks) but with no other signal anywhere that it happened.
+pub fn capture_config_problem(cwd: &str) -> Option<(PathBuf, String)> {
+    let marker = find_marker(cwd)?;
+    if capture_policy(cwd).state() != PolicyState::Invalid {
+        return None;
+    }
+    let marker_dir = marker.parent().and_then(Path::to_str).unwrap_or(cwd);
+    let home = home_dir();
+    let reason = match read_capture_config_verbose(&marker) {
+        Err(reason) => reason,
+        Ok(config) => describe_invalid_capture_config(
+            &config,
+            marker_dir,
+            home.as_deref().and_then(Path::to_str),
+        )
+        .unwrap_or_else(|| {
+            "the `[capture]` table did not resolve into an active policy".to_owned()
+        }),
+    };
+    Some((marker, reason))
+}
+
+/// First top-level `cwd` string in the payload (parity with
+/// `ai_memory_extract_cwd`: take the top-level value, ignore nested
+/// `cwd` fields in tool payloads).
+pub fn extract_cwd(payload: &serde_json::Value) -> Option<String> {
+    payload
+        .get("cwd")
+        .and_then(|v| v.as_str())
+        .map(str::to_owned)
+}
+
+/// Fixture-backed canonical routing context shared by native marker routing and
+/// pre-spool capture. Only explicit agent payload shapes are accepted.
+pub fn canonical_context(payload: &serde_json::Value) -> (Option<String>, Option<String>) {
+    let direct = |keys: &[&str]| {
+        keys.iter().find_map(|key| {
+            payload
+                .get(*key)
+                .and_then(serde_json::Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .map(str::to_owned)
+        })
+    };
+    let nested = |path: &[&str]| {
+        path.iter()
+            .try_fold(payload, |value, key| value.get(*key))
+            .and_then(serde_json::Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .map(str::to_owned)
+    };
+    // `workspacePaths` is Antigravity's spelling; `workspace_roots` is
+    // Cursor's. Cursor never sends a usable top-level `cwd` — `sessionStart`
+    // / `sessionEnd` omit it and its tool events send `cwd: ""` — so without
+    // this the whole session resolves to no cwd and lands in `default/scratch`.
+    let first_array_path = |keys: &[&str]| {
+        keys.iter().find_map(|key| {
+            payload
+                .get(*key)
+                .and_then(serde_json::Value::as_array)
+                .and_then(|paths| {
+                    paths
+                        .iter()
+                        .filter_map(serde_json::Value::as_str)
+                        .find(|value| !value.trim().is_empty())
+                })
+                .map(str::to_owned)
+        })
+    };
+    let cwd = direct(&["cwd", "current_dir", "working_dir", "directory"])
+        .or_else(|| first_array_path(&["workspacePaths", "workspace_roots"]))
+        .or_else(|| {
+            [
+                ["path", "cwd"].as_slice(),
+                ["info", "directory"].as_slice(),
+                ["properties", "info", "directory"].as_slice(),
+                ["event", "properties", "info", "directory"].as_slice(),
+                ["payload", "path", "cwd"].as_slice(),
+                ["payload", "info", "directory"].as_slice(),
+                ["payload", "properties", "info", "directory"].as_slice(),
+            ]
+            .iter()
+            .find_map(|path| nested(path))
+        });
+    let session = direct(&[
+        "session_id",
+        "sessionId",
+        "sessionID",
+        "session",
+        "conversationId",
+    ])
+    .or_else(|| {
+        [
+            ["info", "id"].as_slice(),
+            ["properties", "sessionID"].as_slice(),
+            ["properties", "info", "id"].as_slice(),
+            ["event", "properties", "sessionID"].as_slice(),
+            ["event", "properties", "info", "id"].as_slice(),
+            ["payload", "info", "id"].as_slice(),
+            ["payload", "properties", "sessionID"].as_slice(),
+            ["payload", "properties", "info", "id"].as_slice(),
+        ]
+        .iter()
+        .find_map(|path| nested(path))
+    });
+    (cwd, session)
+}
+
+fn non_empty(value: Option<String>) -> Option<String> {
+    value.filter(|s| !s.trim().is_empty())
+}
+
+/// Resolve the cwd for hook bridges whose native payload may omit it.
+///
+/// Ordered fallback:
+///
+/// 1. `cwd` in the payload, if present.
+/// 2. `DEVIN_PROJECT_DIR`, when the launcher provides it.
+/// 3. The native hook process current directory.
+pub fn resolve_cwd_with_fallbacks(
+    payload: &serde_json::Value,
+    mut env_lookup: impl FnMut(&str) -> Option<String>,
+    current_dir: impl FnOnce() -> Option<PathBuf>,
+) -> Option<String> {
+    non_empty(canonical_context(payload).0)
+        .or_else(|| non_empty(env_lookup("DEVIN_PROJECT_DIR")))
+        .or_else(|| {
+            current_dir().and_then(|path| {
+                let cwd = path.to_string_lossy().into_owned();
+                non_empty(Some(cwd))
+            })
+        })
+}
+
+/// Percent-encode everything outside the RFC 3986 unreserved set
+/// (`A-Z a-z 0-9 - _ . ~`), byte-wise, so multibyte UTF-8 is encoded
+/// per byte. Parity with `ai_memory_url_encode` in `hooks/_lib.sh`.
+///
+/// An allow-list on purpose: the old deny-list missed `\` (and friends),
+/// so a Windows cwd like `C:\dev\myproject` went into the query string
+/// raw and the HTTP layer refused the request — the session-start hook
+/// printed `{}` and the pending handoff was never fetched (#188).
+/// Over-encoding is always safe; the server percent-decodes uniformly.
+pub fn url_encode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char);
+            }
+            other => {
+                out.push_str(&format!("%{other:02X}"));
+            }
+        }
+    }
+    out
+}
+
+/// Build `&cwd=…[&workspace=…&project=…&project_strategy=…]`, mirroring
+/// `ai_memory_marker_qs`: always include cwd; append marker-declared
+/// fields when a `.ai-memory.toml` is found walking up toward $HOME.
+///
+/// `default_strategy` is the install-time default baked into the native hook
+/// command by `install-hooks --project-strategy` (passed via the `hook
+/// --project-strategy` flag). It fills `project_strategy` only when no marker
+/// pins one. A marker's explicit `project` or `identity` and operator-home
+/// routing win; otherwise a valid remote's canonical path wins, and repo-root
+/// is only the host-side no-valid-remote fallback.
+pub fn marker_query_suffix(cwd: &str, default_strategy: Option<&str>) -> String {
+    marker_query_suffix_impl(cwd, default_strategy, true)
+}
+
+/// [`marker_query_suffix`] without the `[briefing]` pair
+/// (`&briefing=…&briefing_budget=…`).
+///
+/// Used by the kimi user-prompt handoff fetch: kimi discards SessionStart
+/// hook stdout, so the compiled project brief is delivered on the FIRST user
+/// prompt of a session (parity with Claude's once-per-SessionStart brief) and
+/// later prompts re-fetch the handoff — kept on every prompt because it is
+/// cheap and self-limiting (empty body when nothing is pending) — without the
+/// briefing params, so the server does not recompose the brief per prompt.
+pub fn marker_query_suffix_without_briefing(cwd: &str, default_strategy: Option<&str>) -> String {
+    marker_query_suffix_impl(cwd, default_strategy, false)
+}
+
+/// Whether the marker that routes `cwd` explicitly enables the compiled
+/// project brief. It is the selection [`marker_query_suffix`] reads its
+/// `&briefing` params from, so the Kimi gate agrees with the query it gates:
+/// the nearest settings-declaring marker (a nested capture-only marker does
+/// not shadow an outer marker's `[briefing]` opt-in, #668), else the
+/// operator-home marker, whether `cwd` is inside `$HOME` or not (#1665).
+///
+/// Kimi Code uses this before creating its local once-per-session marker so
+/// repositories that did not opt in do not accumulate marker files.
+pub fn marker_requests_briefing(cwd: &str) -> bool {
+    marker_requests_briefing_with_home(cwd, home_dir().as_deref())
+}
+
+/// [`marker_requests_briefing`] resolved against `home` instead of the
+/// operator's home directory.
+fn marker_requests_briefing_with_home(cwd: &str, home: Option<&Path>) -> bool {
+    crate::marker::routing_selection_with_home(cwd, cwd, home, false)
+        .ok()
+        .flatten()
+        .and_then(|selection| parse_toml_flag(&selection.path, "inject_on_session_start"))
+        .is_some_and(|value| is_truthy(&value))
+}
+
+/// Host-side routing hints sent with native lifecycle events.
+/// Missing names are left to the server; this inspection creates no scope.
+#[derive(Debug, PartialEq, Eq, serde::Serialize)]
+pub struct HookScope {
+    #[serde(serialize_with = "serialize_scope_hint")]
+    workspace: Option<String>,
+    #[serde(serialize_with = "serialize_scope_hint")]
+    project: Option<String>,
+    project_src: Option<&'static str>,
+    #[serde(serialize_with = "serialize_scope_hint")]
+    project_strategy: Option<String>,
+    #[serde(serialize_with = "serialize_scope_hint")]
+    identity: Option<String>,
+    identity_src: Option<&'static str>,
+    identity_style: Option<&'static str>,
+    aliases: Option<String>,
+    server_may_remap: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub(crate) struct RepositoryCoordinateEvidence {
+    pub(crate) marker_status: &'static str,
+    pub(crate) scope_source: &'static str,
+    pub(crate) identity_source: Option<String>,
+    pub(crate) identity_style: Option<String>,
+    pub(crate) canonical_candidate: Option<String>,
+    pub(crate) legacy_candidate: Option<String>,
+    pub(crate) messages: Vec<String>,
+}
+
+pub(crate) struct RepositoryCoordinateInspection {
+    pub(crate) evidence: RepositoryCoordinateEvidence,
+    pub(crate) repository: Option<ai_memory_core::repository_identity::RepositoryIdentity>,
+}
+
+const MAX_SCOPE_HINT_BYTES: usize = 512;
+
+fn serialize_scope_hint<S: serde::Serializer>(
+    value: &Option<String>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    serde::Serialize::serialize(
+        &value
+            .as_deref()
+            .filter(|value| value.len() <= MAX_SCOPE_HINT_BYTES),
+        serializer,
+    )
+}
+
+impl HookScope {
+    /// Whether all routing hints fit the bounded inspection response.
+    #[must_use]
+    pub fn is_inspectable(&self) -> bool {
+        [
+            &self.workspace,
+            &self.project,
+            &self.project_strategy,
+            &self.identity,
+        ]
+        .into_iter()
+        .all(|value| {
+            value
+                .as_ref()
+                .is_none_or(|value| value.len() <= MAX_SCOPE_HINT_BYTES)
+        })
+    }
+
+    /// Whether only one name was explicitly declared in the marker.
+    #[must_use]
+    pub fn is_partial(&self) -> bool {
+        (self.workspace.is_some() || self.project_src == Some("marker")) && !self.is_explicit()
+    }
+
+    /// Whether these hints alone decide the server's project: a project name,
+    /// or an identity the server routes by. Otherwise the server derives the
+    /// project from the event's cwd.
+    pub(crate) const fn names_the_project(&self) -> bool {
+        self.project.is_some() || self.identity.is_some()
+    }
+
+    /// Whether a project the server derives from the cwd follows the
+    /// enclosing repository (`repo-root`) rather than the cwd's own folder,
+    /// the default `basename`.
+    pub(crate) fn derives_from_repo_root(&self) -> bool {
+        matches!(
+            self.project_strategy.as_deref(),
+            Some("repo-root" | "repo_root")
+        )
+    }
+
+    /// Whether both names were resolved on the host.
+    #[must_use]
+    pub fn is_explicit(&self) -> bool {
+        self.workspace
+            .as_deref()
+            .is_some_and(|v| !v.trim().is_empty())
+            && self
+                .project
+                .as_deref()
+                .is_some_and(|v| !v.trim().is_empty())
+    }
+}
+
+/// Inspect the same marker, worktree and repository identity as hook routing.
+#[must_use]
+pub fn hook_scope(cwd: &str, default_strategy: Option<&str>) -> HookScope {
+    hook_scope_from_selection(cwd, default_strategy, routing_selection(cwd).ok().flatten())
+}
+
+/// [`hook_scope`] resolved against `home` instead of the operator's home
+/// directory, so tests can keep a developer's `~/.ai-memory.toml` out.
+#[cfg(test)]
+pub(crate) fn hook_scope_with_home(
+    cwd: &str,
+    default_strategy: Option<&str>,
+    home: Option<&std::path::Path>,
+) -> HookScope {
+    let selection = crate::marker::routing_selection_with_home(cwd, cwd, home, false);
+    hook_scope_from_selection(cwd, default_strategy, selection.ok().flatten())
+}
+
+pub(crate) fn inspect_repository_coordinate(
+    identity_cwd: &str,
+    marker: &crate::marker::MarkerInspection,
+    explicit_workspace: Option<&str>,
+    explicit_project: Option<&str>,
+) -> RepositoryCoordinateInspection {
+    let declared_project = if explicit_project.is_some_and(|value| !value.is_empty()) {
+        None
+    } else {
+        marker.fields.project.as_deref()
+    };
+    let repository = marker.route_identity.clone().or_else(|| {
+        repository_identity(
+            identity_cwd,
+            marker.fields.identity.as_deref(),
+            declared_project,
+        )
+    });
+    let identity_style = repository.as_ref().and_then(|identity| {
+        (identity.source == ai_memory_core::repository_identity::IdentitySource::GitRemote)
+            .then(|| forwarded_identity_style(marker.fields.identity_style.as_deref()).to_owned())
+    });
+    RepositoryCoordinateInspection {
+        evidence: RepositoryCoordinateEvidence {
+            marker_status: marker.status,
+            scope_source: match (
+                explicit_workspace.is_some_and(|value| !value.is_empty()),
+                explicit_project.is_some_and(|value| !value.is_empty()),
+                marker.scope.is_some(),
+            ) {
+                (true, true, _) => "cli",
+                (true, false, _) | (false, true, _) => "cli_and_marker_or_fallback",
+                (false, false, true) => "marker_or_fallback",
+                _ => "fallback",
+            },
+            identity_source: repository
+                .as_ref()
+                .map(|identity| identity.source.as_str().to_owned()),
+            identity_style,
+            canonical_candidate: repository
+                .as_ref()
+                .and_then(ai_memory_core::repository_identity::path_style_name),
+            legacy_candidate: repository
+                .as_ref()
+                .and_then(ai_memory_core::repository_identity::legacy_basename_name),
+            messages: match marker.status {
+                "invalid_home_routes" => {
+                    vec!["invalid home route map; marker routing was refused".to_owned()]
+                }
+                "invalid" => vec!["invalid marker TOML; marker routing was ignored".to_owned()],
+                "unreadable" => vec!["unreadable marker; marker routing was ignored".to_owned()],
+                "conflicting" => {
+                    vec!["conflicting marker settings; marker routing was ignored".to_owned()]
+                }
+                "ignored" => vec!["marker ignored by configuration".to_owned()],
+                _ => Vec::new(),
+            },
+        },
+        repository,
+    }
+}
+
+fn hook_scope_from_selection(
+    cwd: &str,
+    default_strategy: Option<&str>,
+    selection: Option<RoutingSelection>,
+) -> HookScope {
+    let workspace = selection
+        .as_ref()
+        .and_then(|selection| selection.fields.workspace.clone());
+    let mut project = selection
+        .as_ref()
+        .and_then(|selection| selection.fields.project.clone());
+    let mut strategy = selection
+        .as_ref()
+        .and_then(|selection| selection.fields.project_strategy.clone());
+    let explicit_identity = selection
+        .as_ref()
+        .and_then(|selection| selection.fields.identity.clone());
+    let style = selection
+        .as_ref()
+        .and_then(|selection| selection.fields.identity_style.clone());
+    let mut aliases =
+        selection
+            .as_ref()
+            .and_then(|selection| match selection.fields.aliases.clone() {
+                Ok(Some(aliases)) if !aliases.is_empty() => serde_json::to_string(&aliases).ok(),
+                Ok(_) => None,
+                Err(_) => Some("invalid".to_owned()),
+            });
+    let canonical_project = project.clone();
+    let routed = selection.as_ref().is_some_and(|selection| {
+        matches!(
+            selection.source,
+            RoutingSource::HomeIdentityRoute | RoutingSource::HomePathRoute
+        )
+    });
+    let mut project_src = project.as_ref().map(|_| "marker");
+    let identity = if routed {
+        selection.and_then(|selection| selection.remote_identity)
+    } else if aliases.is_none() {
+        repository_identity(cwd, explicit_identity.as_deref(), project.as_deref())
+    } else {
+        repository_identity(cwd, None, None).filter(|identity| {
+            identity.source == ai_memory_core::repository_identity::IdentitySource::GitRemote
+        })
+    };
+    if aliases.is_some()
+        && identity.as_ref().is_none_or(|identity| {
+            identity.source != ai_memory_core::repository_identity::IdentitySource::GitRemote
+        })
+    {
+        aliases = if routed {
+            None
+        } else {
+            Some("invalid".to_owned())
+        };
+    } else if aliases.is_some() && canonical_project.is_none() {
+        aliases = Some("invalid".to_owned());
+    }
+    if strategy.is_none() {
+        strategy = default_strategy.map(str::to_owned);
+    }
+    if project.is_none() && matches!(strategy.as_deref(), Some("repo-root" | "repo_root")) {
+        project = repo_root_project(cwd);
+        project_src = project.as_ref().map(|_| "repo-root");
+    }
+    // Only a remote has a host to drop, so the style travels with a remote
+    // identity and nothing else (#1033).
+    let identity_style = identity.as_ref().and_then(|identity| {
+        (identity.source == ai_memory_core::repository_identity::IdentitySource::GitRemote)
+            .then(|| forwarded_identity_style(style.as_deref()))
+    });
+    let (identity, identity_src) = match identity {
+        Some(identity) => (Some(identity.identity), Some(identity.source.as_str())),
+        None => (None, None),
+    };
+    let server_may_remap = project_src != Some("marker") || identity.is_some();
+    HookScope {
+        workspace,
+        project,
+        project_src,
+        project_strategy: strategy,
+        identity,
+        identity_src,
+        identity_style,
+        aliases,
+        server_may_remap,
+    }
+}
+
+/// The `identity_style` every Phase-5 client sends with a valid git remote.
+/// Explicit marker/home-route values win; omission emits `path`. The server
+/// keeps omitted wire input as legacy `host_path` for old-client compatibility.
+fn forwarded_identity_style(raw: Option<&str>) -> &'static str {
+    use ai_memory_core::repository_identity::IdentityStyle;
+    raw.and_then(IdentityStyle::from_str_opt)
+        .unwrap_or(IdentityStyle::Path)
+        .as_str()
+}
+
+/// A resolved marker's `[profile]` flag as the explicit value the hook
+/// forwards: `0` for a falsy value, `1` for anything else, an absent key
+/// included.
+fn profile_flag_value(raw: Option<String>) -> &'static str {
+    if raw.as_deref().is_some_and(crate::marker::is_falsy) {
+        "0"
+    } else {
+        "1"
+    }
+}
+
+fn marker_query_suffix_impl(
+    cwd: &str,
+    default_strategy: Option<&str>,
+    include_briefing: bool,
+) -> String {
+    let selection = match routing_selection(cwd) {
+        Ok(selection) => selection,
+        Err(_) => return String::new(),
+    };
+    marker_query_suffix_impl_from_selection(cwd, default_strategy, include_briefing, selection)
+}
+
+fn marker_query_suffix_impl_from_selection(
+    cwd: &str,
+    default_strategy: Option<&str>,
+    include_briefing: bool,
+    selection: Option<RoutingSelection>,
+) -> String {
+    let mut qs = format!("&cwd={}", url_encode(cwd));
+    let marker = selection.as_ref().map(|selection| selection.path.clone());
+    let scope = hook_scope_from_selection(cwd, default_strategy, selection);
+    let (mut drop_subagent, mut default_global) = (None, None);
+    let (mut briefing, mut briefing_budget) = (None, None);
+    let (mut profile_contribute, mut profile_consume) = (None, None);
+    // The nearest marker that declares more than `[capture]` (#668): a
+    // nested capture-only marker (e.g. one that only sets `ignore_paths`)
+    // must not shadow an outer marker's workspace/project/briefing/etc.
+    if let Some(marker) = marker {
+        drop_subagent = parse_toml_key(&marker, "drop_subagent_captures");
+        // `[recall] default_global = true` (or top-level; quoted or bare) —
+        // a meta-repo opts every default-scoped read into a global search.
+        default_global = parse_toml_flag(&marker, "default_global");
+        // `[briefing] inject_on_session_start = true` + optional
+        // `max_chars = N` — opt this repo into the compiled project brief
+        // appended to the session-start handoff fetch (#176).
+        briefing = parse_toml_flag(&marker, "inject_on_session_start");
+        briefing_budget = parse_toml_flag(&marker, "max_chars");
+        // `[profile] contribute` / `consume` (quoted or bare), always sent
+        // explicitly once a marker resolved: a falsy value sends `0`, anything
+        // else (an absent key included) `1`. Removing the key re-enables; no
+        // marker sends nothing, so the server keeps what it stored.
+        profile_contribute = Some(profile_flag_value(parse_toml_flag(&marker, "contribute")));
+        profile_consume = Some(profile_flag_value(parse_toml_flag(&marker, "consume")));
+    }
+    if let Some(val) = scope.workspace {
+        qs.push_str(&format!("&workspace={}", url_encode(&val)));
+    }
+    if let Some(val) = scope.project {
+        qs.push_str(&format!("&project={}", url_encode(&val)));
+    }
+    if let Some(val) = scope.project_src {
+        qs.push_str(&format!("&project_src={val}"));
+    }
+    if let Some(val) = scope.project_strategy {
+        qs.push_str(&format!("&project_strategy={}", url_encode(&val)));
+    }
+    if let (Some(identity), Some(source)) = (scope.identity, scope.identity_src) {
+        qs.push_str(&format!(
+            "&identity={}&identity_src={}",
+            url_encode(&identity),
+            source
+        ));
+    }
+    if let Some(style) = scope.identity_style {
+        qs.push_str(&format!("&identity_style={style}"));
+    }
+    if let Some(aliases) = scope.aliases {
+        qs.push_str(&format!("&aliases={}", url_encode(&aliases)));
+    }
+    // Per-project `drop_subagent_captures` opt-in: forward the marker's value as
+    // the `drop_subagent` flag so the server scopes the drop to this project.
+    // The server interprets truthiness (`1`/`true`/…).
+    if let Some(val) = drop_subagent.filter(|v| !v.is_empty()) {
+        qs.push_str(&format!("&drop_subagent={}", url_encode(&val)));
+    }
+    // Per-repo `default_global` opt-in: forward the marker's value so the
+    // server can publish it on the ActiveProject and make default-scoped read
+    // tools search globally. Truthiness is decided server-side.
+    if let Some(val) = default_global.filter(|v| !v.is_empty()) {
+        qs.push_str(&format!("&default_global={}", url_encode(&val)));
+    }
+    // Per-project `[profile]` settings: the server records `contribute` on the
+    // project for harvesting, and `consume = false` suppresses the digest and
+    // the profile union for this project.
+    if let Some(val) = profile_contribute {
+        qs.push_str(&format!("&profile_contribute={val}"));
+    }
+    if let Some(val) = profile_consume {
+        qs.push_str(&format!("&profile_consume={val}"));
+    }
+    // Per-repo session-start brief opt-in: forwarded on every request for
+    // simplicity (the capture path ignores it); only the `/handoff` GET at
+    // session start acts on it. Truthiness and the char-budget clamp are
+    // decided server-side. Callers that deliver the brief once per session
+    // (the kimi user-prompt path) pass `include_briefing = false` after the
+    // first delivery so the server stops recomposing the brief per request.
+    if include_briefing {
+        if let Some(val) = briefing.filter(|v| !v.is_empty()) {
+            qs.push_str(&format!("&briefing={}", url_encode(&val)));
+        }
+        if let Some(val) = briefing_budget.filter(|v| !v.is_empty()) {
+            qs.push_str(&format!("&briefing_budget={}", url_encode(&val)));
+        }
+    }
+    qs
+}
+
+/// The repository identity to send with this checkout's events (#708), or
+/// `None` to let the server route by project name as it always has.
+///
+/// Only the rungs that route by identity are sent: an explicit `identity`
+/// from the marker, or — when the marker declares no `project` — the
+/// `upstream`/`origin` remote. A declared `project` outranks the remote and
+/// routes by name, so git is not consulted at all when one is present; that
+/// also keeps the lookup off the hot path for every repository that declares
+/// itself. The remote is normalised here, so credentials embedded in its URL
+/// never leave the machine.
+fn repository_identity(
+    cwd: &str,
+    explicit_identity: Option<&str>,
+    declared_project: Option<&str>,
+) -> Option<ai_memory_core::repository_identity::RepositoryIdentity> {
+    use ai_memory_core::repository_identity::{IdentityInputs, resolve};
+    let declared = |value: Option<&str>| value.is_some_and(|v| !v.trim().is_empty());
+    let (upstream, origin) = if declared(explicit_identity) || declared(declared_project) {
+        (None, None)
+    } else {
+        ai_memory_consolidate::read_identity_remotes(std::path::Path::new(cwd))
+    };
+    resolve(&IdentityInputs {
+        explicit_identity,
+        manifest_name: declared_project,
+        upstream_remote: upstream.as_deref(),
+        origin_remote: origin.as_deref(),
+        folder_name: None,
+    })
+    .filter(|identity| identity.source.routes_by_identity())
+}
+
+/// [`CLIENT_MARKER_HEADER`] value the native hook sends on
+/// every request to the server. Set per request rather than as a client
+/// default because the same client also refreshes OIDC tokens with a third
+/// party, which has no use for it.
+const NATIVE_HOOK_CLIENT_KIND: &str = "hook";
+
+/// Build a reqwest client for the hook's one-shot requests. `no_proxy`
+/// ignores `HTTP_PROXY`, `HTTPS_PROXY` and `ALL_PROXY`, which have no
+/// business on a loopback/LAN POST; reqwest is built without its
+/// `system-proxy` feature, so no OS proxy setting is read either way.
+/// Built once per invocation and reused for both the event POST and the
+/// handoff GET. Default root certs are kept so HTTPS targets (e.g. a TLS
+/// proxy) still work.
+pub fn build_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .no_proxy()
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new())
+}
+
+/// Outcome of one spooled-event POST — enough for the drain loop to decide
+/// whether a miss should cost the entry a retry attempt. Never errors, so a
+/// hook/flush never fails the agent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PostOutcome {
+    /// Server acknowledged with a 2xx (the engine answers `202 queued`): the
+    /// entry was delivered and can be removed from the spool.
+    Delivered,
+    /// Server answered `429 Too Many Requests` (`hook queue full`): transient
+    /// backpressure, the event was never processed. Keep it queued WITHOUT
+    /// bumping attempts so saturation never burns the entry's retry budget.
+    Saturated,
+    /// Any other non-2xx: the server answered and refused. A genuine miss
+    /// that should count against the retry limit.
+    Failed,
+    /// The request never reached a server — connection refused, DNS failure,
+    /// or timeout. Distinguished from [`Self::Failed`] because it says
+    /// something about the *endpoint* rather than the entry: every other
+    /// spooled event addressed to the same endpoint will fail the same way,
+    /// so the drain can skip past them instead of stopping at the first one
+    /// (#493).
+    Unreachable,
+    /// `403` — the server understood the request and will never accept it.
+    /// Today that means the author may not write the project
+    /// the event belongs to.
+    ///
+    /// Terminal, and that is the whole point of separating it from
+    /// [`Self::Failed`]. A refusal that counts as a failure gets re-sent until
+    /// it exhausts the retry limit, and every one of those attempts is
+    /// guaranteed to be refused for the same reason. Retrying something that
+    /// cannot succeed is how a parse failure once cost this project 10.7M
+    /// tokens in a day. The entry is dropped on the spot.
+    Refused,
+    /// `401` — the server rejected the bearer. Distinguished from
+    /// [`Self::Failed`] because it says something about the *credential*
+    /// rather than the entry: a spooled event carries the token frozen at
+    /// capture time, so after a rotation every entry captured under the old
+    /// one fails identically and is recoverable by retrying with the current
+    /// token (#542).
+    Unauthorized,
+}
+
+/// POST the payload as JSON, best-effort. `timeout` is caller-chosen: the
+/// per-tool-call hot path no longer POSTs at all (it spools); the drain calls
+/// this with a budget that tolerates a remote/slow server. Returns a
+/// [`PostOutcome`] (never errors) so the drain can give a 429 (saturation) a
+/// free retry while still bounding genuine failures by `MAX_ATTEMPTS`.
+pub async fn post_hook(
+    client: &reqwest::Client,
+    url: &str,
+    body: &str,
+    token: Option<&str>,
+    timeout: Duration,
+) -> PostOutcome {
+    let mut req = client
+        .post(url)
+        .header("Content-Type", "application/json")
+        .header(CLIENT_MARKER_HEADER, NATIVE_HOOK_CLIENT_KIND)
+        .timeout(timeout)
+        .body(body.to_owned());
+    if let Some(t) = token {
+        req = req.bearer_auth(t);
+    }
+    match req.send().await {
+        Ok(resp) if resp.status().is_success() => PostOutcome::Delivered,
+        Ok(resp) if resp.status() == reqwest::StatusCode::TOO_MANY_REQUESTS => {
+            PostOutcome::Saturated
+        }
+        Ok(resp) if resp.status() == reqwest::StatusCode::UNAUTHORIZED => PostOutcome::Unauthorized,
+        Ok(resp) if resp.status() == reqwest::StatusCode::FORBIDDEN => PostOutcome::Refused,
+        Ok(_) => PostOutcome::Failed,
+        Err(_) => PostOutcome::Unreachable,
+    }
+}
+
+/// Outcome of one `POST /hook/batch` request — many spooled events delivered in
+/// a single round-trip, so a draining client amortizes TLS + network RTT + the
+/// edge auth hop over the whole batch instead of paying it per event.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BatchOutcome {
+    /// Modern server returned one terminal result for each acknowledged item.
+    Detailed {
+        /// Per-item processing outcomes in request order.
+        outcomes: Vec<String>,
+        /// Item that failed after any earlier acknowledged items.
+        failed_index: Option<usize>,
+    },
+    /// Server committed the leading `usize` items (contiguous prefix, oldest
+    /// first). Equals the request length on full success; a smaller value means
+    /// the server stopped on that item (fail-fast) — the caller deletes the
+    /// prefix and charges the next item a retry.
+    Accepted(usize),
+    /// Server committed these item indexes, which may be non-contiguous when it
+    /// skipped per-source rate-limited events and continued with later sources.
+    /// If `failed_index` is present, that item failed processing and should be
+    /// charged instead of assuming the first unaccepted item failed.
+    AcceptedIndices {
+        indices: Vec<usize>,
+        failed_index: Option<usize>,
+    },
+    /// `429` — ingest saturated after committing this many leading items. The
+    /// caller deletes that prefix and retries the rest later WITHOUT bumping
+    /// attempts (saturation isn't a failure).
+    Saturated(usize),
+    /// `429` with a non-contiguous committed set. New servers can include this
+    /// when a global saturation happens after earlier skipped items.
+    SaturatedIndices(Vec<usize>),
+    /// The request never reached a server — connection refused, DNS failure,
+    /// or timeout. Says something about the *endpoint*, not the batch: every
+    /// other entry addressed there will fail identically, so the drain skips
+    /// past them rather than stopping at the first (#493).
+    Unreachable,
+    /// `404`/`405` — the server has no `/hook/batch` (a pre-upgrade build). The
+    /// caller falls back to per-event `POST /hook` for the rest of the drain.
+    Unsupported,
+    /// `401` — the server rejected the batch's bearer. See
+    /// [`PostOutcome::Unauthorized`]; the whole batch shares one identity, so
+    /// a rejected credential fails all of it and none of it was processed.
+    Unauthorized,
+    /// Transport error or any other non-2xx: the batch outcome is unknown. The
+    /// drain charges conservatively so trailing events that may never have been
+    /// attempted do not burn retry budget.
+    Failed,
+}
+
+/// POST a pre-serialized JSON array of `{url, body}` events to `<batch_url>`.
+/// `bearer` authenticates the whole batch (every item shares the drain's single
+/// identity). Best-effort: never errors. Reads `{"accepted": K}` from a 2xx
+/// body; a 2xx whose body can't be read is treated as `Failed` (re-send rather
+/// than risk dropping undelivered events).
+pub async fn post_batch(
+    client: &reqwest::Client,
+    batch_url: &str,
+    payload: &str,
+    token: Option<&str>,
+    timeout: Duration,
+) -> BatchOutcome {
+    let mut req = client
+        .post(batch_url)
+        .header("Content-Type", "application/json")
+        .header(CLIENT_MARKER_HEADER, NATIVE_HOOK_CLIENT_KIND)
+        .timeout(timeout)
+        .body(payload.to_owned());
+    if let Some(t) = token {
+        req = req.bearer_auth(t);
+    }
+    match req.send().await {
+        Ok(resp) => {
+            let status = resp.status();
+            if status.is_success() {
+                match resp.json::<serde_json::Value>().await {
+                    Ok(v) => {
+                        if let Some(outcomes) = batch_outcomes(&v) {
+                            BatchOutcome::Detailed {
+                                outcomes,
+                                failed_index: failed_index(&v),
+                            }
+                        } else if let Some(indices) = accepted_indices(&v) {
+                            BatchOutcome::AcceptedIndices {
+                                indices,
+                                failed_index: failed_index(&v),
+                            }
+                        } else {
+                            let accepted = v
+                                .get("accepted")
+                                .and_then(serde_json::Value::as_u64)
+                                .unwrap_or(0) as usize;
+                            BatchOutcome::Accepted(accepted)
+                        }
+                    }
+                    Err(_) => BatchOutcome::Failed,
+                }
+            } else if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
+                let body = resp.json::<serde_json::Value>().await.ok();
+                if let Some(indices) = body.as_ref().and_then(accepted_indices) {
+                    BatchOutcome::SaturatedIndices(indices)
+                } else {
+                    let accepted = body
+                        .and_then(|v| {
+                            v.get("accepted")
+                                .and_then(serde_json::Value::as_u64)
+                                .map(|n| n as usize)
+                        })
+                        .unwrap_or(0);
+                    BatchOutcome::Saturated(accepted)
+                }
+            } else if status == reqwest::StatusCode::NOT_FOUND
+                || status == reqwest::StatusCode::METHOD_NOT_ALLOWED
+            {
+                BatchOutcome::Unsupported
+            } else if status == reqwest::StatusCode::UNAUTHORIZED {
+                BatchOutcome::Unauthorized
+            } else {
+                BatchOutcome::Failed
+            }
+        }
+        Err(_) => BatchOutcome::Unreachable,
+    }
+}
+
+fn batch_outcomes(v: &serde_json::Value) -> Option<Vec<String>> {
+    let results = v.get("results")?.as_array()?;
+    let mut outcomes = Vec::with_capacity(results.len());
+    for (position, result) in results.iter().enumerate() {
+        if result.get("index")?.as_u64()? as usize != position {
+            return None;
+        }
+        outcomes.push(result.get("outcome")?.as_str()?.to_owned());
+    }
+    Some(outcomes)
+}
+
+fn failed_index(v: &serde_json::Value) -> Option<usize> {
+    v.get("failed_index")?.as_u64().map(|n| n as usize)
+}
+
+fn accepted_indices(v: &serde_json::Value) -> Option<Vec<usize>> {
+    let arr = v.get("accepted_indices")?.as_array()?;
+    let mut indices = Vec::with_capacity(arr.len());
+    for item in arr {
+        indices.push(item.as_u64()? as usize);
+    }
+    Some(indices)
+}
+
+/// GET the handoff text with a caller-chosen budget. Returns None on any error
+/// or an empty body. This is the one synchronous read on the agent's critical
+/// path (session-start injects it as context), so the budget is larger than a
+/// loopback default to tolerate a remote server.
+pub async fn get_handoff(
+    client: &reqwest::Client,
+    url: &str,
+    token: Option<&str>,
+    timeout: Duration,
+) -> Option<String> {
+    let mut req = client
+        .get(url)
+        .header(CLIENT_MARKER_HEADER, NATIVE_HOOK_CLIENT_KIND)
+        .timeout(timeout);
+    if let Some(t) = token {
+        req = req.bearer_auth(t);
+    }
+    // Warn on stderr instead of failing silently: the hook still exits 0 (a
+    // hook must never break the agent), but an unreachable server would
+    // otherwise be indistinguishable from "no pending handoff" (#188).
+    let resp = match req.send().await {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!(
+                "ai-memory hook warning: handoff fetch failed ({e}); \
+                 a pending handoff (if any) was NOT injected"
+            );
+            return None;
+        }
+    };
+    if resp.status() == reqwest::StatusCode::FORBIDDEN {
+        // Not authorized for this repository (#708). Same reasoning as the
+        // transport warning above: silence here would read as "nothing was
+        // handed off", when the truth is "you cannot see what was". The body
+        // is the server's reason and goes to stderr, never into context.
+        let reason = resp.text().await.unwrap_or_default();
+        eprintln!(
+            "ai-memory hook warning: not authorized for this project's memory ({}); \
+             nothing was injected",
+            reason.trim()
+        );
+        return None;
+    }
+    if !resp.status().is_success() {
+        return None;
+    }
+    let body = resp.text().await.ok()?;
+    if body.is_empty() { None } else { Some(body) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    /// Shadows [`super::marker_query_suffix`] for every test in this module,
+    /// resolving against an empty operator home: the real one reads
+    /// `home_dir()`, and a developer's own `~/.ai-memory.toml` applies to
+    /// every cwd, so it would leak into the assertions. Tests that exercise a
+    /// home marker pass one to `routing_selection_with_home` themselves.
+    fn marker_query_suffix(cwd: &str, default_strategy: Option<&str>) -> String {
+        let home = tempfile::TempDir::new().unwrap();
+        match super::super::super::marker::routing_selection_with_home(
+            cwd,
+            cwd,
+            Some(home.path()),
+            false,
+        ) {
+            Ok(selection) => {
+                marker_query_suffix_impl_from_selection(cwd, default_strategy, true, selection)
+            }
+            Err(_) => String::new(),
+        }
+    }
+
+    /// Shadows [`super::hook_scope`] the same way, for the same reason.
+    fn hook_scope(cwd: &str, default_strategy: Option<&str>) -> HookScope {
+        let home = tempfile::TempDir::new().unwrap();
+        hook_scope_with_home(cwd, default_strategy, Some(home.path()))
+    }
+
+    /// Shadows [`super::marker_requests_briefing`] the same way, for the same
+    /// reason.
+    fn marker_requests_briefing(cwd: &str) -> bool {
+        let home = tempfile::TempDir::new().unwrap();
+        marker_requests_briefing_with_home(cwd, Some(home.path()))
+    }
+
+    async fn serve_once(status: &'static str, body: &'static str) -> String {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut buf = [0_u8; 1024];
+            let _ = stream.read(&mut buf).await;
+            let response = format!(
+                "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            let _ = stream.write_all(response.as_bytes()).await;
+        });
+        format!("http://{addr}/handoff")
+    }
+
+    #[test]
+    fn extracts_top_level_cwd() {
+        let p: serde_json::Value =
+            serde_json::from_str(r#"{"cwd":"/d/proj","tool_input":{"cwd":"/nested"}}"#).unwrap();
+        assert_eq!(extract_cwd(&p).as_deref(), Some("/d/proj"));
+    }
+
+    #[test]
+    fn missing_cwd_is_none() {
+        let p: serde_json::Value = serde_json::from_str(r#"{"x":1}"#).unwrap();
+        assert_eq!(extract_cwd(&p), None);
+    }
+
+    #[test]
+    fn resolve_cwd_prefers_payload_over_env_and_process_cwd() {
+        let p: serde_json::Value = serde_json::from_str(r#"{"cwd":"/payload"}"#).unwrap();
+
+        let cwd = resolve_cwd_with_fallbacks(
+            &p,
+            |_| Some("/env".into()),
+            || Some(PathBuf::from("/process")),
+        );
+
+        assert_eq!(cwd.as_deref(), Some("/payload"));
+    }
+
+    #[test]
+    fn resolve_cwd_uses_devin_project_dir_when_payload_omits_cwd() {
+        let p: serde_json::Value = serde_json::from_str(r#"{"source":"startup"}"#).unwrap();
+
+        let cwd = resolve_cwd_with_fallbacks(
+            &p,
+            |name| (name == "DEVIN_PROJECT_DIR").then(|| "/env-project".into()),
+            || Some(PathBuf::from("/process")),
+        );
+
+        assert_eq!(cwd.as_deref(), Some("/env-project"));
+    }
+
+    #[test]
+    fn resolve_cwd_uses_process_cwd_when_payload_and_env_omit_cwd() {
+        let p: serde_json::Value = serde_json::from_str(r#"{"source":"startup"}"#).unwrap();
+
+        let cwd =
+            resolve_cwd_with_fallbacks(&p, |_| None, || Some(PathBuf::from("process-project")));
+
+        assert_eq!(cwd.as_deref(), Some("process-project"));
+    }
+
+    #[test]
+    fn query_suffix_without_marker_has_only_cwd() {
+        let qs = marker_query_suffix("/nonexistent/path/xyz", None);
+        assert_eq!(qs, "&cwd=%2Fnonexistent%2Fpath%2Fxyz");
+    }
+
+    #[test]
+    fn url_encode_escapes_reserved() {
+        assert_eq!(url_encode("a b&c=d"), "a%20b%26c%3Dd");
+    }
+
+    #[tokio::test]
+    async fn post_hook_unreachable_when_server_is_not_listening() {
+        // Port 1 is unroutable. Best-effort means this resolves to an outcome
+        // rather than panicking — and specifically to `Unreachable`, not
+        // `Failed`: the request never reached a server, so the result says
+        // something about the endpoint rather than about this event. The drain
+        // relies on that distinction to skip past a dead address instead of
+        // stalling the whole spool behind it (#493).
+        let client = build_client();
+        let outcome = post_hook(
+            &client,
+            "http://127.0.0.1:1/hook?event=pre-tool-use",
+            "{}",
+            None,
+            Duration::from_millis(500),
+        )
+        .await;
+        assert_eq!(outcome, PostOutcome::Unreachable);
+    }
+
+    #[tokio::test]
+    async fn post_hook_saturated_on_429() {
+        // 429 = server backpressure; the event was never processed, so the
+        // drain must treat it as a free retry, not a failed attempt.
+        let url = serve_once("429 Too Many Requests", "hook queue full").await;
+        let outcome = post_hook(&build_client(), &url, "{}", None, Duration::from_secs(1)).await;
+        assert_eq!(outcome, PostOutcome::Saturated);
+    }
+
+    #[tokio::test]
+    async fn post_hook_delivered_on_2xx() {
+        let url = serve_once("202 Accepted", "queued").await;
+        let outcome = post_hook(&build_client(), &url, "{}", None, Duration::from_secs(1)).await;
+        assert_eq!(outcome, PostOutcome::Delivered);
+    }
+
+    #[tokio::test]
+    async fn post_hook_refused_on_403_is_terminal_not_a_failure() {
+        // 403 means the server will never accept this event. Classifying it as
+        // `Failed` would re-send it until it burnt the retry limit, and every
+        // attempt would be refused identically — the shape of retry loop that
+        // once cost this project 10.7M tokens in a day. It must be its own
+        // outcome so the drain can drop it on the spot.
+        let url = serve_once("403 Forbidden", "capture not authorized").await;
+        let outcome = post_hook(&build_client(), &url, "{}", None, Duration::from_secs(1)).await;
+        assert_eq!(outcome, PostOutcome::Refused);
+        assert_ne!(
+            outcome,
+            PostOutcome::Failed,
+            "a refusal must never be charged a retry attempt"
+        );
+    }
+
+    #[tokio::test]
+    async fn post_hook_408_and_425_are_retryable_failed_not_refused() {
+        // 408 (request timeout) and 425 (too early) say "retry me", not
+        // "never": they must fall through to `Failed` so the spool keeps the
+        // entry queued subject to the attempt limit. Classifying every 4xx as
+        // a terminal refusal deleted such events on the spot (#1092
+        // regression).
+        for status in ["408 Request Timeout", "425 Too Early"] {
+            let url = serve_once(status, "retry later").await;
+            let outcome =
+                post_hook(&build_client(), &url, "{}", None, Duration::from_secs(1)).await;
+            assert_ne!(
+                outcome,
+                PostOutcome::Refused,
+                "{status} is retryable and must not be terminal"
+            );
+            assert_eq!(outcome, PostOutcome::Failed, "{status} is a retryable miss");
+        }
+    }
+
+    #[tokio::test]
+    async fn post_batch_unhandled_4xx_is_retryable_failed() {
+        // Base semantics: only 401/404/405/429 are special-cased for batches;
+        // every other status — 400, and retryable timeouts like 408/425 — is
+        // a `Failed` with an unknown outcome, never a terminal refusal.
+        for status in ["400 Bad Request", "408 Request Timeout", "425 Too Early"] {
+            let url = serve_once(status, "invalid batch").await;
+            let outcome =
+                post_batch(&build_client(), &url, "[]", None, Duration::from_secs(1)).await;
+            assert_eq!(outcome, BatchOutcome::Failed, "{status} is retryable");
+        }
+    }
+
+    #[tokio::test]
+    async fn get_handoff_never_injects_a_refusal() {
+        // A 403 carries the server's reason (#708). It is reported on stderr
+        // and must not reach the agent as context.
+        let url = serve_once(
+            "403 Forbidden",
+            "not authorized for scratch. This is an access problem, not an empty memory",
+        )
+        .await;
+        let got = get_handoff(&build_client(), &url, None, Duration::from_secs(1)).await;
+        assert!(got.is_none(), "a refusal must not become context");
+    }
+
+    #[tokio::test]
+    async fn get_handoff_ignores_non_success_status() {
+        let url = serve_once("401 Unauthorized", "unauthorized").await;
+        let got = get_handoff(&build_client(), &url, None, Duration::from_secs(1)).await;
+        assert!(got.is_none(), "non-2xx body must not become context");
+    }
+
+    /// Like `serve_once`, but answers 200 and hands back the raw request.
+    async fn capture_once() -> (String, tokio::task::JoinHandle<String>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let handle = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            // Read until the end of the headers; the body is irrelevant.
+            let mut head = Vec::new();
+            let mut buf = [0_u8; 4096];
+            while !head.windows(4).any(|w| w == b"\r\n\r\n") {
+                let n = stream.read(&mut buf).await.unwrap();
+                if n == 0 {
+                    break;
+                }
+                head.extend_from_slice(&buf[..n]);
+            }
+            let body = "ok";
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            let _ = stream.write_all(response.as_bytes()).await;
+            String::from_utf8_lossy(&head).to_ascii_lowercase()
+        });
+        (format!("http://{addr}"), handle)
+    }
+
+    #[tokio::test]
+    async fn every_native_hook_request_carries_the_client_marker() {
+        // An unauthenticated server reached by a LAN name refuses a handoff
+        // fetch without it, and hook events ride the same contract.
+        let marker = format!("{CLIENT_MARKER_HEADER}: hook\r\n");
+        let (base, request) = capture_once().await;
+        get_handoff(
+            &build_client(),
+            &format!("{base}/handoff?agent=claude-code"),
+            None,
+            Duration::from_secs(2),
+        )
+        .await;
+        let request = request.await.unwrap();
+        assert!(request.starts_with("get /handoff?"), "{request}");
+        assert!(request.contains(&marker), "handoff GET: {request}");
+
+        let (base, request) = capture_once().await;
+        post_hook(
+            &build_client(),
+            &format!("{base}/hook?event=stop"),
+            "{}",
+            None,
+            Duration::from_secs(2),
+        )
+        .await;
+        assert!(request.await.unwrap().contains(&marker), "hook POST");
+
+        let (base, request) = capture_once().await;
+        post_batch(
+            &build_client(),
+            &format!("{base}/hook/batch"),
+            "[]",
+            None,
+            Duration::from_secs(2),
+        )
+        .await;
+        assert!(request.await.unwrap().contains(&marker), "batch POST");
+    }
+
+    // The marker parser's own tests (`parse_toml_key`, `find_marker`) moved to
+    // `crate::marker` along with the code. What stays here is hook-specific:
+    // the strict `[capture]` section and the query-string suffix.
+
+    #[test]
+    fn capture_section_is_strict_and_marker_read_is_bounded() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let marker = tmp.path().join(".ai-memory.toml");
+        std::fs::write(
+            &marker,
+            "workspace = \"allowed\"\n[capture]\nignore_paths = [\"secret/**\"]\n",
+        )
+        .unwrap();
+        assert_eq!(
+            read_capture_config(&marker).unwrap().ignore_paths,
+            ["secret/**"]
+        );
+        std::fs::write(&marker, "[capture]\nunknown = true\n").unwrap();
+        assert!(read_capture_config(&marker).is_err());
+        std::fs::write(&marker, "[capture\n").unwrap();
+        assert!(read_capture_config(&marker).is_err());
+        std::fs::write(&marker, "x".repeat(MAX_MARKER_BYTES + 1)).unwrap();
+        assert!(read_capture_config(&marker).is_err());
+    }
+
+    /// Every TOML spelling of `[capture]` the native parser honours, and the
+    /// ones it rejects, from the shared fixture the generated TypeScript
+    /// reader's Node runtime evidence runs too: a dotted top-level key or a
+    /// quoted table name must not escape either reader, and a shape toml_edit
+    /// rejects (an inline table, `[[capture]]`) fails closed in both.
+    #[test]
+    fn capture_section_spellings_match_toml_semantics() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../ai-memory-hooks/tests/fixtures/capture-policy.json"
+        ))
+        .unwrap();
+        let spellings = &fixture["marker_spellings"];
+        let texts = |kind: &str| {
+            spellings[kind]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|text| text.as_str().unwrap().to_owned())
+                .collect::<Vec<_>>()
+        };
+        let tmp = tempfile::TempDir::new().unwrap();
+        let marker = tmp.path().join(".ai-memory.toml");
+        let read = |text: &str| {
+            std::fs::write(&marker, text).unwrap();
+            read_capture_config(&marker).map(|config| config.ignore_paths)
+        };
+        for honoured in texts("honoured") {
+            assert_eq!(
+                read(&honoured),
+                Ok(vec!["secret/**".to_owned()]),
+                "{honoured}"
+            );
+        }
+        for rejected in texts("rejected") {
+            assert!(read(&rejected).is_err(), "{rejected}");
+        }
+        for unrelated in texts("unrelated") {
+            assert_eq!(read(&unrelated), Ok(Vec::new()), "{unrelated}");
+        }
+    }
+
+    #[test]
+    fn canonical_context_matches_supported_routing_shapes() {
+        let agy =
+            serde_json::json!({"workspacePaths":["/workspace/project"],"conversationId":"conv"});
+        assert_eq!(
+            canonical_context(&agy),
+            (Some("/workspace/project".into()), Some("conv".into()))
+        );
+        let generated = serde_json::json!({"payload":{"properties":{"info":{"directory":"/generated"},"sessionID":"nested"}}});
+        assert_eq!(
+            canonical_context(&generated),
+            (Some("/generated".into()), Some("nested".into()))
+        );
+    }
+
+    /// Cursor routes the workspace directory through `workspace_roots`:
+    /// `sessionStart` omits `cwd` entirely and tool events send `cwd: ""`.
+    /// Both must resolve, or every Cursor event reaches the server with no
+    /// cwd and is filed under the default `scratch` project. Shapes captured
+    /// live from Cursor CLI 2026.09.02-c22c1a3.
+    #[test]
+    fn canonical_context_reads_cursor_workspace_roots() {
+        let session_start = serde_json::json!({
+            "session_id": "cf111450-8c45-4da1-a384-7a48e08099c3",
+            "hook_event_name": "sessionStart",
+            "cursor_version": "2026.09.02-c22c1a3",
+            "workspace_roots": ["/checkouts/repo-a"]
+        });
+        assert_eq!(
+            canonical_context(&session_start),
+            (
+                Some("/checkouts/repo-a".into()),
+                Some("cf111450-8c45-4da1-a384-7a48e08099c3".into())
+            )
+        );
+
+        let tool_event = serde_json::json!({
+            "session_id": "cf111450-8c45-4da1-a384-7a48e08099c3",
+            "hook_event_name": "postToolUse",
+            "cursor_version": "2026.09.02-c22c1a3",
+            "cwd": "",
+            "workspace_roots": ["/checkouts/repo-a"]
+        });
+        assert_eq!(
+            canonical_context(&tool_event).0,
+            Some("/checkouts/repo-a".into())
+        );
+    }
+
+    /// `marker_query_suffix` appends `&workspace=…&project=…` (and
+    /// `&project_strategy=…`, `&drop_subagent=…`) when the marker declares them.
+    /// Each value is URL-encoded, so a workspace with a space round-trips as `%20`.
+    /// Regression for #188: a Windows cwd must be fully percent-encoded or
+    /// the HTTP layer refuses the request URL and the session-start hook
+    /// silently returns `{}` while the handoff stays pending.
+    #[test]
+    fn url_encode_is_an_unreserved_allow_list() {
+        // The reported case: raw `\` and `:` broke the request outright.
+        assert_eq!(url_encode(r"C:\dev\myproject"), "C%3A%5Cdev%5Cmyproject");
+        // RFC 3986 unreserved passes through untouched.
+        assert_eq!(url_encode("abc-XYZ_0.9~"), "abc-XYZ_0.9~");
+        // Previous deny-list behavior is preserved (space, slash, etc.).
+        assert_eq!(url_encode("/home/u/my repo"), "%2Fhome%2Fu%2Fmy%20repo");
+        // Multibyte UTF-8 is encoded per byte.
+        assert_eq!(url_encode("r\u{e9}po"), "r%C3%A9po");
+    }
+
+    /// The full marker suffix built from a Windows cwd must parse as a real
+    /// URL query — the end-to-end guarantee behind the #188 fix.
+    #[test]
+    fn marker_query_suffix_windows_cwd_yields_parseable_url() {
+        let qs = marker_query_suffix(r"C:\dev\myproject", None);
+        assert!(qs.contains("cwd=C%3A%5Cdev%5Cmyproject"), "{qs}");
+        let url = format!("http://127.0.0.1:49374/handoff?agent=claude-code{qs}");
+        let parsed = reqwest::Url::parse(&url).expect("must be a valid URL");
+        let cwd = parsed
+            .query_pairs()
+            .find(|(k, _)| k == "cwd")
+            .map(|(_, v)| v.into_owned())
+            .expect("cwd param present");
+        assert_eq!(
+            cwd, r"C:\dev\myproject",
+            "round-trips through percent-decoding"
+        );
+    }
+
+    /// A throwaway repository with the given remotes, or `None` when there is
+    /// no `git` binary to build one with. The host is not a real forge, so a
+    /// developer's global `url.<base>.insteadOf` rules cannot rewrite it.
+    fn repo_with_remotes(remotes: &[(&str, &str)]) -> Option<tempfile::TempDir> {
+        let git = |args: &[&str], dir: &std::path::Path| {
+            std::process::Command::new("git")
+                .arg("-C")
+                .arg(dir)
+                .args(args)
+                .status()
+                .ok()
+                .filter(std::process::ExitStatus::success)
+        };
+        let tmp = tempfile::TempDir::new().unwrap();
+        git(&["init", "-q"], tmp.path())?;
+        for (name, url) in remotes {
+            git(&["remote", "add", name, url], tmp.path())?;
+        }
+        Some(tmp)
+    }
+
+    /// An undeclared checkout sends the identity of its remote — `upstream`
+    /// over `origin` — normalised on this side, so the credentials in the URL
+    /// never reach the query string.
+    #[test]
+    fn marker_query_suffix_sends_the_remote_identity_of_an_undeclared_checkout() {
+        let Some(repo) = repo_with_remotes(&[
+            (
+                "origin",
+                "https://someone:s3cret-token@git.example.test/Fork/API.git",
+            ),
+            ("upstream", "git@git.example.test:Acme/API.git"),
+        ]) else {
+            return;
+        };
+        let qs = marker_query_suffix(repo.path().to_str().unwrap(), None);
+        assert!(
+            qs.contains("&identity=git.example.test%2Facme%2Fapi&identity_src=git_remote&identity_style=path"),
+            "{qs}"
+        );
+        assert!(
+            !qs.contains("s3cret"),
+            "credentials must not leave the machine: {qs}"
+        );
+
+        let Some(origin_only) = repo_with_remotes(&[(
+            "origin",
+            "https://someone:s3cret-token@git.example.test/Fork/API.git",
+        )]) else {
+            return;
+        };
+        let qs = marker_query_suffix(origin_only.path().to_str().unwrap(), None);
+        assert!(
+            qs.contains("&identity=git.example.test%2Ffork%2Fapi"),
+            "{qs}"
+        );
+        assert!(!qs.contains("s3cret"), "{qs}");
+        let scope =
+            serde_json::to_value(hook_scope(origin_only.path().to_str().unwrap(), None)).unwrap();
+        assert_eq!(scope["identity"], "git.example.test/fork/api");
+        assert_eq!(scope["identity_src"], "git_remote");
+        assert!(!scope.to_string().contains("s3cret"));
+    }
+
+    /// A declared `project` outranks the remote and routes by name, so nothing
+    /// is sent for it; an explicit `identity` outranks both.
+    #[test]
+    fn marker_query_suffix_lets_declarations_decide_the_identity() {
+        let Some(repo) = repo_with_remotes(&[("upstream", "git@git.example.test:acme/tool.git")])
+        else {
+            return;
+        };
+        let cwd = repo.path().to_str().unwrap();
+        let marker = repo.path().join(".ai-memory.toml");
+
+        std::fs::write(&marker, "project = \"my-fork\"\n").unwrap();
+        let qs = marker_query_suffix(cwd, None);
+        assert!(qs.contains("&project=my-fork"), "{qs}");
+        assert!(
+            !qs.contains("&identity="),
+            "a declared project routes by name: {qs}"
+        );
+
+        std::fs::write(
+            &marker,
+            "project = \"my-fork\"\nidentity = \"Acme/Platform\"\n",
+        )
+        .unwrap();
+        let qs = marker_query_suffix(cwd, None);
+        assert!(
+            qs.contains("&identity=acme%2Fplatform&identity_src=explicit"),
+            "{qs}"
+        );
+    }
+
+    #[test]
+    fn marker_aliases_keep_project_canonical_and_forward_remote_identity() {
+        let Some(repo) = repo_with_remotes(&[("origin", "git@git.example.test:acme/api.git")])
+        else {
+            return;
+        };
+        let cwd = repo.path().to_str().unwrap();
+        std::fs::write(
+            repo.path().join(".ai-memory.toml"),
+            "project = \"acme-api\"\naliases = [\" former-name \", \"legacy_name\", \"former-name\"]\n",
+        )
+        .unwrap();
+        let qs = marker_query_suffix(cwd, None);
+        let url = reqwest::Url::parse(&format!("http://localhost/handoff?agent=test{qs}")).unwrap();
+        let params = url
+            .query_pairs()
+            .into_owned()
+            .collect::<std::collections::HashMap<_, _>>();
+        assert_eq!(params.get("project").map(String::as_str), Some("acme-api"));
+        assert_eq!(
+            params.get("identity").map(String::as_str),
+            Some("git.example.test/acme/api")
+        );
+        assert_eq!(
+            params.get("identity_src").map(String::as_str),
+            Some("git_remote")
+        );
+        assert_eq!(
+            params.get("aliases").map(String::as_str),
+            Some("[\"former-name\",\"legacy_name\"]")
+        );
+    }
+
+    /// #1033: every valid remote carries a style. Omission and invalid marker
+    /// values send `path`; explicit `host_path` remains the opt-out. A declared
+    /// project or identity has no inferred remote style.
+    #[test]
+    fn marker_query_suffix_forwards_the_path_style_with_a_remote_identity() {
+        let Some(repo) = repo_with_remotes(&[("origin", "git@git.example.test:acme/api.git")])
+        else {
+            return;
+        };
+        let cwd = repo.path().to_str().unwrap();
+        let marker = repo.path().join(".ai-memory.toml");
+
+        std::fs::write(&marker, "").unwrap();
+        let qs = marker_query_suffix(cwd, None);
+        assert!(
+            qs.contains("&identity_src=git_remote&identity_style=path"),
+            "{qs}"
+        );
+
+        std::fs::write(&marker, "identity_style = \"path\"\n").unwrap();
+        let qs = marker_query_suffix(cwd, None);
+        assert!(
+            qs.contains("&identity_src=git_remote&identity_style=path"),
+            "{qs}"
+        );
+        let scope = serde_json::to_value(hook_scope(cwd, None)).unwrap();
+        assert_eq!(scope["identity_style"], "path");
+
+        std::fs::write(&marker, "identity_style = \"host_path\"\n").unwrap();
+        let qs = marker_query_suffix(cwd, None);
+        assert!(
+            qs.contains("&identity_src=git_remote&identity_style=host_path"),
+            "{qs}"
+        );
+
+        std::fs::write(&marker, "identity_style = \"Path\"\n").unwrap();
+        let qs = marker_query_suffix(cwd, None);
+        assert!(qs.contains("&identity_style=path"), "{qs}");
+
+        for (body, why) in [
+            (
+                "identity_style = \"path\"\nproject = \"api\"\n",
+                "a declared project routes by name",
+            ),
+            (
+                "identity_style = \"path\"\nidentity = \"acme/api\"\n",
+                "a declared identity keeps its own name",
+            ),
+        ] {
+            std::fs::write(&marker, body).unwrap();
+            let qs = marker_query_suffix(cwd, None);
+            assert!(!qs.contains("identity_style"), "{why}: {qs}");
+        }
+    }
+
+    /// The forwarding decision every client makes, against the shared fixture.
+    #[test]
+    fn forwarded_identity_style_matches_the_shared_fixture() {
+        let cases: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../ai-memory-core/fixtures/remote_identity_cases.json"
+        ))
+        .unwrap();
+        for case in cases["identity_style"].as_array().unwrap() {
+            let value = case["value"].as_str().unwrap();
+            let expected = case["style"].as_str().unwrap_or("path");
+            assert_eq!(forwarded_identity_style(Some(value)), expected, "{value:?}");
+        }
+        assert_eq!(forwarded_identity_style(None), "path");
+    }
+
+    /// No repository, no remote, no declaration: nothing to send, and the
+    /// server routes by folder name exactly as before.
+    #[test]
+    fn marker_query_suffix_sends_no_identity_outside_a_repository() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let qs = marker_query_suffix(tmp.path().to_str().unwrap(), None);
+        assert!(!qs.contains("identity"), "{qs}");
+    }
+
+    #[test]
+    fn matched_home_route_keeps_root_behavior_flags() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let home = tmp.path().join("home");
+        let repo = home.join("src/api/lib");
+        std::fs::create_dir_all(&repo).unwrap();
+        std::fs::write(
+            home.join(".ai-memory.toml"),
+            "workspace=\"wrong\"\nproject=\"wrong\"\nproject_strategy=\"repo-root\"\ndrop_subagent_captures=\"true\"\n[recall]\ndefault_global=true\n[briefing]\ninject_on_session_start=true\nmax_chars=3210\n[profile]\ncontribute=true\nconsume=false\n[routes.path.\"~/src/api\"]\nroute_workspace=\"right\"\nroute_project=\"api\"\n",
+        )
+        .unwrap();
+        let selection = super::super::super::marker::routing_selection_with_home(
+            repo.to_str().unwrap(),
+            repo.to_str().unwrap(),
+            Some(&home),
+            false,
+        )
+        .unwrap();
+        let query =
+            marker_query_suffix_impl_from_selection(repo.to_str().unwrap(), None, true, selection);
+        for expected in [
+            "&workspace=right",
+            "&project=api",
+            "&drop_subagent=true",
+            "&default_global=true",
+            "&briefing=true",
+            "&briefing_budget=3210",
+            "&profile_contribute=1",
+            "&profile_consume=0",
+        ] {
+            assert!(query.contains(expected), "{expected}: {query}");
+        }
+        assert!(!query.contains("project_strategy="), "{query}");
+        assert!(!query.contains("workspace=wrong"), "{query}");
+    }
+
+    #[test]
+    fn non_git_home_path_route_omits_aliases() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let home = tmp.path().join("home");
+        let repo = home.join("src/api");
+        std::fs::create_dir_all(&repo).unwrap();
+        std::fs::write(
+            home.join(".ai-memory.toml"),
+            "[routes.path.\"~/src/api\"]\nroute_workspace=\"path\"\nroute_project=\"api\"\nroute_aliases=[\"old-api\"]\n",
+        )
+        .unwrap();
+        let selection = super::super::super::marker::routing_selection_with_home(
+            repo.to_str().unwrap(),
+            repo.to_str().unwrap(),
+            Some(&home),
+            false,
+        )
+        .unwrap();
+        let query =
+            marker_query_suffix_impl_from_selection(repo.to_str().unwrap(), None, false, selection);
+        assert!(query.contains("&workspace=path&project=api"), "{query}");
+        assert!(!query.contains("aliases="), "{query}");
+        assert!(!query.contains("identity_src="), "{query}");
+    }
+
+    #[test]
+    fn invalid_home_routes_produce_no_hook_scope_or_query() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let home = tmp.path().join("home");
+        let repo = home.join("repo");
+        std::fs::create_dir_all(&repo).unwrap();
+        std::fs::write(
+            home.join(".ai-memory.toml"),
+            "workspace=\"wrong\"\nproject=\"wrong\"\n[routes.path.\"relative\"]\nroute_workspace=\"route\"\nroute_project=\"route\"\n",
+        )
+        .unwrap();
+        let result = super::super::super::marker::routing_selection_with_home(
+            repo.to_str().unwrap(),
+            repo.to_str().unwrap(),
+            Some(&home),
+            false,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn marker_query_suffix_appends_marker_fields() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let marker = tmp.path().join(".ai-memory.toml");
+        std::fs::write(
+            &marker,
+            r#"
+workspace = "acme corp"
+project = "infra"
+project_strategy = "repo-root"
+drop_subagent_captures = "true"
+"#,
+        )
+        .unwrap();
+        let cwd = tmp.path().to_str().unwrap();
+        let qs = marker_query_suffix(cwd, None);
+        // cwd is encoded first; marker fields follow in the iteration order
+        // of the loop in `marker_query_suffix`.
+        assert!(qs.contains("&workspace=acme%20corp"), "{qs}");
+        assert!(qs.contains("&project=infra"), "{qs}");
+        assert!(qs.contains("&project_strategy=repo-root"), "{qs}");
+        assert!(qs.contains("&drop_subagent=true"), "{qs}");
+    }
+
+    /// `[profile] contribute` / `consume` are forwarded as written (quoted or
+    /// bare) for the server to interpret, and a marker that sets only them is
+    /// a settings boundary; a marker without them forwards nothing.
+    #[test]
+    fn marker_query_suffix_forwards_the_profile_flags() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let inner = tmp.path().join("inner");
+        std::fs::create_dir(&inner).unwrap();
+        std::fs::write(
+            tmp.path().join(".ai-memory.toml"),
+            "workspace = \"outer\"\n",
+        )
+        .unwrap();
+        std::fs::write(
+            inner.join(".ai-memory.toml"),
+            "[profile]\ncontribute = false\nconsume = \"no\"\n",
+        )
+        .unwrap();
+        let qs = marker_query_suffix(inner.to_str().unwrap(), None);
+        assert!(qs.contains("&profile_contribute=0"), "{qs}");
+        assert!(qs.contains("&profile_consume=0"), "{qs}");
+        assert!(
+            !qs.contains("workspace=outer"),
+            "a [profile] marker is a boundary: {qs}"
+        );
+        // A resolved marker without the keys states the defaults explicitly,
+        // so removing an opt-out from the marker turns it back on.
+        let outer = marker_query_suffix(tmp.path().to_str().unwrap(), None);
+        assert!(
+            outer.contains("&profile_contribute=1&profile_consume=1"),
+            "{outer}"
+        );
+        // No marker at all: nothing is sent, so the server keeps what it stored.
+        let bare = tempfile::TempDir::new().unwrap();
+        let none = marker_query_suffix(bare.path().to_str().unwrap(), None);
+        assert!(!none.contains("profile_"), "{none}");
+    }
+
+    /// A marker WITHOUT `drop_subagent_captures` does not forward the flag, so
+    /// the server keeps that project's subagent captures (opt-in only).
+    #[test]
+    fn marker_query_suffix_omits_drop_subagent_when_unset() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            tmp.path().join(".ai-memory.toml"),
+            "workspace = \"acme\"\nproject = \"infra\"\n",
+        )
+        .unwrap();
+        let qs = marker_query_suffix(tmp.path().to_str().unwrap(), None);
+        assert!(!qs.contains("drop_subagent"), "{qs}");
+    }
+
+    /// A `[recall] default_global` marker (bare `true`, under a section)
+    /// forwards the flag so the server can broaden default-scoped reads.
+    #[test]
+    fn marker_query_suffix_appends_default_global() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            tmp.path().join(".ai-memory.toml"),
+            "workspace = \"acme\"\n[recall]\ndefault_global = true\n",
+        )
+        .unwrap();
+        let qs = marker_query_suffix(tmp.path().to_str().unwrap(), None);
+        assert!(qs.contains("&default_global=true"), "{qs}");
+    }
+
+    #[test]
+    fn marker_query_suffix_omits_default_global_when_unset() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            tmp.path().join(".ai-memory.toml"),
+            "workspace = \"acme\"\nproject = \"infra\"\n",
+        )
+        .unwrap();
+        let qs = marker_query_suffix(tmp.path().to_str().unwrap(), None);
+        assert!(!qs.contains("default_global"), "{qs}");
+    }
+
+    /// A `[briefing]` section (bare or quoted values) forwards the opt-in
+    /// and the char budget so the session-start `/handoff` GET can compose
+    /// the project brief (#176).
+    #[test]
+    fn marker_query_suffix_appends_briefing_opt_in() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            tmp.path().join(".ai-memory.toml"),
+            "workspace = \"acme\"\n[briefing]\ninject_on_session_start = true\nmax_chars = 6000\n",
+        )
+        .unwrap();
+        let qs = marker_query_suffix(tmp.path().to_str().unwrap(), None);
+        assert!(qs.contains("&briefing=true"), "{qs}");
+        assert!(qs.contains("&briefing_budget=6000"), "{qs}");
+    }
+
+    #[test]
+    fn marker_query_suffix_omits_briefing_when_unset() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            tmp.path().join(".ai-memory.toml"),
+            "workspace = \"acme\"\nproject = \"infra\"\n",
+        )
+        .unwrap();
+        let qs = marker_query_suffix(tmp.path().to_str().unwrap(), None);
+        assert!(!qs.contains("briefing"), "{qs}");
+    }
+
+    #[test]
+    fn marker_requests_briefing_only_for_truthy_opt_in() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let marker = tmp.path().join(".ai-memory.toml");
+        let cwd = tmp.path().to_str().unwrap();
+
+        assert!(!marker_requests_briefing(cwd));
+        std::fs::write(
+            &marker,
+            "[briefing]\ninject_on_session_start = false\nmax_chars = 6000\n",
+        )
+        .unwrap();
+        assert!(!marker_requests_briefing(cwd));
+        std::fs::write(
+            &marker,
+            "[briefing]\ninject_on_session_start = YeS\nmax_chars = 6000\n",
+        )
+        .unwrap();
+        assert!(marker_requests_briefing(cwd));
+    }
+
+    /// The Kimi once-per-session gate reads the marker the query it gates
+    /// reads. A home marker's `[briefing]` applies to every cwd, so a checkout
+    /// outside the home with no marker of its own opens the gate too;
+    /// otherwise no brief marker is written and every prompt asks for the
+    /// brief again (#1665).
+    #[test]
+    fn briefing_gate_and_query_agree_on_the_home_marker_outside_the_home() {
+        let home = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            home.path().join(".ai-memory.toml"),
+            "[briefing]\ninject_on_session_start = true\nmax_chars = 4000\n",
+        )
+        .unwrap();
+        let repo = tempfile::TempDir::new().unwrap();
+        let cwd = repo.path().to_str().unwrap();
+        let query = || {
+            let selection = super::super::super::marker::routing_selection_with_home(
+                cwd,
+                cwd,
+                Some(home.path()),
+                false,
+            );
+            marker_query_suffix_impl_from_selection(cwd, None, true, selection.unwrap())
+        };
+
+        let qs = query();
+        assert!(qs.contains("&briefing=true"), "{qs}");
+        assert!(marker_requests_briefing_with_home(cwd, Some(home.path())));
+
+        // The repo's own settings marker wins over the home marker for both.
+        std::fs::write(repo.path().join(".ai-memory.toml"), "project = \"repo\"\n").unwrap();
+        let qs = query();
+        assert!(!qs.contains("briefing"), "{qs}");
+        assert!(!marker_requests_briefing_with_home(cwd, Some(home.path())));
+    }
+
+    #[test]
+    fn marker_query_suffix_repo_root_non_git_keeps_project_implicit() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let child = tmp.path().join("plain-dir");
+        std::fs::create_dir_all(&child).unwrap();
+        std::fs::write(
+            child.join(".ai-memory.toml"),
+            "workspace = \"oss\"\nproject_strategy = \"repo-root\"\n",
+        )
+        .unwrap();
+        let qs = marker_query_suffix(child.to_str().unwrap(), None);
+        assert!(qs.contains("&workspace=oss"), "{qs}");
+        assert!(!qs.contains("&project="), "{qs}");
+        assert!(qs.contains("&project_strategy=repo-root"), "{qs}");
+    }
+
+    #[test]
+    fn marker_query_suffix_repo_root_collapses_out_of_tree_worktree() {
+        if std::process::Command::new("git")
+            .arg("--version")
+            .status()
+            .is_err()
+        {
+            return;
+        }
+        let tmp = tempfile::TempDir::new().unwrap();
+        let repo = tmp.path().join("repos/acme-api");
+        std::fs::create_dir_all(&repo).unwrap();
+        assert!(
+            std::process::Command::new("git")
+                .args(["init", "-q"])
+                .arg(&repo)
+                .status()
+                .unwrap()
+                .success()
+        );
+        // The commit exists only because `git worktree add` refuses a repo with
+        // no commits. --no-gpg-sign: a global `commit.gpgsign = true` would
+        // otherwise make git sign as this throwaway identity, and fail.
+        assert!(
+            std::process::Command::new("git")
+                .arg("-C")
+                .arg(&repo)
+                .args([
+                    "-c",
+                    "user.email=t@example.com",
+                    "-c",
+                    "user.name=t",
+                    "commit",
+                    "-q",
+                    "--no-gpg-sign",
+                    "--allow-empty",
+                    "-m",
+                    "init",
+                ])
+                .status()
+                .unwrap()
+                .success()
+        );
+
+        let worktrees = tmp.path().join("worktrees");
+        std::fs::create_dir_all(&worktrees).unwrap();
+        let wt = worktrees.join("acme-api/wt-feature");
+        std::fs::create_dir_all(wt.parent().unwrap()).unwrap();
+        if !std::process::Command::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .args(["worktree", "add", "-q", "-b", "feat/worktree-inspection"])
+            .arg(&wt)
+            .status()
+            .unwrap()
+            .success()
+        {
+            return;
+        }
+        std::fs::write(
+            wt.join(".ai-memory.toml"),
+            "workspace = \"oss\"\nproject_strategy = \"repo-root\"\n",
+        )
+        .unwrap();
+
+        let qs = marker_query_suffix(wt.to_str().unwrap(), None);
+        assert!(qs.contains("&workspace=oss"), "{qs}");
+        assert!(qs.contains("&project=acme-api"), "{qs}");
+        assert!(qs.contains("&project_strategy=repo-root"), "{qs}");
+        let scope = hook_scope(wt.to_str().unwrap(), None);
+        assert!(scope.is_explicit());
+        let scope = serde_json::to_value(scope).unwrap();
+        assert_eq!(scope["workspace"], "oss");
+        assert_eq!(scope["project"], "acme-api");
+        assert_eq!(scope["project_src"], "repo-root");
+        assert_eq!(scope["server_may_remap"], true);
+    }
+
+    // ── install-time default strategy (#128), no marker required ──────
+
+    #[test]
+    fn marker_query_suffix_default_repo_root_non_git_keeps_project_implicit() {
+        // Baked repo-root default, no marker, not a git tree: the strategy is
+        // forwarded but no project is derived (server falls back to basename).
+        let tmp = tempfile::TempDir::new().unwrap();
+        let child = tmp.path().join("plain-dir");
+        std::fs::create_dir_all(&child).unwrap();
+        let qs = marker_query_suffix(child.to_str().unwrap(), Some("repo-root"));
+        assert!(!qs.contains("&project="), "{qs}");
+        assert!(qs.contains("&project_strategy=repo-root"), "{qs}");
+    }
+
+    #[test]
+    fn marker_query_suffix_default_repo_root_collapses_git_subdir() {
+        // Baked repo-root default, no marker, inside a git subdir: the project
+        // collapses to the repo-root basename.
+        if std::process::Command::new("git")
+            .arg("--version")
+            .status()
+            .is_err()
+        {
+            return;
+        }
+        let tmp = tempfile::TempDir::new().unwrap();
+        let repo = tmp.path().join("contentcreator");
+        std::fs::create_dir_all(&repo).unwrap();
+        assert!(
+            std::process::Command::new("git")
+                .args(["init", "-q"])
+                .arg(&repo)
+                .status()
+                .unwrap()
+                .success()
+        );
+        let sub = repo.join("transcripts");
+        std::fs::create_dir_all(&sub).unwrap();
+        let qs = marker_query_suffix(sub.to_str().unwrap(), Some("repo-root"));
+        assert!(qs.contains("&project=contentcreator"), "{qs}");
+        assert!(qs.contains("&project_strategy=repo-root"), "{qs}");
+        // Host-derived, so the server may let a session overrule it (#394).
+        assert!(qs.contains("&project_src=repo-root"), "{qs}");
+    }
+
+    // `project_src` must faithfully separate the two ways a `project` override
+    // is produced — that distinction is the whole basis for `[routing]
+    // mid_session = "sticky"` honoring markers while overruling derivation.
+    /// A nested capture-only marker (only `[capture]`) must not shadow an
+    /// outer marker's `workspace`/`project` — `marker_query_suffix` forwards
+    /// those from the OUTER marker — while `capture_policy` for the SAME cwd
+    /// still resolves the INNER (nearest) marker's `ignore_paths`: scope and
+    /// capture deliberately read different markers (#668).
+    #[test]
+    fn marker_query_suffix_skips_nested_capture_only_marker_for_scope() {
+        use ai_memory_core::AgentKind;
+        use ai_memory_hooks::CaptureDisposition;
+
+        let tmp = tempfile::TempDir::new().unwrap();
+        // A `.git` dir makes tmp.path() the checkout boundary the walk-up
+        // stops at, so it is actually consulted (a plain non-git directory
+        // outside $HOME only checks its exact cwd — see `checkout_root`).
+        std::fs::create_dir_all(tmp.path().join(".git")).unwrap();
+        std::fs::write(
+            tmp.path().join(".ai-memory.toml"),
+            "workspace = \"acme\"\nproject = \"infra\"\n",
+        )
+        .unwrap();
+        let inner = tmp.path().join("sub");
+        std::fs::create_dir_all(&inner).unwrap();
+        std::fs::write(
+            inner.join(".ai-memory.toml"),
+            "[capture]\nignore_paths = [\"secret/**\"]\n",
+        )
+        .unwrap();
+        let inner_str = inner.to_str().unwrap();
+
+        let qs = marker_query_suffix(inner_str, None);
+        assert!(qs.contains("&workspace=acme"), "{qs}");
+        assert!(qs.contains("&project=infra"), "{qs}");
+
+        // Same cwd: capture policy still comes from the INNER (nearest)
+        // marker, so its `ignore_paths` still applies.
+        let policy = capture_policy(inner_str);
+        let raw = serde_json::json!({
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Edit",
+            "tool_input": {"file_path": format!("{inner_str}/secret/token.txt")},
+            "session_id": "s",
+            "cwd": inner_str,
+        });
+        let decision = policy.inspect(AgentKind::ClaudeCode, &raw, inner_str);
+        assert_eq!(decision.protocol().disposition(), CaptureDisposition::Drop);
+    }
+
+    /// The predicate is conservative: a marker declaring `[capture]` PLUS a
+    /// scope key is a settings boundary, not capture-only, so its own
+    /// `project` wins rather than an outer marker's.
+    #[test]
+    fn marker_query_suffix_capture_plus_project_is_a_boundary() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            tmp.path().join(".ai-memory.toml"),
+            "workspace = \"acme\"\nproject = \"infra\"\n",
+        )
+        .unwrap();
+        let inner = tmp.path().join("sub");
+        std::fs::create_dir_all(&inner).unwrap();
+        std::fs::write(
+            inner.join(".ai-memory.toml"),
+            "project = \"x\"\n[capture]\nignore_paths = [\"secret/**\"]\n",
+        )
+        .unwrap();
+
+        let qs = marker_query_suffix(inner.to_str().unwrap(), None);
+        assert!(qs.contains("&project=x"), "{qs}");
+        assert!(!qs.contains("&workspace=acme"), "{qs}");
+    }
+
+    #[test]
+    fn marker_query_suffix_tags_project_provenance() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let dir = tmp.path().join("workdir");
+        std::fs::create_dir_all(&dir).unwrap();
+
+        // No override at all: nothing to describe.
+        let qs = marker_query_suffix(dir.to_str().unwrap(), None);
+        assert!(!qs.contains("&project="), "{qs}");
+        assert!(!qs.contains("&project_src="), "{qs}");
+
+        // Marker-declared project: a deliberate rescope.
+        std::fs::write(dir.join(".ai-memory.toml"), "project = \"pinned\"\n").unwrap();
+        let qs = marker_query_suffix(dir.to_str().unwrap(), None);
+        assert!(qs.contains("&project=pinned"), "{qs}");
+        assert!(qs.contains("&project_src=marker"), "{qs}");
+
+        // A marker project wins over the baked repo-root default, and keeps
+        // reporting `marker` — the provenance must follow the value that
+        // actually shipped, not the strategy that was configured.
+        let qs = marker_query_suffix(dir.to_str().unwrap(), Some("repo-root"));
+        assert!(qs.contains("&project=pinned"), "{qs}");
+        assert!(qs.contains("&project_src=marker"), "{qs}");
+        assert!(!qs.contains("project_src=repo-root"), "{qs}");
+    }
+
+    #[test]
+    fn marker_query_suffix_marker_strategy_overrides_default() {
+        // A marker that pins `project_strategy = "basename"` wins over the
+        // install-time repo-root default — no repo-root derivation happens.
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            tmp.path().join(".ai-memory.toml"),
+            "project_strategy = \"basename\"\n",
+        )
+        .unwrap();
+        let qs = marker_query_suffix(tmp.path().to_str().unwrap(), Some("repo-root"));
+        assert!(qs.contains("&project_strategy=basename"), "{qs}");
+        assert!(!qs.contains("repo-root"), "{qs}");
+        assert!(!qs.contains("&project="), "{qs}");
+    }
+
+    #[test]
+    fn marker_query_suffix_marker_project_overrides_default_repo_root() {
+        // A marker's explicit `project` wins over repo-root derivation, while
+        // the baked default strategy is still forwarded.
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(tmp.path().join(".ai-memory.toml"), "project = \"pinned\"\n").unwrap();
+        let qs = marker_query_suffix(tmp.path().to_str().unwrap(), Some("repo-root"));
+        assert!(qs.contains("&project=pinned"), "{qs}");
+        assert!(qs.contains("&project_strategy=repo-root"), "{qs}");
+    }
+
+    #[test]
+    fn capture_config_problem_is_none_without_a_marker() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        assert!(capture_config_problem(tmp.path().to_str().unwrap()).is_none());
+    }
+
+    #[test]
+    fn capture_config_problem_is_none_for_a_well_formed_capture_table() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            tmp.path().join(".ai-memory.toml"),
+            "project = \"ok\"\n\n[capture]\nignore_paths = [\"**/.env\"]\n",
+        )
+        .unwrap();
+        assert!(capture_config_problem(tmp.path().to_str().unwrap()).is_none());
+    }
+
+    /// The exact failure mode found in practice: a dropped `#` turns a
+    /// wrapped comment into a stray token right after a `[capture]` header,
+    /// which is invalid TOML.
+    #[test]
+    fn capture_config_problem_reports_a_toml_syntax_error() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let marker = tmp.path().join(".ai-memory.toml");
+        std::fs::write(
+            &marker,
+            "project = \"example\"\n\n\
+             [capture] this used to be a comment, now it is a stray token\n\
+             project_strategy = \"repo-root\"\n\n\
+             [capture]\nignore_paths = [\"**/.env\"]\n",
+        )
+        .unwrap();
+        let (reported_marker, reason) =
+            capture_config_problem(tmp.path().to_str().unwrap()).expect("malformed TOML");
+        assert_eq!(reported_marker, marker);
+        assert!(reason.contains("invalid TOML"), "{reason}");
+    }
+
+    #[test]
+    fn capture_config_problem_reports_an_unsupported_capture_key() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            tmp.path().join(".ai-memory.toml"),
+            "[capture]\nallowlist = [\"**\"]\n",
+        )
+        .unwrap();
+        let (_, reason) =
+            capture_config_problem(tmp.path().to_str().unwrap()).expect("unsupported key");
+        assert!(reason.contains("allowlist"), "{reason}");
+    }
+
+    /// The gap the parse-only check missed: a `[capture]` table that is
+    /// perfectly valid TOML, and a `[capture]` shape `read_capture_config`
+    /// accepts, but whose `ignore_paths` entry `compile` itself rejects (an
+    /// unsupported glob character). `capture_policy(cwd).state()` must still
+    /// catch this as `Invalid` even though the TOML parse alone would not.
+    #[test]
+    fn capture_config_problem_reports_a_pattern_compile_failure() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            tmp.path().join(".ai-memory.toml"),
+            "[capture]\nignore_paths = [\"secrets/{a,b}\"]\n",
+        )
+        .unwrap();
+        let (_, reason) = capture_config_problem(tmp.path().to_str().unwrap())
+            .expect("a rejected glob must still surface as a problem");
+        assert!(reason.contains("secrets/{a,b}"), "{reason}");
+        assert!(reason.contains("unsupported glob character"), "{reason}");
+    }
+
+    #[test]
+    fn read_capture_config_and_verbose_agree_on_success() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let marker = tmp.path().join(".ai-memory.toml");
+        std::fs::write(&marker, "[capture]\nignore_paths = [\"**/*.pem\"]\n").unwrap();
+        let terse = read_capture_config(&marker).expect("valid marker parses");
+        let verbose = read_capture_config_verbose(&marker).expect("valid marker parses");
+        assert_eq!(terse.ignore_paths, verbose.ignore_paths);
+    }
+}

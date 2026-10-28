@@ -1,0 +1,59 @@
+{
+  "source": "Sanitized payloads captured from an interactive Kiro CLI 2.16.2 --v3 session on 2026-08-07.",
+  "events": [
+    {
+      "event": "session-start",
+      "payload": {
+        "hook_event_name": "SessionStart",
+        "cwd": "/workspace/project",
+        "session_id": "kiro-v3-session"
+      }
+    },
+    {
+      "event": "user-prompt-submit",
+      "payload": {
+        "hook_event_name": "UserPromptSubmit",
+        "cwd": "/workspace/project",
+        "session_id": "kiro-v3-session",
+        "prompt": "Inspect the project"
+      }
+    },
+    {
+      "event": "pre-tool-use",
+      "payload": {
+        "hook_event_name": "PreToolUse",
+        "cwd": "/workspace/project",
+        "session_id": "kiro-v3-session",
+        "tool_name": "read_file",
+        "tool_input": {
+          "path": "/workspace/project/sample.txt",
+          "offset": null,
+          "limit": null
+        }
+      }
+    },
+    {
+      "event": "post-tool-use",
+      "payload": {
+        "hook_event_name": "PostToolUse",
+        "cwd": "/workspace/project",
+        "session_id": "kiro-v3-session",
+        "tool_name": "read_file",
+        "tool_input": {
+          "path": "/workspace/project/sample.txt",
+          "offset": null,
+          "limit": null
+        },
+        "tool_response": "sanitized fixture content"
+      }
+    },
+    {
+      "event": "stop",
+      "payload": {
+        "hook_event_name": "Stop",
+        "cwd": "/workspace/project",
+        "session_id": "kiro-v3-session"
+      }
+    }
+  ]
+}

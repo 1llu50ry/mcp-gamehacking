@@ -1,0 +1,17 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/index.ts", "src/admin.ts"],
+  "tsconfig": "tsconfig.build.json",
+  "out": "build/api-docs",
+  "name": "ai-memory-ts",
+  "readme": "README.md",
+  "excludeInternal": true,
+  "excludePrivate": true,
+  "treatWarningsAsErrors": true,
+  "treatValidationWarningsAsErrors": true,
+  "validation": {
+    "notExported": true,
+    "invalidLink": true,
+    "notDocumented": true
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "name": "pt-br-tail-and-error-forms",
+  "description": "pt-BR session (#1215 Q1): a pasted log past the 3,000-character excerpt cap whose ERRO: line is the last line (lost by projection), a 125-character accented ERRO: line, and an error worded only in Portuguese, without any ERRO:/error prefix. Measures where pt-BR error text is lost: projection or model.",
+  "observations": [
+    {
+      "kind": "user-prompt",
+      "title": "user prompt",
+      "body": "o deploy do fence-svc quebrou de novo, segue o log completo:\n2026-10-11 21:40:00 fence-svc[1200]: aplicando lote 0 de 120 (ok)\n2026-10-11 21:40:01 fence-svc[1201]: aplicando lote 1 de 120 (ok)\n2026-10-11 21:40:02 fence-svc[1202]: aplicando lote 2 de 120 (ok)\n2026-10-11 21:40:03 fence-svc[1203]: aplicando lote 3 de 120 (ok)\n2026-10-11 21:40:04 fence-svc[1204]: aplicando lote 4 de 120 (ok)\n2026-10-11 21:40:05 fence-svc[1205]: aplicando lote 5 de 120 (ok)\n2026-10-11 21:40:06 fence-svc[1206]: aplicando lote 6 de 120 (ok)\n2026-10-11 21:40:07 fence-svc[1207]: aplicando lote 7 de 120 (ok)\n2026-10-11 21:40:08 fence-svc[1208]: aplicando lote 8 de 120 (ok)\n2026-10-11 21:40:09 fence-svc[1209]: aplicando lote 9 de 120 (ok)\n2026-10-11 21:40:10 fence-svc[1210]: aplicando lote 10 de 120 (ok)\n2026-10-11 21:40:11 fence-svc[1211]: aplicando lote 11 de 120 (ok)\n2026-10-11 21:40:12 fence-svc[1212]: aplicando lote 12 de 120 (ok)\n2026-10-11 21:40:13 fence-svc[1213]: aplicando lote 13 de 120 (ok)\n2026-10-11 21:40:14 fence-svc[1214]: aplicando lote 14 de 120 (ok)\n2026-10-11 21:40:15 fence-svc[1215]: aplicando lote 15 de 120 (ok)\n2026-10-11 21:40:16 fence-svc[1216]: aplicando lote 16 de 120 (ok)\n2026-10-11 21:40:17 fence-svc[1217]: aplicando lote 17 de 120 (ok)\n2026-10-11 21:40:18 fence-svc[1218]: aplicando lote 18 de 120 (ok)\n2026-10-11 21:40:19 fence-svc[1219]: aplicando lote 19 de 120 (ok)\n2026-10-11 21:40:20 fence-svc[1220]: aplicando lote 20 de 120 (ok)\n2026-10-11 21:40:21 fence-svc[1221]: aplicando lote 21 de 120 (ok)\n2026-10-11 21:40:22 fence-svc[1222]: aplicando lote 22 de 120 (ok)\n2026-10-11 21:40:23 fence-svc[1223]: aplicando lote 23 de 120 (ok)\n2026-10-11 21:40:24 fence-svc[1224]: aplicando lote 24 de 120 (ok)\n2026-10-11 21:40:25 fence-svc[1225]: aplicando lote 25 de 120 (ok)\n2026-10-11 21:40:26 fence-svc[1226]: aplicando lote 26 de 120 (ok)\n2026-10-11 21:40:27 fence-svc[1227]: aplicando lote 27 de 120 (ok)\n2026-10-11 21:40:28 fence-svc[1228]: aplicando lote 28 de 120 (ok)\n2026-10-11 21:40:29 fence-svc[1229]: aplicando lote 29 de 120 (ok)\n2026-10-11 21:40:30 fence-svc[1230]: aplicando lote 30 de 120 (ok)\n2026-10-11 21:40:31 fence-svc[1231]: aplicando lote 31 de 120 (ok)\n2026-10-11 21:40:32 fence-svc[1232]: aplicando lote 32 de 120 (ok)\n2026-10-11 21:40:33 fence-svc[1233]: aplicando lote 33 de 120 (ok)\n2026-10-11 21:40:34 fence-svc[1234]: aplicando lote 34 de 120 (ok)\n2026-10-11 21:40:35 fence-svc[1235]: aplicando lote 35 de 120 (ok)\n2026-10-11 21:40:36 fence-svc[1236]: aplicando lote 36 de 120 (ok)\n2026-10-11 21:40:37 fence-svc[1237]: aplicando lote 37 de 120 (ok)\n2026-10-11 21:40:38 fence-svc[1238]: aplicando lote 38 de 120 (ok)\n2026-10-11 21:40:39 fence-svc[1239]: aplicando lote 39 de 120 (ok)\n2026-10-11 21:40:40 fence-svc[1240]: aplicando lote 40 de 120 (ok)\n2026-10-11 21:40:41 fence-svc[1241]: aplicando lote 41 de 120 (ok)\n2026-10-11 21:40:42 fence-svc[1242]: aplicando lote 42 de 120 (ok)\n2026-10-11 21:40:43 fence-svc[1243]: aplicando lote 43 de 120 (ok)\n2026-10-11 21:40:44 fence-svc[1244]: aplicando lote 44 de 120 (ok)\n2026-10-11 21:40:45 fence-svc[1245]: aplicando lote 45 de 120 (ok)\n2026-10-11 21:40:46 fence-svc[1246]: aplicando lote 46 de 120 (ok)\nERRO:  duplicar valor da chave viola a restrição de unicidade \"fence_epochs_pkey\""
+    },
+    {
+      "kind": "post-tool-use",
+      "title": "psql",
+      "body": "tool: psql\n---\nERRO:  não foi possível obter bloqueio exclusivo na relação \"fence_epochs\": operação cancelada após 30 s de espera (PID 4127)"
+    },
+    {
+      "kind": "post-tool-use",
+      "title": "tool non-file",
+      "body": "tool_family: non-file\ntool_call_id: exec-6f1c2a9e-0b7d-4c41-9a53-2f0e8d1b7c44\noutcome: success\n---\n{\"stdout\": \"certbot renew: não foi possível renovar o certificado do fence-svc: prazo esgotado\", \"stderr\": \"\", \"interrupted\": false, \"isImage\": false}"
+    },
+    {
+      "kind": "stop",
+      "title": "stop",
+      "body": "O lote 87 colidiu com uma época já gravada; o bloqueio expirou e o certificado não renovou. Vou reverter o deploy."
+    },
+    {
+      "kind": "user-prompt",
+      "title": "user prompt",
+      "body": "pode reverter, e anota o que deu errado"
+    }
+  ],
+  "must_mention": [
+    "ERRO:  duplicar valor da chave viola a restrição de unicidade \"fence_epochs_pkey\"",
+    "ERRO:  não foi possível obter bloqueio exclusivo na relação \"fence_epochs\": operação cancelada após 30 s de espera (PID 4127)",
+    "não foi possível renovar o certificado do fence-svc: prazo esgotado"
+  ]
+}

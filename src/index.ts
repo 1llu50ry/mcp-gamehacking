@@ -22,6 +22,10 @@ import { registerBm25Search } from "./bm25-search.js";
 import { registerAuditAndRate } from "./audit-rate.js";
 import { registerDynamicResources } from "./dynamic-resources.js";
 import { registerNativeDisasm } from "./native-disasm.js";
+import { registerNativeMemory } from "./native-memory.js";
+import { registerNativeYara } from "./native-yara.js";
+import { registerNativeReclass } from "./native-reclass.js";
+import { registerCeserverClient } from "./native-ceserver.js";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const DIRS = {
@@ -1654,6 +1658,19 @@ registerDynamicResources(server, ROOT);
 
 // Native x86-64 mini-disassembler (prologue/epilogue coverage).
 registerNativeDisasm(server);
+
+// Native "mega-brain" absorption of previously-hub-only backends:
+//   memory_put/get/search/list/delete/prune/export/stats
+//     — replaces local-memory-mcp + ai-memory + TencentDB-Agent-Memory
+//       client role; shared JSON persistence under <project>/.memory/
+//   yara_scan / yara_parse — in-process YARA-light engine
+//   reclass_parse / reclass_to_cpp — ReClass.NET project → C++ header
+//   ce_attach / ce_aob_scan / ce_pointer_scan / ce_read_memory /
+//     ce_write_memory / ce_lua / ce_status — ceserver HTTP client
+await registerNativeMemory(server, ROOT);
+registerNativeYara(server);
+registerNativeReclass(server);
+registerCeserverClient(server);
 
 // ============================================================
 // MAIN

@@ -1,0 +1,239 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/ai-memory-core",
+    "crates/ai-memory-store",
+    "crates/ai-memory-wiki",
+    "crates/ai-memory-mcp",
+    "crates/ai-memory-hooks",
+    "crates/ai-memory-llm",
+    "crates/ai-memory-consolidate",
+    "crates/ai-memory-web",
+    "crates/ai-memory-cli",
+    "crates/ai-memory-workstream",
+    # Test-only helpers shared across crates (dev-dependency, never shipped).
+    "crates/ai-memory-test-support",
+    # Live A/B harness — not part of the shipped binary, but in
+    # the workspace so it shares deps + builds with the rest.
+    "evals",
+]
+# What a bare `cargo t` / `cargo build` at the root means: everything that
+# ships, plus test-support. The evals harness is two more test binaries nobody
+# iterates on; `--workspace` (CI, the pre-push hook, `cargo tf`) still covers it.
+default-members = [
+    "crates/ai-memory-core",
+    "crates/ai-memory-store",
+    "crates/ai-memory-wiki",
+    "crates/ai-memory-mcp",
+    "crates/ai-memory-hooks",
+    "crates/ai-memory-llm",
+    "crates/ai-memory-consolidate",
+    "crates/ai-memory-web",
+    "crates/ai-memory-cli",
+    "crates/ai-memory-workstream",
+    "crates/ai-memory-test-support",
+]
+
+[workspace.package]
+version = "3.2.8"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT"
+homepage = "https://aimemory.sh"
+repository = "https://github.com/akitaonrails/ai-memory"
+authors = ["Fabio Akita <boss@akitaonrails.com>"]
+
+[workspace.dependencies]
+# Inter-crate dependencies.
+ai-memory-core = { path = "crates/ai-memory-core", version = "3.2.8" }
+ai-memory-store = { path = "crates/ai-memory-store", version = "3.2.8" }
+ai-memory-wiki = { path = "crates/ai-memory-wiki", version = "3.2.8" }
+ai-memory-mcp = { path = "crates/ai-memory-mcp", version = "3.2.8" }
+ai-memory-hooks = { path = "crates/ai-memory-hooks", version = "3.2.8" }
+ai-memory-llm = { path = "crates/ai-memory-llm", version = "3.2.8" }
+ai-memory-consolidate = { path = "crates/ai-memory-consolidate", version = "3.2.8" }
+ai-memory-web = { path = "crates/ai-memory-web", version = "3.2.8" }
+ai-memory-workstream = { path = "crates/ai-memory-workstream", version = "3.2.8" }
+ai-memory-test-support = { path = "crates/ai-memory-test-support", version = "3.2.8" }
+
+# (Workspace shared deps follow below)
+
+# Error handling.
+anyhow = "1"
+thiserror = "2"
+
+# Serialization.
+serde = { version = "1", features = ["derive"] }
+# `preserve_order` keeps existing JSON key order intact when we
+# round-trip user config files via `install-mcp --apply`. Without it,
+# `~/.claude.json` (which has dozens of CC-managed keys) would be
+# alphabetised on every write — semantically equivalent but a giant
+# cosmetic diff the user didn't ask for.
+serde_json = { version = "1", features = ["preserve_order"] }
+# Wiki frontmatter YAML. Each crate opts into the half it uses.
+serde-saphyr = { version = "1.3", default-features = false }
+# Zed's settings.json is JSONC despite the .json suffix. Its CST lets
+# install/uninstall preserve comments, trailing commas, and unrelated layout.
+jsonc-parser = { version = "0.33", features = ["cst", "serde_json"] }
+
+# Async runtime.
+tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["rt", "io"] }
+
+# Logging / tracing.
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+tracing-appender = "0.2"
+
+# Time & IDs.
+jiff = { version = "0.2", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "v5", "v7", "serde"] }
+
+# Config & CLI.
+figment = { version = "0.10", features = ["toml", "env"] }
+clap = { version = "4", features = ["derive", "env"] }
+# Shell-completion generator for `ai-memory completions <shell>`. Reads the
+# same derived `Command` the parser uses, so completions can never drift
+# from the actual CLI surface.
+clap_complete = "4"
+# Raw-mode key reading for `ai-memory show`'s interactive picker. The CLI had
+# no terminal crate before this: `anstyle` arrives transitively through clap
+# and only styles text, it cannot read arrow keys. crossterm is the portable
+# option that keeps one code path across Linux, macOS, and Windows consoles
+# instead of a `#[cfg]` split over termios and the Win32 console API.
+crossterm = "0.29"
+# Terminal tables need display-cell widths: byte and scalar counts both
+# misalign names containing accented or double-width characters.
+unicode-width = "0.2"
+dirs = "5"
+# Format-preserving TOML editor for install-mcp --apply against
+# Codex's config.toml. Plain `toml` round-trips destroy comments;
+# `toml_edit` doesn't.
+toml_edit = "0.22"
+
+# Secrets + constant-time / RNG primitives for bearer-token auth.
+secrecy = { version = "0.10", features = ["serde"] }
+subtle = "2"
+getrandom = "0.3"
+base64 = "0.22"
+
+# Storage.
+rusqlite = { version = "0.32", features = ["bundled", "backup"] }
+refinery = { version = "0.8", features = ["rusqlite"] }
+sha2 = "0.10"
+# Argon2id PHC for human passwords. Tokens stay SHA-256+pepper (hot-path
+# unique lookup); the slow KDF is reserved for the password class.
+argon2 = { version = "0.5", default-features = false, features = ["alloc", "password-hash", "std"] }
+parking_lot = "0.12"
+
+# Filesystem watcher + process inspection.
+notify = "8"
+notify-debouncer-full = "0.6"
+sysinfo = "0.32"
+fs2 = "0.4"
+libc = "0.2"
+
+# Windows NTFS file-index (inode equivalent) for own-write detection.
+winapi-util = "0.1"
+
+# MCP server SDK.
+# Only used to install a process-wide crypto provider for the MCP bridge's HTTPS
+# transport. `default-features = false` is load-bearing: rustls' default set includes
+# `aws_lc_rs`, which is exactly the C/JNI toolchain the bridge avoids by using
+# rmcp's `reqwest-tls-no-provider`. `ring` is already in the lockfile via reqwest 0.12.
+rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std", "tls12"] }
+rmcp = { version = "2.2", features = ["server", "macros", "transport-io", "transport-streamable-http-server", "schemars"] }
+schemars = "1"
+axum = "0.8"
+# Same `http` 1.x rmcp/axum use, so handlers can read the injected
+# `http::request::Parts` (URI + headers) from MCP request extensions.
+http = "1"
+# Direct dep so tests can use `Router::oneshot` via `ServiceExt`.
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["fs", "cors"] }
+
+# Backup / restore archive format.
+tar = "0.4"
+flate2 = "1"
+# Native Windows release zip extract/write for `ai-memory upgrade` (#801).
+# Already in the lockfile via candle-core. Keep default-features off so we
+# do not pull bzip2/`libbz2-rs-sys` (license not in deny allowlist); Deflate
+# covers PowerShell Compress-Archive release zips and Stored test fixtures.
+zip = { version = "8.6", default-features = false, features = ["deflate"] }
+
+# Native transcript reading: Codex keeps a rollout it has not written for a
+# week as `.jsonl.zst`, so the workstream adapter needs a zstd decoder to find
+# and resume that session. Pure Rust, so the build needs no extra C library.
+# The `hash` feature only computes frame checksums and nothing here compares
+# them, so it stays off; frames that carry one still decode.
+ruzstd = { version = "0.9", default-features = false, features = ["std"] }
+
+# Text munging / hook payload sanitisation.
+regex = "1"
+# Unicode NFC for the portable page-path key. Already in the tree via
+# idna -> idna_adapter, so this adds no new code to the binary.
+icu_normalizer = "2"
+
+# Wiki git versioning.
+git2 = { version = "0.21", default-features = false, features = ["vendored-libgit2"] }
+
+# LLM provider HTTP.
+# `rustls-tls` bundles the Mozilla webpki root store and ignores the OS trust
+# store, so a CA an operator installed locally — Caddy's `tls internal`, a
+# corporate MITM appliance, any private PKI — is invisible to this client even
+# though `curl` and the agent CLIs trust it. That made lifecycle capture fail
+# with `UnknownIssuer` on every install following the project's own
+# HTTPS-via-proxy Path 2 (#492). `rustls-tls-native-roots` reads the platform
+# store instead; the runtime image installs `ca-certificates`, so the server
+# path keeps a populated store.
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls-native-roots", "stream"] }
+# Local (in-process, pure-Rust) embeddings — 2.0 item 5.
+candle-core = "0.11"
+candle-nn = "0.11"
+candle-transformers = "0.11"
+tokenizers = { version = "0.22", default-features = false, features = ["fancy-regex"] }
+futures-util = "0.3"
+async-trait = "0.1"
+
+# Testing.
+tempfile = "3"
+rstest = "0.26"
+
+# Candle 0.11 requires `zip ^8.6`, but crates.io yanked every compatible 8.x
+# release after publishing zip 9. Pin the upstream v8.6.0 release commit so a
+# fresh `cargo install --path` can still resolve the graph. Remove this patch
+# when Candle publishes a release compatible with zip 9.
+[patch.crates-io]
+zip = { git = "https://github.com/zip-rs/zip2", rev = "771dfc534d2614158af5497ea3dff4d4208d7db1" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+# Pedantic is opt-in per-crate once code stabilises; too noisy for early skeleton.
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+
+[profile.dev]
+opt-level = 0
+# Full debuginfo put ~190 MB in each of the 71 test binaries and made the
+# build linker-bound. Line tables keep file:line in panics; use
+# `RUSTFLAGS="-C debuginfo=2"` for a real debugger session.
+debug = "line-tables-only"
+
+# Deps are not what you step through, and they dominate the graph.
+# opt-level 1 costs one slow rebuild and buys faster tests: the store crate's
+# suite went 8.6s to 6.3s. Deps recompile rarely, so it amortises.
+[profile.dev.package."*"]
+debug = false
+opt-level = 1
+
+# Proc macros and build scripts are *run* by every crate that depends on them,
+# so optimising them speeds compilation rather than slowing it.
+[profile.dev.build-override]
+opt-level = 3

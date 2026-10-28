@@ -1,0 +1,1036 @@
+//! OpenAI ChatGPT/Codex OAuth provider.
+//!
+//! This is intentionally not a thin wrapper around `api.openai.com`: ChatGPT
+//! OAuth access tokens are Codex/ChatGPT credentials, not Platform API keys.
+//! Requests go to the Codex Responses backend and include the account id when
+//! the token exposes one.
+
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+
+use async_trait::async_trait;
+use base64::Engine as _;
+use secrecy::{ExposeSecret as _, SecretString};
+use serde::{Deserialize, Serialize};
+use tokio::sync::Mutex;
+use tracing::info;
+
+use crate::auth_file::now_ms;
+use crate::codex_responses::{CodexResponsesAuth, post_codex_responses};
+use crate::error::{LlmError, LlmResult};
+use crate::openai::{STRUCTURED_OUTPUT_SCHEMA_NAME, enforce_strict_object_schemas};
+use crate::provider::LlmProvider;
+use crate::stored_token::{StoredOAuthToken, credential_endpoint, refresh_grant};
+use crate::text::truncate_with_ellipsis;
+use crate::types::{ChatRequest, ChatResponse, ExtraHeaders, ReasoningEffort, Usage};
+
+/// OpenAI OAuth issuer used by Codex/OpenCode.
+pub const OPENAI_OAUTH_ISSUER: &str = "https://auth.openai.com";
+
+/// OpenAI OAuth authorization endpoint.
+pub const OPENAI_OAUTH_AUTH_URL: &str = "https://auth.openai.com/oauth/authorize";
+
+/// OpenAI OAuth token endpoint.
+pub const OPENAI_OAUTH_TOKEN_URL: &str = "https://auth.openai.com/oauth/token";
+
+pub use crate::codex_responses::CODEX_RESPONSES_URL;
+
+/// Public Codex/OpenCode OAuth client id.
+pub const CODEX_CLIENT_ID: &str = "app_EMoamEEZ73f0CkXaXp7hrann";
+
+/// Scopes used by Codex/OpenCode for ChatGPT sign-in.
+pub const OAUTH_SCOPES: &str = "openid profile email offline_access";
+
+/// Status code used when the Codex SSE stream carries a terminal error
+/// event (`response.failed`/`response.cancelled`, a
+/// `response.incomplete` the output budget does not explain, or a
+/// top-level `error` payload). 502 ("Bad Gateway") models the
+/// situation accurately: the upstream connected, but the response it
+/// sent was not a usable completion — the Codex backend, not
+/// ai-memory's HTTP layer, produced the failure.
+const SSE_TERMINAL_ERROR_STATUS: u16 = 502;
+
+/// Trim length for the body field of an SSE-terminal error so we
+/// don't echo a multi-megabyte upstream error into the logs / chain.
+/// Matches the 1024 used by `OpenAiProvider::post` for HTTP 4xx/5xx
+/// bodies — same defensive cap, same reasoning.
+const SSE_ERROR_BODY_TRIM: usize = 1024;
+
+/// OpenAI-specific claim persisted next to the shared token triple.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct OpenAiExtras {
+    /// ChatGPT account/workspace id, when present in the token claims.
+    #[serde(rename = "accountId", skip_serializing_if = "Option::is_none")]
+    pub account_id: Option<String>,
+}
+
+/// Stored OpenAI OAuth token.
+pub type OpenAiOAuthToken = StoredOAuthToken<OpenAiExtras>;
+
+impl OpenAiOAuthToken {
+    /// Build a token from an OAuth token response.
+    #[must_use]
+    pub fn from_token_response(
+        access: impl Into<String>,
+        refresh: impl Into<String>,
+        expires_in_secs: u64,
+        id_token: Option<&str>,
+        previous_account_id: Option<String>,
+    ) -> Self {
+        let access = access.into();
+        let account_id = id_token
+            .and_then(extract_account_id_from_jwt)
+            .or_else(|| extract_account_id_from_jwt(&access))
+            .or(previous_account_id);
+        Self {
+            access: SecretString::from(access),
+            refresh: SecretString::from(refresh.into()),
+            expires_at_ms: now_ms().saturating_add(expires_in_secs.saturating_mul(1000)),
+            extra: OpenAiExtras { account_id },
+        }
+    }
+
+    /// Load the OpenAI OAuth token from a shared token file.
+    ///
+    /// # Errors
+    /// Returns [`LlmError::Auth`] when the file exists but cannot be read or
+    /// parsed.
+    pub fn load(path: &Path) -> LlmResult<Option<Self>> {
+        Self::load_key(path, "openai")
+    }
+
+    /// Save the token into the shared token file, preserving unknown keys.
+    ///
+    /// # Errors
+    /// Returns [`LlmError::Auth`] when the file cannot be written.
+    pub fn save(&self, path: &Path) -> LlmResult<()> {
+        self.save_key(path, "openai")
+    }
+
+    /// Remove the OpenAI entry from the shared token file.
+    ///
+    /// # Errors
+    /// Returns [`LlmError::Auth`] when the file cannot be updated.
+    pub fn remove(path: &Path) -> LlmResult<()> {
+        Self::remove_key(path, "openai")
+    }
+}
+
+/// OAuth token response returned by `auth.openai.com`.
+#[derive(Debug, Deserialize)]
+pub struct OpenAiOAuthTokenResponse {
+    /// Access token.
+    pub access_token: String,
+    /// Refresh token. Refresh responses may omit it, meaning keep old refresh.
+    #[serde(default)]
+    pub refresh_token: Option<String>,
+    /// Expires-in seconds. Codex/OpenCode default to one hour when omitted.
+    #[serde(default)]
+    pub expires_in: Option<u64>,
+    /// Optional ID token carrying ChatGPT account claims.
+    #[serde(default)]
+    pub id_token: Option<String>,
+}
+
+/// OpenAI OAuth provider backed by the ChatGPT/Codex Responses endpoint.
+pub struct OpenAiOAuthProvider {
+    client: reqwest::Client,
+    model: String,
+    token_path: PathBuf,
+    token: Mutex<OpenAiOAuthToken>,
+    timeout: Duration,
+    reasoning_effort: Option<ReasoningEffort>,
+    extra_headers: ExtraHeaders,
+}
+
+impl OpenAiOAuthProvider {
+    /// Build a provider from an OAuth token file.
+    ///
+    /// # Errors
+    /// Returns [`LlmError::NotConfigured`] when no token is present.
+    pub fn new(token_path: PathBuf, model: impl Into<String>) -> LlmResult<Self> {
+        let token = OpenAiOAuthToken::load(&token_path)?.ok_or_else(|| {
+            LlmError::NotConfigured(format!(
+                "no openai-oauth token found at {}; run `ai-memory auth login openai-oauth`",
+                token_path.display()
+            ))
+        })?;
+        let client = reqwest::Client::builder()
+            .redirect(crate::redirect::same_origin_redirects())
+            .build()
+            .map_err(LlmError::from)?;
+        Ok(Self {
+            client,
+            model: model.into(),
+            token_path,
+            token: Mutex::new(token),
+            timeout: Duration::from_secs(crate::DEFAULT_REQUEST_TIMEOUT_SECS),
+            reasoning_effort: None,
+            extra_headers: ExtraHeaders::default(),
+        })
+    }
+
+    /// Override the per-request timeout (default
+    /// [`crate::DEFAULT_REQUEST_TIMEOUT_SECS`]).
+    #[must_use]
+    pub fn with_timeout_secs(mut self, secs: u64) -> Self {
+        self.timeout = Duration::from_secs(secs);
+        self
+    }
+
+    /// Attach operator-configured headers to every chat request. The factory
+    /// calls this with `ProviderConfig::extra_headers`.
+    #[must_use]
+    pub fn with_extra_headers(mut self, headers: ExtraHeaders) -> Self {
+        self.extra_headers = headers;
+        self
+    }
+
+    /// Set Responses API `reasoning.effort`. `None` omits the field so the
+    /// model default applies.
+    #[must_use]
+    pub fn with_reasoning_effort(mut self, effort: Option<ReasoningEffort>) -> Self {
+        self.reasoning_effort = effort;
+        self
+    }
+
+    async fn current_token(&self) -> LlmResult<OpenAiOAuthToken> {
+        let mut guard = self.token.lock().await;
+        if guard.needs_refresh() {
+            info!("openai-oauth token expired or near-expiry, refreshing");
+            let refreshed = refresh_access_token(&self.client, &guard).await?;
+            refreshed.save(&self.token_path)?;
+            *guard = refreshed;
+        }
+        Ok(guard.clone())
+    }
+
+    async fn post(&self, body: &CodexResponsesRequest<'_>) -> LlmResult<CodexResponsesResponse> {
+        let token = self.current_token().await?;
+        post_codex_responses(
+            &self.client,
+            CODEX_RESPONSES_URL,
+            self.timeout,
+            &CodexResponsesAuth {
+                access_token: &token.access,
+                account_id: token.extra.account_id.as_deref(),
+            },
+            &self.extra_headers,
+            body,
+        )
+        .await
+    }
+}
+
+#[async_trait]
+impl LlmProvider for OpenAiOAuthProvider {
+    fn name(&self) -> &'static str {
+        "openai-oauth"
+    }
+
+    fn model(&self) -> &str {
+        &self.model
+    }
+
+    async fn complete(&self, request: ChatRequest) -> LlmResult<ChatResponse> {
+        let response = self
+            .post(&build_request(
+                &self.model,
+                &request,
+                None,
+                self.reasoning_effort,
+            ))
+            .await?;
+        Ok(into_chat_response(response))
+    }
+
+    async fn complete_structured_raw(
+        &self,
+        request: ChatRequest,
+        mut schema: serde_json::Value,
+    ) -> LlmResult<serde_json::Value> {
+        enforce_strict_object_schemas(&mut schema);
+        let response_format = CodexText {
+            format: CodexTextFormat::JsonSchema {
+                name: STRUCTURED_OUTPUT_SCHEMA_NAME.into(),
+                schema,
+                strict: true,
+            },
+        };
+        let response = self
+            .post(&build_request(
+                &self.model,
+                &request,
+                Some(response_format),
+                self.reasoning_effort,
+            ))
+            .await?;
+        // No content at all is a distinct terminal failure, not a JSON parse
+        // error, as the OpenAI path already treats it: `unwrap_or_default()` fed
+        // an empty string to serde, so the caller saw "EOF while parsing a value
+        // at line 1 column 0", which names neither the model nor the cause.
+        let text = require_output_text(&response, &self.model)?;
+        serde_json::from_str::<serde_json::Value>(&text).map_err(LlmError::from)
+    }
+}
+
+async fn refresh_access_token(
+    client: &reqwest::Client,
+    current: &OpenAiOAuthToken,
+) -> LlmResult<OpenAiOAuthToken> {
+    let token_endpoint =
+        credential_endpoint("OpenAI OAuth token endpoint", OPENAI_OAUTH_TOKEN_URL)?;
+    let token_response = refresh_grant::<OpenAiOAuthTokenResponse>(
+        client,
+        &token_endpoint,
+        current.refresh.expose_secret(),
+        CODEX_CLIENT_ID,
+        "openai-oauth refresh failed",
+        "Run `ai-memory auth login openai-oauth` again.",
+    )
+    .await?;
+    Ok(OpenAiOAuthToken::from_token_response(
+        token_response.access_token,
+        token_response
+            .refresh_token
+            .unwrap_or_else(|| current.refresh.expose_secret().to_string()),
+        token_response.expires_in.unwrap_or(3600),
+        token_response.id_token.as_deref(),
+        current.extra.account_id.clone(),
+    ))
+}
+
+pub(crate) fn build_request<'a>(
+    model: &'a str,
+    request: &'a ChatRequest,
+    text: Option<CodexText>,
+    reasoning_effort: Option<ReasoningEffort>,
+) -> CodexResponsesRequest<'a> {
+    let input = request
+        .messages
+        .iter()
+        .map(|msg| CodexInputMessage {
+            role: msg.role.as_str(),
+            content: vec![CodexInputContent {
+                kind: "input_text",
+                text: &msg.content,
+            }],
+        })
+        .collect();
+    CodexResponsesRequest {
+        model,
+        instructions: request.system.as_deref(),
+        input,
+        // The ChatGPT/Codex backend currently rejects `max_output_tokens`
+        // for OAuth callers on this endpoint, so rely on the server default.
+        max_output_tokens: None,
+        temperature: if model_uses_default_temperature(model) {
+            None
+        } else {
+            request.temperature
+        },
+        store: false,
+        stream: true,
+        text,
+        reasoning: reasoning_effort.map(|effort| CodexReasoning {
+            effort: effort.openai_wire_effort(),
+        }),
+    }
+}
+
+pub(crate) fn parse_sse_response(body: &str, model: &str) -> LlmResult<CodexResponsesResponse> {
+    let mut current_event: Option<String> = None;
+    let mut data_lines: Vec<&str> = Vec::new();
+    let mut output_text = String::new();
+    let mut completed: Option<CodexResponsesResponse> = None;
+
+    let mut flush_event = |event: Option<&str>, data_lines: &mut Vec<&str>| -> LlmResult<()> {
+        if data_lines.is_empty() {
+            return Ok(());
+        }
+        let data = data_lines.join("\n");
+        data_lines.clear();
+        let trimmed = data.trim();
+        if trimmed.is_empty() || trimmed == "[DONE]" {
+            return Ok(());
+        }
+
+        let value = serde_json::from_str::<serde_json::Value>(trimmed)?;
+        // A bare `data: {"error": {...}}` event without a `type` field
+        // and without an `event:` header would otherwise fall through
+        // the `_ => {}` arm and silently disappear, leaving the caller
+        // with "stream closed before response.completed". Promote
+        // any top-level `error` payload to a terminal error so the real
+        // upstream failure reaches the caller verbatim.
+        if value.get("error").is_some() {
+            return Err(LlmError::Provider {
+                status: SSE_TERMINAL_ERROR_STATUS,
+                body: truncate_with_ellipsis(trimmed, SSE_ERROR_BODY_TRIM),
+                retry_after: None,
+            });
+        }
+        let kind = value
+            .get("type")
+            .and_then(|v| v.as_str())
+            .or(event)
+            .unwrap_or_default();
+        match kind {
+            "response.output_text.delta" => {
+                if let Some(delta) = value.get("delta").and_then(|v| v.as_str()) {
+                    output_text.push_str(delta);
+                }
+            }
+            "response.completed" => {
+                let response = value.get("response").cloned().unwrap_or(value);
+                completed = Some(serde_json::from_value(response)?);
+            }
+            // An `incomplete` stop for `max_output_tokens` is an output-budget
+            // stop, not a provider fault, and the 502 below is transient: the
+            // fallback chain and the SessionEnd queue would re-send the same
+            // expensive prompt only to have it truncated again at the same
+            // budget. The OpenAI and Copilot paths already report this stop as
+            // `TruncatedResponse`, which is terminal. Every other non-completed
+            // status keeps the 502 path.
+            "response.incomplete"
+                if value
+                    .pointer("/response/incomplete_details/reason")
+                    .and_then(serde_json::Value::as_str)
+                    == Some("max_output_tokens") =>
+            {
+                return Err(LlmError::TruncatedResponse {
+                    model: model.to_owned(),
+                    completion_tokens: value
+                        .pointer("/response/usage/output_tokens")
+                        .and_then(serde_json::Value::as_u64)
+                        .and_then(|tokens| u32::try_from(tokens).ok()),
+                });
+            }
+            "response.failed" | "response.incomplete" | "response.cancelled" | "error" => {
+                return Err(LlmError::Provider {
+                    status: SSE_TERMINAL_ERROR_STATUS,
+                    body: truncate_with_ellipsis(trimmed, SSE_ERROR_BODY_TRIM),
+                    retry_after: None,
+                });
+            }
+            _ => {}
+        }
+        Ok(())
+    };
+
+    for line in body.lines() {
+        if line.is_empty() {
+            flush_event(current_event.as_deref(), &mut data_lines)?;
+            current_event = None;
+            continue;
+        }
+        if let Some(rest) = line.strip_prefix("event:") {
+            current_event = Some(rest.trim().to_string());
+            continue;
+        }
+        if let Some(rest) = line.strip_prefix("data:") {
+            data_lines.push(rest.trim_start());
+        }
+    }
+    // Final flush. A stream that ended mid-`data:` chunk leaves the
+    // last partial JSON in `data_lines`; surface that as a
+    // truncated-stream error so the caller doesn't see a generic
+    // serde parse failure when the true cause is the upstream socket
+    // closing before sending the closing `}`.
+    if let Err(err) = flush_event(current_event.as_deref(), &mut data_lines) {
+        return match (&err, completed.is_some()) {
+            (LlmError::Serde(_), false) => Err(LlmError::UnexpectedShape(
+                "openai-oauth stream truncated before final event closed (incomplete JSON payload)"
+                    .into(),
+            )),
+            _ => Err(err),
+        };
+    }
+
+    let mut response = completed.ok_or_else(|| {
+        LlmError::UnexpectedShape("openai-oauth stream closed before response.completed".into())
+    })?;
+    if response
+        .output_text
+        .as_deref()
+        .unwrap_or_default()
+        .is_empty()
+        && !output_text.is_empty()
+    {
+        response.output_text = Some(output_text);
+    }
+    Ok(response)
+}
+
+/// Models on the ChatGPT/Codex and Copilot backends that reject a
+/// caller-supplied `temperature`. Shared by the `openai-oauth`, `codex`
+/// and `copilot` providers.
+pub(crate) fn model_uses_default_temperature(model: &str) -> bool {
+    let m = model.to_ascii_lowercase();
+    m.starts_with("gpt-5") || m.starts_with("gpt-6") || m.starts_with('o')
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct CodexResponsesRequest<'a> {
+    pub(crate) model: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    instructions: Option<&'a str>,
+    input: Vec<CodexInputMessage<'a>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_output_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    temperature: Option<f32>,
+    store: bool,
+    pub(crate) stream: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    text: Option<CodexText>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reasoning: Option<CodexReasoning>,
+}
+
+#[derive(Debug, Serialize)]
+struct CodexReasoning {
+    effort: ReasoningEffort,
+}
+
+#[derive(Debug, Serialize)]
+struct CodexInputMessage<'a> {
+    role: &'a str,
+    content: Vec<CodexInputContent<'a>>,
+}
+
+#[derive(Debug, Serialize)]
+struct CodexInputContent<'a> {
+    #[serde(rename = "type")]
+    kind: &'a str,
+    text: &'a str,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct CodexText {
+    pub(crate) format: CodexTextFormat,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub(crate) enum CodexTextFormat {
+    JsonSchema {
+        name: String,
+        schema: serde_json::Value,
+        strict: bool,
+    },
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct CodexResponsesResponse {
+    #[serde(default)]
+    output_text: Option<String>,
+    #[serde(default)]
+    output: Vec<CodexOutputItem>,
+    #[serde(default)]
+    usage: Option<CodexUsage>,
+    #[serde(default)]
+    model: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CodexOutputItem {
+    #[serde(default)]
+    content: Vec<CodexOutputContent>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CodexOutputContent {
+    #[serde(default)]
+    text: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CodexUsage {
+    #[serde(default)]
+    input_tokens: u32,
+    #[serde(default)]
+    output_tokens: u32,
+}
+
+pub(crate) fn into_chat_response(response: CodexResponsesResponse) -> ChatResponse {
+    let model = response
+        .model
+        .clone()
+        .unwrap_or_else(|| "openai-oauth".into());
+    ChatResponse {
+        text: extract_output_text(&response).unwrap_or_default(),
+        usage: response.usage.map(|u| Usage {
+            input_tokens: u.input_tokens,
+            output_tokens: u.output_tokens,
+        }),
+        model,
+    }
+}
+
+pub(crate) fn extract_output_text(response: &CodexResponsesResponse) -> Option<String> {
+    if let Some(text) = response
+        .output_text
+        .as_deref()
+        .filter(|text| !text.is_empty())
+    {
+        return Some(text.to_string());
+    }
+    response
+        .output
+        .iter()
+        .flat_map(|item| item.content.iter())
+        .filter_map(|content| content.text.as_deref())
+        .find(|text| !text.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+pub(crate) fn require_output_text(
+    response: &CodexResponsesResponse,
+    model: &str,
+) -> LlmResult<String> {
+    extract_output_text(response)
+        .filter(|text| !text.trim().is_empty())
+        .ok_or_else(|| LlmError::EmptyContent {
+            model: model.to_owned(),
+        })
+}
+
+fn extract_account_id_from_jwt(token: &str) -> Option<String> {
+    let payload = token.split('.').nth(1)?;
+    let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(payload)
+        .ok()?;
+    let value = serde_json::from_slice::<serde_json::Value>(&bytes).ok()?;
+    value
+        .get("chatgpt_account_id")
+        .and_then(|v| v.as_str())
+        .or_else(|| {
+            value
+                .get("https://api.openai.com/auth")
+                .and_then(|v| v.get("chatgpt_account_id"))
+                .and_then(|v| v.as_str())
+        })
+        .or_else(|| {
+            value
+                .get("organizations")
+                .and_then(|v| v.as_array())
+                .and_then(|v| v.first())
+                .and_then(|v| v.get("id"))
+                .and_then(|v| v.as_str())
+        })
+        .map(ToOwned::to_owned)
+}
+
+#[cfg(test)]
+mod tests {
+    use rstest::rstest;
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn token_file_preserves_unknown_entries() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("oauth_token.json");
+        std::fs::write(
+            &path,
+            serde_json::to_vec_pretty(&json!({
+                "other": { "type": "oauth", "access": "x" }
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let token = OpenAiOAuthToken {
+            access: SecretString::from("access"),
+            refresh: SecretString::from("refresh"),
+            expires_at_ms: 1234,
+            extra: OpenAiExtras {
+                account_id: Some("acct".into()),
+            },
+        };
+        token.save(&path).unwrap();
+        let value =
+            serde_json::from_slice::<serde_json::Value>(&std::fs::read(&path).unwrap()).unwrap();
+        assert!(value.get("other").is_some());
+        assert_eq!(value["openai"]["access"], "access");
+        assert_eq!(value["openai"]["accountId"], "acct");
+    }
+
+    #[test]
+    fn token_file_round_trips_openai_entry() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("oauth_token.json");
+        let token = OpenAiOAuthToken {
+            access: SecretString::from("access"),
+            refresh: SecretString::from("refresh"),
+            expires_at_ms: 1234,
+            extra: OpenAiExtras { account_id: None },
+        };
+        token.save(&path).unwrap();
+        let loaded = OpenAiOAuthToken::load(&path).unwrap().unwrap();
+        assert_eq!(loaded.access.expose_secret(), "access");
+        assert_eq!(loaded.refresh.expose_secret(), "refresh");
+        assert_eq!(loaded.expires_at_ms, 1234);
+        // On-disk format: `accountId` is omitted entirely when absent.
+        let value =
+            serde_json::from_slice::<serde_json::Value>(&std::fs::read(&path).unwrap()).unwrap();
+        assert!(value["openai"].get("accountId").is_none());
+    }
+
+    #[test]
+    fn token_file_ignores_non_oauth_openai_entry() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("oauth_token.json");
+        std::fs::write(
+            &path,
+            serde_json::to_vec_pretty(&json!({
+                "openai": { "type": "api", "key": "sk-test" }
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+        assert!(OpenAiOAuthToken::load(&path).unwrap().is_none());
+    }
+
+    #[test]
+    fn remove_deletes_only_openai_entry() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("oauth_token.json");
+        std::fs::write(
+            &path,
+            serde_json::to_vec_pretty(&json!({
+                "openai": { "type": "oauth", "access": "a", "refresh": "r", "expires": 1 },
+                "other": { "type": "oauth", "access": "x" }
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        OpenAiOAuthToken::remove(&path).unwrap();
+        let value =
+            serde_json::from_slice::<serde_json::Value>(&std::fs::read(&path).unwrap()).unwrap();
+        assert!(value.get("openai").is_none());
+        assert!(value.get("other").is_some());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn token_file_is_mode_0600() {
+        use std::os::unix::fs::PermissionsExt as _;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("oauth_token.json");
+        let token = OpenAiOAuthToken {
+            access: SecretString::from("access"),
+            refresh: SecretString::from("refresh"),
+            expires_at_ms: 1234,
+            extra: OpenAiExtras { account_id: None },
+        };
+        token.save(&path).unwrap();
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600);
+    }
+
+    #[test]
+    fn jwt_account_id_extraction_uses_supported_fallbacks() {
+        fn jwt(payload: serde_json::Value) -> String {
+            let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD
+                .encode(serde_json::to_vec(&payload).unwrap());
+            format!("x.{payload}.y")
+        }
+        assert_eq!(
+            extract_account_id_from_jwt(&jwt(json!({ "chatgpt_account_id": "top" }))),
+            Some("top".into())
+        );
+        assert_eq!(
+            extract_account_id_from_jwt(&jwt(json!({
+                "https://api.openai.com/auth": { "chatgpt_account_id": "nested" }
+            }))),
+            Some("nested".into())
+        );
+        assert_eq!(
+            extract_account_id_from_jwt(&jwt(json!({ "organizations": [{ "id": "org" }] }))),
+            Some("org".into())
+        );
+    }
+
+    #[test]
+    fn codex_request_omits_gpt6_temperature() {
+        let request = ChatRequest {
+            system: None,
+            messages: vec![crate::types::ChatMessage::user("hello")],
+            temperature: Some(0.2),
+            max_tokens: 123,
+        };
+        let value =
+            serde_json::to_value(build_request("gpt-6-luna", &request, None, None)).unwrap();
+        assert!(value.get("temperature").is_none());
+    }
+
+    #[test]
+    fn codex_request_moves_system_to_instructions_and_omits_gpt5_temperature() {
+        let request = ChatRequest {
+            system: Some("sys".into()),
+            messages: vec![crate::types::ChatMessage::user("hello")],
+            temperature: Some(0.2),
+            max_tokens: 123,
+        };
+        let value = serde_json::to_value(build_request("gpt-5.5", &request, None, None)).unwrap();
+        assert_eq!(value["instructions"], "sys");
+        assert_eq!(value["input"][0]["content"][0]["type"], "input_text");
+        assert!(value.get("max_output_tokens").is_none());
+        assert!(value.get("temperature").is_none());
+        assert!(value.get("reasoning").is_none());
+        assert_eq!(value["store"], false);
+        assert_eq!(value["stream"], true);
+    }
+
+    #[rstest]
+    #[case::omitted(None, None)]
+    #[case::low(Some(ReasoningEffort::Low), Some("low"))]
+    #[case::persistent_clamps_max(Some(ReasoningEffort::Persistent), Some("max"))]
+    fn codex_request_reasoning_effort(
+        #[case] effort: Option<ReasoningEffort>,
+        #[case] expected: Option<&str>,
+    ) {
+        let request = ChatRequest::user_prompt("hello");
+        let value = serde_json::to_value(build_request("gpt-5.5", &request, None, effort)).unwrap();
+        match expected {
+            Some(effort) => assert_eq!(value["reasoning"]["effort"], effort),
+            None => assert!(value.get("reasoning").is_none()),
+        }
+    }
+
+    #[test]
+    fn parse_sse_response_reconstructs_completed_payload() {
+        let body = concat!(
+            "event: response.output_text.delta\n",
+            "data: {\"type\":\"response.output_text.delta\",\"delta\":\"hel\"}\n\n",
+            "event: response.output_text.delta\n",
+            "data: {\"type\":\"response.output_text.delta\",\"delta\":\"lo\"}\n\n",
+            "event: response.completed\n",
+            "data: {\"type\":\"response.completed\",\"response\":{\"model\":\"gpt-5.5\",\"usage\":{\"input_tokens\":12,\"output_tokens\":3},\"output\":[]}}\n\n",
+            "data: [DONE]\n\n"
+        );
+
+        let response = parse_sse_response(body, "gpt-5.5").unwrap();
+        assert_eq!(response.model.as_deref(), Some("gpt-5.5"));
+        assert_eq!(response.output_text.as_deref(), Some("hello"));
+        let usage = response.usage.expect("usage from completed event");
+        assert_eq!(usage.input_tokens, 12);
+        assert_eq!(usage.output_tokens, 3);
+    }
+
+    #[test]
+    fn parse_sse_response_surfaces_terminal_failure_events() {
+        for event in ["response.failed", "response.cancelled", "error"] {
+            let body = format!(
+                "event: {event}\n\
+                 data: {{\"type\":\"{event}\",\"error\":{{\"message\":\"stream stopped\"}}}}\n\n"
+            );
+
+            let err = parse_sse_response(&body, "gpt-5.5").expect_err("terminal event must fail");
+            match err {
+                LlmError::Provider { status, body, .. } => {
+                    assert_eq!(status, 502);
+                    assert!(body.contains(event), "body should include event: {body}");
+                    assert!(
+                        body.contains("stream stopped"),
+                        "body should include error: {body}"
+                    );
+                }
+                other => panic!("expected provider error for {event}, got {other:?}"),
+            }
+        }
+    }
+
+    /// A `response.incomplete` stop whose `incomplete_details.reason` is
+    /// `max_output_tokens` is an output-budget stop, so it must land in the
+    /// terminal `truncated-response` class rather than the transient 502 that
+    /// `is_transient()` tells the fallback chain and the SessionEnd queue to
+    /// re-send. `incomplete` for any other reason stays on the 502 path (the
+    /// control below).
+    #[test]
+    fn parse_sse_response_maps_incomplete_to_truncated_response() {
+        let body = concat!(
+            "event: response.incomplete\n",
+            "data: {\"type\":\"response.incomplete\",\"response\":{\"status\":\"incomplete\",",
+            "\"model\":\"gpt-5.5-wire\",\"usage\":{\"input_tokens\":12,\"output_tokens\":16000},",
+            "\"incomplete_details\":{\"reason\":\"max_output_tokens\"}}}\n\n"
+        );
+
+        let err = parse_sse_response(body, "gpt-5.5").expect_err("a budget stop must not parse");
+        match &err {
+            LlmError::TruncatedResponse {
+                model,
+                completion_tokens,
+            } => {
+                assert_eq!(
+                    model, "gpt-5.5",
+                    "the configured model label, not the wire one"
+                );
+                assert_eq!(*completion_tokens, Some(16_000));
+            }
+            other => panic!("expected TruncatedResponse, got {other:?}"),
+        }
+        assert_eq!(err.class(), "truncated-response");
+        assert!(!err.is_transient(), "a budget stop must not be retried");
+    }
+
+    /// Control for the arm above: a `response.incomplete` the output budget
+    /// does not explain keeps the terminal 502 path.
+    #[test]
+    fn parse_sse_response_keeps_non_budget_incomplete_on_provider_path() {
+        let body = concat!(
+            "event: response.incomplete\n",
+            "data: {\"type\":\"response.incomplete\",\"response\":{\"status\":\"incomplete\",",
+            "\"incomplete_details\":{\"reason\":\"content_filter\"}}}\n\n"
+        );
+
+        let err = parse_sse_response(body, "gpt-5.5").expect_err("terminal event must fail");
+        match err {
+            LlmError::Provider { status, body, .. } => {
+                assert_eq!(status, SSE_TERMINAL_ERROR_STATUS);
+                assert!(
+                    body.contains("content_filter"),
+                    "body should carry the reason: {body}"
+                );
+            }
+            other => panic!("expected Provider error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_sse_response_requires_completed_event() {
+        let body = concat!(
+            "event: response.output_text.delta\n",
+            "data: {\"type\":\"response.output_text.delta\",\"delta\":\"partial\"}\n\n",
+            "data: [DONE]\n\n",
+        );
+
+        let err =
+            parse_sse_response(body, "gpt-5.5").expect_err("missing completed event must fail");
+        assert!(
+            err.to_string()
+                .contains("stream closed before response.completed"),
+            "unexpected error: {err}"
+        );
+    }
+
+    /// Audit BLOCKING fix: a `data: {"error":{...}}` event without a
+    /// `type` field and without a preceding `event:` header used to
+    /// fall through the kind-dispatch silently. Now any top-level
+    /// `error` payload is promoted to a terminal error so the real
+    /// upstream failure reaches the caller.
+    #[test]
+    fn parse_sse_response_promotes_top_level_error_without_event_header() {
+        let body = "data: {\"error\":{\"message\":\"context length exceeded\"}}\n\n";
+        let err = parse_sse_response(body, "gpt-5.5")
+            .expect_err("top-level error payload must surface as a terminal error");
+        match err {
+            LlmError::Provider { status, body, .. } => {
+                assert_eq!(status, super::SSE_TERMINAL_ERROR_STATUS);
+                assert!(
+                    body.contains("context length exceeded"),
+                    "body must carry upstream error message: {body}"
+                );
+            }
+            other => panic!("expected Provider error, got {other:?}"),
+        }
+    }
+
+    /// Audit BLOCKING fix: a stream that ends mid-`data:` JSON (the
+    /// upstream socket closes before the closing brace) used to surface
+    /// as a generic serde parse error. The post-loop flush now catches
+    /// that case when no `response.completed` event has arrived and
+    /// emits the actionable "stream truncated" diagnostic.
+    #[test]
+    fn parse_sse_response_truncated_data_surfaces_as_truncated_stream() {
+        // `data:` line carrying an unterminated JSON object, no blank
+        // line after — the post-loop flush is what runs.
+        let body = "data: {\"type\":\"response.output_text.delta\",\"delta\":\"hel";
+        let err = parse_sse_response(body, "gpt-5.5").expect_err("truncated stream must fail");
+        assert!(
+            err.to_string()
+                .contains("stream truncated before final event closed"),
+            "expected truncation-aware error, got: {err}"
+        );
+    }
+
+    /// Empty body — no `data:` lines at all — falls through to the
+    /// `completed.is_none()` branch with the original
+    /// "stream closed before response.completed" error.
+    #[test]
+    fn parse_sse_response_empty_body_reports_no_completed_event() {
+        let err = parse_sse_response("", "gpt-5.5").expect_err("empty body must fail");
+        assert!(
+            err.to_string()
+                .contains("stream closed before response.completed"),
+            "expected canonical 'no completed' error, got: {err}"
+        );
+    }
+
+    /// SSE spec allows an event to carry multiple `data:` lines; the
+    /// parser joins them with `\n` before JSON-decoding. Exercise the
+    /// continuation path so a future refactor doesn't drop it.
+    #[test]
+    fn parse_sse_response_handles_multi_line_data_continuation() {
+        // Real upstreams sometimes split a wide JSON object across
+        // multiple `data:` lines; the parser joins on '\n' before
+        // serde_json parses, so a JSON value spanning newlines must
+        // survive (here we exercise a JSON STRING that contains a
+        // literal newline, which IS valid serde input).
+        let body = concat!(
+            "event: response.completed\n",
+            "data: {\"type\":\"response.completed\",\"response\":{\"model\":\"gpt-5.5\",\"output_text\":\"line1\\nline2\",\"output\":[]}}\n\n",
+            "data: [DONE]\n\n",
+        );
+        let resp = parse_sse_response(body, "gpt-5.5").expect("multi-line content must parse");
+        assert_eq!(resp.output_text.as_deref(), Some("line1\nline2"));
+    }
+
+    #[test]
+    fn structured_request_uses_responses_json_schema_format() {
+        let request = ChatRequest::user_prompt("json please");
+        let text = CodexText {
+            format: CodexTextFormat::JsonSchema {
+                name: "Result".into(),
+                schema: json!({ "type": "object", "properties": {} }),
+                strict: true,
+            },
+        };
+        let value =
+            serde_json::to_value(build_request("gpt-5.5", &request, Some(text), None)).unwrap();
+        assert_eq!(value["text"]["format"]["type"], "json_schema");
+        assert_eq!(value["text"]["format"]["name"], "Result");
+        assert_eq!(value["text"]["format"]["strict"], true);
+    }
+
+    #[test]
+    fn response_text_prefers_output_text_then_output_items() {
+        let direct: CodexResponsesResponse = serde_json::from_value(json!({
+            "output_text": "direct",
+            "output": [{ "content": [{ "text": "nested" }] }]
+        }))
+        .unwrap();
+        assert_eq!(extract_output_text(&direct).as_deref(), Some("direct"));
+
+        let nested: CodexResponsesResponse = serde_json::from_value(json!({
+            "output": [{ "content": [{ "text": "nested" }] }]
+        }))
+        .unwrap();
+        assert_eq!(extract_output_text(&nested).as_deref(), Some("nested"));
+    }
+
+    #[test]
+    fn responses_structured_output_requires_non_blank_text() {
+        for response in [
+            serde_json::from_value(json!({"output": []})).unwrap(),
+            serde_json::from_value(json!({"output_text": " \n\t", "output": []})).unwrap(),
+        ] {
+            let error = require_output_text(&response, "gpt-empty")
+                .expect_err("missing or blank Responses output must be empty content");
+            assert_eq!(error.class(), "empty-content");
+            assert!(matches!(error, LlmError::EmptyContent { model } if model == "gpt-empty"));
+        }
+    }
+}

@@ -1,0 +1,49 @@
+[package]
+name = "ai-memory-wiki"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Markdown wiki read/write, file watcher and git versioning."
+
+[dependencies]
+ai-memory-core.workspace = true
+ai-memory-llm.workspace = true
+ai-memory-store.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde-saphyr = { workspace = true, features = ["deserialize", "serialize"] }
+tempfile.workspace = true
+jiff.workspace = true
+tar.workspace = true
+flate2.workspace = true
+dirs.workspace = true
+# Destination-filesystem free space for the pre-migration backup receipt.
+fs2.workspace = true
+tracing.workspace = true
+tokio.workspace = true
+notify.workspace = true
+notify-debouncer-full.workspace = true
+git2.workspace = true
+async-trait.workspace = true
+# Admission webhook chain (sync HTTP calls before page persistence).
+reqwest.workspace = true
+futures-util.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+winapi-util = { workspace = true }
+
+[dev-dependencies]
+# Mock HTTP server for admission chain integration tests.
+axum.workspace = true
+tower.workspace = true
+# Direct DB access to fabricate legacy (pre-OKF) stores in migration tests.
+rusqlite.workspace = true
+
+[lints]
+workspace = true

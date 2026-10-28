@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "reclass": {
+      "command": "python",
+      "args": ["path/to/ReClassMCP.Server/reclass_mcp_server.py"],
+      "env": {}
+    }
+  }
+}

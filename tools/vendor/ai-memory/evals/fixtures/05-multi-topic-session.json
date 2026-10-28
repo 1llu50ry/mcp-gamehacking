@@ -1,0 +1,16 @@
+{
+  "name": "multi-topic-session",
+  "description": "Mixed session covering two unrelated topics. Tests whether the model produces SEPARATE pages per topic rather than mashing them together. The two topics share no semantic overlap; if the model emits one mixed concept page it has failed at scoping.",
+  "observations": [
+    {"kind": "session-start", "title": "session start", "body": "cwd=/mnt/data/Projects/ai-memory"},
+    {"kind": "user-prompt", "title": "user prompt", "body": "the docker image is 380 MB which is way too big — can we strip debug symbols and use a distroless base?"},
+    {"kind": "pre-tool-use", "title": "Edit", "body": "Dockerfile: stage 1 rust:slim, stage 2 gcr.io/distroless/cc-debian12, strip symbols via CARGO_PROFILE_RELEASE_STRIP=symbols"},
+    {"kind": "post-tool-use", "title": "docker build", "body": "image dropped from 380 MB to 67 MB"},
+    {"kind": "user-prompt", "title": "user prompt", "body": "great. unrelated — I noticed `cargo audit` is failing in CI on a transitive dep `xml-rs` with RUSTSEC-2024-xxxx. can we work around?"},
+    {"kind": "pre-tool-use", "title": "Read", "body": "Cargo.lock — xml-rs is pulled in by git2 → libgit2-sys → vendored-libgit2 transitively"},
+    {"kind": "user-prompt", "title": "user prompt", "body": "git2 is load-bearing for the wiki versioning so we can't drop it. add an ignore entry in audit.toml with a TODO+date to revisit"},
+    {"kind": "pre-tool-use", "title": "Write", "body": "audit.toml: ignore RUSTSEC-2024-xxxx with note 'transitive via libgit2-sys; revisit 2026-08'"},
+    {"kind": "post-tool-use", "title": "cargo audit", "body": "passes"},
+    {"kind": "session-end", "title": "session end", "body": "two distinct deliverables: docker slim + audit workaround"}
+  ]
+}

@@ -1,0 +1,83 @@
+name: sdk-ts-publish
+
+# Publishes the optional TypeScript SDK (companions/ai-memory-ts) to npm with
+# trusted publishing (OIDC, no stored npm token) and a provenance statement.
+#
+# DISABLED until the maintainer approves publishing (decision D1 in
+# docs/design-client-sdk.md): the npm package name and the account that owns
+# it are not chosen yet. Until then:
+#
+#   * the only trigger is a manual dispatch, and
+#   * package.json keeps `"private": true`, which the first step checks, so a
+#     dispatch fails before anything is built or uploaded.
+#
+# To enable it after D1: set the final name in package.json, remove
+# `"private": true`, register this repository and workflow file as a trusted
+# publisher for the package on npmjs.com, and add a tag trigger on the SDK's
+# own prefix, for example:
+#
+#   push:
+#     tags: ['sdk-ts-v*']
+#
+# This workflow is separate from release.yml: a server release never publishes
+# the SDK, and the SDK never delays a server release.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "SDK version to publish; must equal companions/ai-memory-ts/package.json"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sdk-ts-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: publish ai-memory-ts
+    runs-on: ubuntu-latest
+    # The `npm` environment is where required reviewers can gate a publish.
+    environment: npm
+    permissions:
+      contents: read
+      # npm trusted publishing exchanges this OIDC token for a short-lived
+      # publish credential and signs the provenance statement with it.
+      id-token: write
+    defaults:
+      run:
+        working-directory: companions/ai-memory-ts
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          # Node 24 ships npm 11, which supports trusted publishing.
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+      - name: Refuse while publishing is not approved
+        env:
+          REQUESTED: ${{ inputs.version }}
+        run: |
+          node -e '
+            const pkg = require("./package.json");
+            if (pkg.private === true) {
+              console.error("package.json is private: publishing awaits decision D1 (docs/design-client-sdk.md)");
+              process.exit(1);
+            }
+            if (pkg.version !== process.env.REQUESTED) {
+              console.error(`requested ${process.env.REQUESTED}, package.json has ${pkg.version}`);
+              process.exit(1);
+            }
+          '
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck
+      - run: npm run test:unit
+      - run: npm run schema:check
+      - run: npm run docs:check
+      - run: npm run docs:api
+      - run: npm audit --audit-level=moderate
+      - run: npm run build
+      - run: npm publish --provenance --access public --ignore-scripts

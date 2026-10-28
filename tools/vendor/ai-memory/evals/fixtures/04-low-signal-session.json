@@ -1,0 +1,13 @@
+{
+  "name": "low-signal-session",
+  "description": "A short, mundane session with no durable lessons — just minor edits. Tests whether the model RESISTS the urge to manufacture concept/decision pages and just returns the session log. (The system prompt explicitly says to favour returning only the session page when there's no reusable insight.)",
+  "observations": [
+    {"kind": "session-start", "title": "session start", "body": "cwd=/mnt/data/Projects/ai-memory"},
+    {"kind": "user-prompt", "title": "user prompt", "body": "fix the typo in README — should be 'Karpathy' not 'Karparthy'"},
+    {"kind": "pre-tool-use", "title": "Edit", "body": "README.md: Karparthy → Karpathy"},
+    {"kind": "post-tool-use", "title": "git diff", "body": "1 line changed"},
+    {"kind": "user-prompt", "title": "user prompt", "body": "commit it"},
+    {"kind": "pre-tool-use", "title": "git commit", "body": "docs: fix Karpathy spelling"},
+    {"kind": "session-end", "title": "session end", "body": "trivial"}
+  ]
+}

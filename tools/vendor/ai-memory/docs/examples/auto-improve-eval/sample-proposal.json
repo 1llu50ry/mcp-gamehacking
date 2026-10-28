@@ -1,0 +1,12 @@
+{
+  "path": "procedures/release.md",
+  "kind": "procedure",
+  "operation": "update",
+  "edit_mode": "full_page",
+  "title": "Release Procedure",
+  "confidence": 0.91,
+  "rationale": "Capture the release smoke-test checklist.",
+  "before_body": "# Release Procedure\n\n## Steps\n- Run tests\n",
+  "after_body": "# Release Procedure\n\n## Purpose\nShip a verified ai-memory build.\n\n## Steps\n- Run the full local gate.\n- Deploy to the homelab service.\n- Check /admin/status.\n",
+  "expected_base_body_sha256": null
+}

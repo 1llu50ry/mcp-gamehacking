@@ -1,0 +1,38 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReClassMCP.Plugin", "ReClassMCP.Plugin\ReClassMCP.Plugin.csproj", "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReClass.NET", "ReClass.NET\ReClass.NET\ReClass.NET.csproj", "{BFB8917D-E9B4-463F-A6E8-612C35728C78}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|x64.ActiveCfg = Debug|x64
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|x64.Build.0 = Debug|x64
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|x86.ActiveCfg = Debug|x86
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|x86.Build.0 = Debug|x86
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|x64.ActiveCfg = Release|x64
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|x64.Build.0 = Release|x64
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|x86.ActiveCfg = Release|x86
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|x86.Build.0 = Release|x86
+		{BFB8917D-E9B4-463F-A6E8-612C35728C78}.Debug|x64.ActiveCfg = Debug|x64
+		{BFB8917D-E9B4-463F-A6E8-612C35728C78}.Debug|x64.Build.0 = Debug|x64
+		{BFB8917D-E9B4-463F-A6E8-612C35728C78}.Debug|x86.ActiveCfg = Debug|x86
+		{BFB8917D-E9B4-463F-A6E8-612C35728C78}.Debug|x86.Build.0 = Debug|x86
+		{BFB8917D-E9B4-463F-A6E8-612C35728C78}.Release|x64.ActiveCfg = Release|x64
+		{BFB8917D-E9B4-463F-A6E8-612C35728C78}.Release|x64.Build.0 = Release|x64
+		{BFB8917D-E9B4-463F-A6E8-612C35728C78}.Release|x86.ActiveCfg = Release|x86
+		{BFB8917D-E9B4-463F-A6E8-612C35728C78}.Release|x86.Build.0 = Release|x86
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

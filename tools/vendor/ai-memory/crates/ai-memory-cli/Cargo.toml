@@ -1,0 +1,121 @@
+[package]
+name = "ai-memory-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "`ai-memory` binary entry point."
+# One integration-test binary instead of one per file. Each binary
+# statically links the whole dep graph and gets scanned by macOS on
+# first run.
+
+[lib]
+name = "ai_memory_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ai-memory"
+path = "src/main.rs"
+# main.rs is a shim with no tests of its own. Without this, `cargo test` builds
+# a second ~120 MB harness binary for it that contains no tests.
+test = false
+
+[features]
+default = []
+management-ui = ["ai-memory-mcp/management-ui", "ai-memory-web/management-ui"]
+
+[dependencies]
+ai-memory-consolidate.workspace = true
+ai-memory-core.workspace = true
+ai-memory-hooks.workspace = true
+ai-memory-llm.workspace = true
+ai-memory-mcp.workspace = true
+ai-memory-store.workspace = true
+ai-memory-web.workspace = true
+ai-memory-workstream.workspace = true
+ai-memory-wiki.workspace = true
+reqwest.workspace = true
+secrecy.workspace = true
+sha2.workspace = true
+base64.workspace = true
+anyhow.workspace = true
+axum.workspace = true
+# Sets SO_KEEPALIVE on accepted `serve` sockets (#792); not a workspace dep,
+# `ai-memory-cli` is the only crate that needs it.
+socket2 = "0.6.3"
+clap.workspace = true
+clap_complete.workspace = true
+crossterm.workspace = true
+unicode-width.workspace = true
+dirs.workspace = true
+figment.workspace = true
+flate2.workspace = true
+fs2.workspace = true
+http.workspace = true
+libc.workspace = true
+# `transport-streamable-http-client-reqwest` pulls reqwest in with no TLS backend
+# (`__reqwest = ["dep:reqwest"]` and nothing more), so the bridge could not reach an
+# `https://` MCP server at all.
+#
+# `reqwest-tls-no-provider` is `reqwest?/rustls-no-provider`: the platform verifier
+# without a pinned crypto provider. rmcp's plain `reqwest` feature would be
+# `reqwest?/rustls`, which additionally pins aws-lc-rs — and with it a C toolchain
+# (cmake/nasm on Windows) in every build of this workspace. `ring` is already in the
+# lockfile via the reqwest 0.12 the rest of the workspace uses, so the bridge
+# installs that as the process default instead (see `install_crypto_provider` in
+# `commands/mcp_bridge.rs`).
+#
+# The crypto provider is the whole of the difference. Both routes go through
+# `rustls-platform-verifier`, so both put its deps — including `jni` and
+# `rustls-platform-verifier-android` — in the lockfile. Those are target-gated and
+# are not compiled for our platforms, but they are not avoided by this choice, and
+# a comment claiming otherwise would misdirect the next TLS decision here.
+rmcp = { workspace = true, features = [
+    "client",
+    "transport-streamable-http-client-reqwest",
+    "reqwest-tls-no-provider",
+] }
+# The reqwest 0.13 that rmcp's client transport is built on, named so the bridge
+# can hand rmcp its own client (`mcp_bridge::upstream_transport`) instead of
+# rmcp's default, which reads `HTTP_PROXY` and friends. No features of its own:
+# rmcp's choice above is the whole TLS setup.
+reqwest-mcp = { package = "reqwest", version = "0.13", default-features = false }
+rustls = { workspace = true }
+serde.workspace = true
+serde_json.workspace = true
+subtle.workspace = true
+parking_lot.workspace = true
+toml_edit.workspace = true
+sysinfo.workspace = true
+tar.workspace = true
+zip.workspace = true
+jiff.workspace = true
+jsonc-parser.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+tracing-appender.workspace = true
+tracing-subscriber.workspace = true
+uuid.workspace = true
+
+tempfile.workspace = true
+
+[dev-dependencies]
+ai-memory-test-support.workspace = true
+ruzstd.workspace = true
+tempfile.workspace = true
+rstest.workspace = true
+rusqlite.workspace = true
+tower.workspace = true
+tokio = { workspace = true, features = ["test-util"] }
+
+[lints]
+workspace = true
+
+[target."cfg(windows)".dependencies]
+windows-registry = "0.100.0"

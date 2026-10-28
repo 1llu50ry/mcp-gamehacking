@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "build",
+    "sourceMap": true,
+    "paths": {
+      "ai-memory-ts": ["./src/index.ts"],
+      "ai-memory-ts/admin": ["./src/admin.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts", "examples/**/*.ts", "scripts/**/*.ts"]
+}

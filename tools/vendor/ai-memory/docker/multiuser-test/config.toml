@@ -1,0 +1,20 @@
+# Two-operator simulation: an SSO-terminating proxy in front of one server.
+#
+# This is the posture the multi-operator work targets: identities arrive as
+# headers asserted by a proxy that authenticates with a dedicated bearer,
+# and no `users` row ever exists.
+
+data_dir = "/data"
+bind = "0.0.0.0:49374"
+log_level = "ai_memory=debug,ai_memory_mcp=debug,ai_memory_store=info,ai_memory_wiki=info,ai_memory_hooks=debug"
+
+[auth]
+# Direct administration uses this; the proxy never receives it.
+bearer_token = "root-token-for-the-proxy-only"
+root_username = "operator-root"
+# The proxy authenticates with this distinct user-tier credential.
+actor_proxy_bearer_token = "proxy-token-for-the-proxy-only"
+
+[slots]
+# The feature under test. Default is false; a separate run covers that.
+per_user = true

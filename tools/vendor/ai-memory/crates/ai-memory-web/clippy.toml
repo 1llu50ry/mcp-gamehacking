@@ -1,0 +1,33 @@
+# The web UI and `/api/v1` are read-only by design (docs/frontend-api.md §10).
+# `WebState` holds a `Wiki`, which can write, so the lint keeps every mutating
+# entry point out of this crate. Writes go through MCP tools or `/admin/*`,
+# where admission, attribution and the audit trail apply. The integration
+# tests seed fixtures through these methods and carry an `allow`.
+disallowed-methods = [
+    { path = "ai_memory_wiki::Wiki::write_page", reason = "the web surface is read-only" },
+    { path = "ai_memory_wiki::Wiki::write_page_if", reason = "the web surface is read-only" },
+    { path = "ai_memory_wiki::Wiki::apply_batch", reason = "the web surface is read-only" },
+    { path = "ai_memory_wiki::Wiki::append_under_project", reason = "the web surface is read-only" },
+    { path = "ai_memory_wiki::Wiki::commit_all", reason = "the web surface is read-only" },
+    { path = "ai_memory_wiki::Wiki::ensure_upgrade_baseline_checkpoint", reason = "the web surface is read-only" },
+    { path = "ai_memory_wiki::Wiki::move_project_workspace", reason = "the web surface is read-only" },
+    { path = "ai_memory_wiki::Wiki::move_session_page", reason = "the web surface is read-only" },
+    { path = "ai_memory_wiki::Wiki::restore_page_from_checkpoint", reason = "the web surface is read-only" },
+    { path = "ai_memory_wiki::Wiki::delete_page", reason = "the web surface is read-only" },
+    { path = "ai_memory_wiki::Wiki::delete_page_if_latest", reason = "the web surface is read-only" },
+    { path = "ai_memory_wiki::Wiki::evict_page_if_latest", reason = "the web surface is read-only" },
+    { path = "ai_memory_wiki::Wiki::hard_delete_decay_tombstone", reason = "the web surface is read-only" },
+    { path = "ai_memory_wiki::Wiki::purge_project", reason = "the web surface is read-only" },
+    { path = "ai_memory_wiki::Wiki::purge_session", reason = "the web surface is read-only" },
+    { path = "ai_memory_wiki::Wiki::remove_project_dir", reason = "the web surface is read-only" },
+    { path = "ai_memory_wiki::Wiki::remove_workspace_dir", reason = "the web surface is read-only" },
+    { path = "ai_memory_wiki::Wiki::write_auto_improve_sidecar", reason = "the web surface is read-only" },
+    { path = "ai_memory_wiki::Wiki::approve_auto_improve_proposal", reason = "the web surface is read-only; /web/pending posts to /admin/pending-writes/*" },
+    { path = "ai_memory_wiki::Wiki::reindex_page", reason = "the web surface is read-only" },
+    { path = "ai_memory_wiki::Wiki::reindex_all", reason = "the web surface is read-only" },
+    { path = "ai_memory_wiki::Wiki::refresh_renamed_scope", reason = "the web surface is read-only" },
+    { path = "ai_memory_wiki::Wiki::backfill_scope_manifests", reason = "the web surface is read-only" },
+    { path = "ai_memory_wiki::Wiki::repair_date_only_stale_after", reason = "the web surface is read-only" },
+    { path = "ai_memory_wiki::Wiki::writer", reason = "the web surface is read-only: the writer actor is not reachable from here" },
+    { path = "ai_memory_wiki::Wiki::git", reason = "the web surface is read-only: the git adapter writes the wiki tree" },
+]
