@@ -1,0 +1,105 @@
+name: db
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "db/skills.db"
+      - "src/skills-db.ts"
+      - "scripts/build-db.mjs"
+      - ".github/workflows/db.yml"
+  pull_request:
+    paths:
+      - "db/skills.db"
+      - "src/skills-db.ts"
+      - "scripts/build-db.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: validate db/skills.db
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { lfs: false }
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - run: npm ci || npm install
+      - run: npx tsc
+      - name: open DB + check schema + counts + FTS integrity
+        run: |
+          node --input-type=module -e "
+          import { DatabaseSync } from 'node:sqlite';
+          import { stat } from 'node:fs/promises';
+          const path = 'db/skills.db';
+          const s = await stat(path);
+          const MB = s.size / 1024 / 1024;
+          if (MB > 100) { console.error('db too big:', MB.toFixed(1), 'MB'); process.exit(1); }
+          const db = new DatabaseSync(path, { readOnly: true });
+          const need = ['skills', 'skills_fts', 'plugins', 'agents', 'subagents', 'prompts', 'meta'];
+          const tables = db.prepare(\"SELECT name FROM sqlite_master WHERE type IN ('table','virtual','vtable')\").all().map(r => r.name);
+          for (const t of need) {
+            if (!tables.includes(t)) { console.error('missing table:', t); process.exit(1); }
+          }
+          const q = (sql) => db.prepare(sql).get();
+          const skills = q('SELECT COUNT(*) c FROM skills').c;
+          const plugins = q('SELECT COUNT(*) c FROM plugins').c;
+          const agents = q('SELECT COUNT(*) c FROM agents').c;
+          const subagents = q('SELECT COUNT(*) c FROM subagents').c;
+          const prompts = q('SELECT COUNT(*) c FROM prompts').c;
+          const ftsCount = q('SELECT COUNT(*) c FROM skills_fts').c;
+          console.log('counts:', { skills, plugins, agents, subagents, prompts, ftsCount, size_mb: MB.toFixed(1) });
+          if (skills < 100) { console.error('too few skills — DB looks truncated'); process.exit(1); }
+          if (ftsCount !== skills) { console.error('FTS index out of sync with skills table'); process.exit(1); }
+          // smoke query — must return hits for well-known tokens
+          for (const q of ['frida', 'battleye', 'il2cpp', 'unity']) {
+            const hits = db.prepare(\"SELECT COUNT(*) c FROM skills_fts WHERE skills_fts MATCH ?\").get(q).c;
+            if (hits < 1) { console.error('zero FTS hits for', q); process.exit(1); }
+          }
+          db.close();
+          console.log('OK');
+          "
+
+  # Manual rebuild path. Content trees are gitignored (they live
+  # outside the repo), so you upload them as an artifact to the
+  # action run via `workflow_dispatch` with inputs — or just rebuild
+  # locally and `git push` the new db/skills.db. This job stays here
+  # as a stable entry point in case we later wire content submission
+  # via PR.
+  rebuild-smoke:
+    name: rebuild from fixture (smoke)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - run: npm ci || npm install
+      - run: npx tsc
+      - name: Rebuild with a tiny synthetic fixture
+        run: |
+          mkdir -p skills/smoke-fixture
+          cat > skills/smoke-fixture/SKILL.md <<'EOF'
+          ---
+          name: smoke-fixture
+          description: "A tiny synthetic skill used to prove the build pipeline."
+          metadata:
+            type: reference
+          ---
+
+          # smoke fixture
+
+          This project is created by the CI rebuild-smoke job.
+          EOF
+          mkdir -p db
+          node scripts/build-db.mjs --out db/smoke.db
+          node --input-type=module -e "
+          import { DatabaseSync } from 'node:sqlite';
+          const db = new DatabaseSync('db/smoke.db', { readOnly: true });
+          const n = db.prepare('SELECT COUNT(*) c FROM skills').get().c;
+          if (n < 1) { console.error('smoke failed: no rows'); process.exit(1); }
+          console.log('smoke OK, rows:', n);
+          "

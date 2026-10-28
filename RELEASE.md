@@ -46,21 +46,48 @@ Or `docker compose up -d` from the compose file in the repo.
 Image is multi-arch (amd64 + arm64), ~400 MiB after the gzipped
 skills tree.
 
-### Working with the compressed sources
+### Fetching the full source archives (optional)
+
+The shipped `db/skills.db` (18 MiB) contains every SKILL.md but NOT the
+raw source dumps for the 3,981 archived projects. If you want them —
+for `grep_sources`, `read_source`, `find_offset`, `get_file_tree`,
+`bm25_search` to actually have content to search — download the fat
+DB attached to the v5.0.0 release:
 
 ```bash
-# Unpack everything into source.txt files for external grep tools
-node bin/mcp-gamehacking.mjs unpack
+# Download the two chunks (each < 2 GiB; GitHub's per-asset limit)
+gh release download v5.0.0 \
+  --repo 1llu50ry/mcp-gamehacking \
+  --pattern "skills-full.db.part-*" \
+  --pattern "skills-full.db.sha256" \
+  --dir db/
 
-# Repack back to .gz when you're done
-node bin/mcp-gamehacking.mjs pack
+# Rejoin into one SQLite file
+cat db/skills-full.db.part-00 db/skills-full.db.part-01 > db/skills-full.db
 
-# Or just one skill
-node bin/mcp-gamehacking.mjs unpack ags-apex-legends-cheat
+# Verify
+sha256sum -c db/skills-full.db.sha256
+
+# Point the server at it
+export MCP_SKILLS_DB=db/skills-full.db
 ```
 
-The server itself reads `.gz` transparently; you only need to unpack
-if you want to use `rg` / `grep` / your editor's search directly.
+The fat DB is ~3.3 GiB (gzipped source blobs embedded as rows). Every
+MCP tool that reads source transparently pulls from it via the same
+code path as the slim DB.
+
+### Working with per-skill source files
+
+```bash
+# Dump every embedded gzipped source back to skills/<name>/source.txt
+node bin/mcp-gamehacking.mjs unpack
+
+# Repack
+node bin/mcp-gamehacking.mjs pack
+
+# Just one skill
+node bin/mcp-gamehacking.mjs unpack ags-apex-legends-cheat
+```
 
 ## For maintainers
 
