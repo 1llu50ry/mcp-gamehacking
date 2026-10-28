@@ -3,6 +3,12 @@ name: Release
 on:
   push:
     tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'tag or ref to release from'
+        required: true
+        default: 'v5.0.0'
 
 permissions:
   contents: write
@@ -13,17 +19,19 @@ jobs:
   npm-publish:
     name: npm publish
     runs-on: ubuntu-latest
+    env:
+      HAS_NPM_TOKEN: ${{ secrets.NPM_TOKEN != '' && 'yes' || 'no' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           registry-url: 'https://registry.npmjs.org'
       - run: npm ci || npm install
       - run: npx tsc
       - run: node --test tests/*.test.mjs
-      - name: Publish to npm (requires NPM_TOKEN secret)
-        if: ${{ secrets.NPM_TOKEN != '' }}
+      - name: Publish to npm (skipped unless NPM_TOKEN is set)
+        if: env.HAS_NPM_TOKEN == 'yes'
         run: npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
