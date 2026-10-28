@@ -36,6 +36,11 @@ import { registerArm64 } from "./native-arm64.js";
 import { registerCacheTools, getCache } from "./decompile-cache.js";
 import { registerChunkTools } from "./chunking.js";
 import { runRequestMiddleware } from "./http-middleware.js";
+import { registerNativeDiff } from "./native-diff.js";
+import { registerRop } from "./native-rop.js";
+import { registerGameEngine } from "./native-gameengine.js";
+import { registerSampling } from "./native-sampling.js";
+import { registerViz } from "./native-viz.js";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const DIRS = {
@@ -387,6 +392,9 @@ const server = new McpServer({
   // registered primitives too, but declaring them explicitly makes the
   // handshake self-descriptive for clients that key feature detection
   // off capabilities rather than trial-and-error.
+  // Sampling is a client capability (we consume it via createMessage in
+  // decompile_summarize / struct_name_suggest / explain_at_level), so
+  // it's not declared here on the server side.
   capabilities: {
     tools:     { listChanged: true },
     resources: { subscribe: false, listChanged: true },
@@ -1726,6 +1734,18 @@ registerChunkTools(server, ROOT);
 // Warm the cache singleton so .stats() in telemetry works even before
 // the first wrap() call.
 getCache(ROOT);
+
+// Wave 4 (RE-ops upgrades):
+//   bindiff — function-level fingerprint diff with equal/shifted/modified
+//   rop_find / rop_chain — gadget search + packed-chain builder (x86-64 & aarch64)
+//   unity_il2cpp_metadata / unreal_fnames / godot_pck — engine metadata
+//   decompile_summarize / struct_name_suggest / explain_at_level — MCP sampling
+//   viz_call_graph / viz_cfg — SVG graph rendering
+registerNativeDiff(server);
+registerRop(server);
+registerGameEngine(server);
+registerSampling(server);
+registerViz(server);
 
 // ============================================================
 // MAIN
