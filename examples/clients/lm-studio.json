@@ -1,0 +1,9 @@
+{
+  "name": "mcp-gamehacking",
+  "command": "node",
+  "args": ["/path/to/mcp-gamehacking/dist/index.js"],
+  "env": {
+    "MCP_TRANSPORT": "stdio",
+    "MCP_FS_ALLOW": "/samples:/reverse"
+  }
+}

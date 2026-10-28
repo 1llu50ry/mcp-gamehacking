@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "mcp-gamehacking": {
+      "transportType": "stdio",
+      "command": "node",
+      "args": ["/path/to/mcp-gamehacking/dist/index.js"],
+      "env": {
+        "MCP_FS_ALLOW": "/home/you/reverse-projects",
+        "MCP_AUDIT_DIR": "/tmp/mcp-audit"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "list_skills", "search_skills", "read_skill",
+        "ghidra_health", "ida_health", "frida_health", "bridge_health_all",
+        "cache_stats"
+      ]
+    }
+  }
+}

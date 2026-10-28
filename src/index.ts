@@ -32,6 +32,10 @@ import { registerNativeDwarf } from "./native-dwarf.js";
 import { registerNativePdb } from "./native-pdb.js";
 import { registerSignatureDb } from "./signature-db.js";
 import { attachObservabilityRoutes, metrics } from "./observability.js";
+import { registerArm64 } from "./native-arm64.js";
+import { registerCacheTools, getCache } from "./decompile-cache.js";
+import { registerChunkTools } from "./chunking.js";
+import { runRequestMiddleware } from "./http-middleware.js";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const DIRS = {
@@ -377,6 +381,20 @@ const PKG_VERSION = JSON.parse(
 const server = new McpServer({
   name: "mcp-gamehacking",
   version: PKG_VERSION,
+  title: "mcp-gamehacking: reverse-engineering mega-brain",
+}, {
+  // Capabilities we actively support. The MCP SDK derives these from
+  // registered primitives too, but declaring them explicitly makes the
+  // handshake self-descriptive for clients that key feature detection
+  // off capabilities rather than trial-and-error.
+  capabilities: {
+    tools:     { listChanged: true },
+    resources: { subscribe: false, listChanged: true },
+    prompts:   { listChanged: true },
+    logging:   {},
+  },
+  instructions:
+    "mcp-gamehacking exposes 180+ tools for binary RE: Ghidra/IDA/Binja/CE/ReClass/dnSpy/x64dbg bridges, Frida dynamic instrumentation, native PE/ELF/Mach-O/DEX/.NET/Unity/UE/IL2CPP parsers, YARA, FLIRT-light signatures, native x86-64 + ARM64 emulators, agent-mesh (multi-model chat), MCP hub (smart decompile fail-over), content-addressable decompile cache. Prefer the `smart_*` composite tools when uncertain which backend to use. Use `cache_stats` + `chunk_fetch` for large results.",
 });
 
 // ============================================================
@@ -1698,6 +1716,17 @@ registerNativeDwarf(server);
 registerNativePdb(server);
 registerSignatureDb(server, ROOT);
 
+// Wave 3 (platform + distribution):
+//   emu_arm64_run   — native AArch64 emulator for iOS/Android loops
+//   cache_stats / cache_clear — content-addressable decompile cache
+//   chunk_fetch / chunk_list — paging through large tool results
+registerArm64(server);
+registerCacheTools(server, ROOT);
+registerChunkTools(server, ROOT);
+// Warm the cache singleton so .stats() in telemetry works even before
+// the first wrap() call.
+getCache(ROOT);
+
 // ============================================================
 // MAIN
 // ============================================================
@@ -1728,6 +1757,12 @@ async function main() {
     };
     const transports = new Map<string, StreamableHTTPServerTransport>();
     const httpServer = createServer(async (req, res) => {
+      // Per-request middleware: trace-id (X-Trace-Id), optional per-user
+      // rate limit (MCP_RATE_LIMIT_PER_USER=1), structured access log.
+      // The middleware already writes a 429 response when it rejects, so
+      // we stop here on `rejected`.
+      const mw = runRequestMiddleware(req, res);
+      if (mw.rejected) return;
       // Normalise the request URL once so query strings, fragments, and
       // trailing slashes can't bypass the route-equality checks that gate
       // the auth call (CodeQL js/user-controlled-bypass-of-security-check).
