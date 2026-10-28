@@ -72,17 +72,25 @@ const CACHE_SUBDIR = ".index-cache";
 const CACHE_FILE = "bm25.json";
 
 async function loadDiskCache(root: string): Promise<InvertedIndex | null> {
-  const { readFile, stat } = await import("node:fs/promises");
+  const { open } = await import("node:fs/promises");
   const { join } = await import("node:path");
   const path = join(root, CACHE_SUBDIR, CACHE_FILE);
+  // Open once as a FileHandle and do both stat + read through it. Using
+  // the handle instead of the path for both operations avoids a TOCTOU
+  // race where the file could be swapped (e.g. symlinked) between the
+  // path-based stat and the subsequent path-based readFile
+  // (CodeQL js/file-system-race).
+  let fh: import("node:fs/promises").FileHandle | null = null;
   try {
-    const st = await stat(path);
-    const text = await readFile(path, "utf8");
+    fh = await open(path, "r");
+    const st = await fh.stat();
+    const text = await fh.readFile("utf8");
     const raw = JSON.parse(text) as { docs: [string, { id: string; len: number; tf: [string, number][]; description: string; type: string }][]; df: [string, number][]; avgLen: number; N: number; mtime: number };
     const docs = new Map<string, IndexDoc>();
     for (const [id, d] of raw.docs) docs.set(id, { id: d.id, len: d.len, tf: new Map(d.tf), description: d.description, type: d.type });
     return { docs, df: new Map(raw.df), avgLen: raw.avgLen, N: raw.N, builtAt: st.mtimeMs };
   } catch { return null; }
+  finally { if (fh) await fh.close(); }
 }
 
 async function saveDiskCache(root: string, idx: InvertedIndex): Promise<void> {

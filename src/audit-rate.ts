@@ -8,7 +8,7 @@
 // enable with MCP_RATE_LIMIT=1 and tune per-tool via
 // MCP_RATE_LIMIT_<TOOL>=<n>  (default per-sec).
 
-import { mkdir, open, rename, type FileHandle } from "node:fs/promises";
+import { mkdir, open, type FileHandle } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { z } from "zod";
@@ -16,29 +16,33 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 const AUDIT_MAX = 10 * 1024 * 1024;
 
+// Per-process audit filename. Rotation advances a sequence suffix on size
+// overflow — there is never a stat+rename+reopen on a shared path (the
+// classic TOCTOU window CodeQL js/file-system-race flagged on the earlier
+// `rename` → `open` pair). The timestamp + pid pair also means concurrent
+// processes write to distinct files, so there's no inter-process race on
+// rotation either.
+const AUDIT_STAMP = new Date().toISOString().replace(/[:.]/g, "-");
+let auditSeq = 0;
+function auditFile(dir: string, seq: number): string {
+  return join(dir, `audit-${AUDIT_STAMP}-${process.pid}-${seq.toString().padStart(4, "0")}.jsonl`);
+}
+
 async function appendAudit(dir: string, record: object): Promise<void> {
   await mkdir(dir, { recursive: true });
-  const f = join(dir, "audit.jsonl");
   const payload = JSON.stringify({ ts: new Date().toISOString(), ...record }) + "\n";
-  // Open the audit file as a single handle and do both stat+append through
-  // it. Using the handle instead of the path for stat avoids a TOCTOU race
-  // where the file could be swapped (e.g. symlinked) between the stat and
-  // the append (CodeQL js/file-system-race).
+  // One FileHandle per call; stat + append go through the same fd so the
+  // path never has to be touched twice for the same decision.
   let fh: FileHandle | null = null;
   try {
-    fh = await open(f, "a");
+    let path = auditFile(dir, auditSeq);
+    fh = await open(path, "a");
     const s = await fh.stat();
-    if (s.size > AUDIT_MAX) {
-      // Rotate: close, rename, re-open. The rename is still against the
-      // path, but by that point the handle we observed the size through
-      // has been closed and we accept the window — the alternative
-      // (keeping the fd through rename) is Unix-only and still can't
-      // guarantee what another writer does.
-      const rotated = join(dir, `audit-${s.mtime.toISOString().replace(/[:.]/g, "-")}.jsonl`);
+    if (s.size + payload.length > AUDIT_MAX) {
       await fh.close();
-      fh = null;
-      try { await rename(f, rotated); } catch { /* best effort */ }
-      fh = await open(f, "a");
+      auditSeq++;
+      path = auditFile(dir, auditSeq);
+      fh = await open(path, "a");
     }
     await fh.appendFile(payload, "utf8");
   } finally {
@@ -67,19 +71,24 @@ export function registerAuditAndRate(server: McpServer, projectRoot: string): vo
 
   server.tool(
     "audit_tail",
-    "Return the last N audit records from the on-disk audit log.",
+    "Return the last N audit records from the current process's audit log segment.",
     { lines: z.number().min(1).max(10000).default(50) },
     async ({ lines }: { lines: number }) => {
-      const f = join(auditDir, "audit.jsonl");
-      try {
-        const { readFile } = await import("node:fs/promises");
-        const content = await readFile(f, "utf8");
-        const all = content.split("\n").filter(Boolean);
-        const tail = all.slice(-lines);
-        return { content: [{ type: "text" as const, text: `# audit (${tail.length} / ${all.length} records)\n\n${tail.join("\n")}` }] };
-      } catch (e) {
-        return { content: [{ type: "text" as const, text: `audit log not yet written at ${f}: ${(e as Error).message}` }], isError: true as const };
+      // Tail the current segment first; fall back to the previous one if
+      // the current is empty (fresh after a rotation).
+      const current = auditFile(auditDir, auditSeq);
+      const previous = auditSeq > 0 ? auditFile(auditDir, auditSeq - 1) : null;
+      const { readFile } = await import("node:fs/promises");
+      for (const f of [current, previous].filter((x): x is string => !!x)) {
+        try {
+          const content = await readFile(f, "utf8");
+          const all = content.split("\n").filter(Boolean);
+          if (!all.length) continue;
+          const tail = all.slice(-lines);
+          return { content: [{ type: "text" as const, text: `# audit ${f}\n(${tail.length} / ${all.length} records)\n\n${tail.join("\n")}` }] };
+        } catch { /* try next */ }
       }
+      return { content: [{ type: "text" as const, text: `audit log not yet written in ${auditDir}` }], isError: true as const };
     }
   );
 

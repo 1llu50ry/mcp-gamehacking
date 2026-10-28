@@ -1685,14 +1685,22 @@ async function main() {
     };
     const transports = new Map<string, StreamableHTTPServerTransport>();
     const httpServer = createServer(async (req, res) => {
+      // Normalise the request URL once so query strings, fragments, and
+      // trailing slashes can't bypass the route-equality checks that gate
+      // the auth call (CodeQL js/user-controlled-bypass-of-security-check).
+      // Equality comparisons downstream use `pathname` only.
+      const pathname = (() => {
+        try { return new URL(req.url ?? "/", "http://localhost").pathname.replace(/\/+$/, "") || "/"; }
+        catch { return "/"; }
+      })();
       // /healthz: readiness probe — always open
-      if (req.method === "GET" && req.url === "/healthz") {
+      if (req.method === "GET" && pathname === "/healthz") {
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({ status: "ok", pid: process.pid, uptime: process.uptime(), version: PKG_VERSION, auth: authRequired ? "on" : "off" }));
         return;
       }
       // /metrics: Prometheus-style — gated when auth is on
-      if (req.method === "GET" && req.url === "/metrics") {
+      if (req.method === "GET" && pathname === "/metrics") {
         if (!checkAuth(req)) {
           res.writeHead(401, { "content-type": "text/plain; charset=utf-8", "www-authenticate": "Bearer" });
           res.end("unauthorized");
@@ -1718,7 +1726,9 @@ async function main() {
         return;
       }
       // MCP endpoint: use streamable HTTP transport. Gated when auth is on.
-      if (req.url === "/mcp" || req.url?.startsWith("/mcp?") || req.url?.startsWith("/mcp/")) {
+      // Uses the normalised `pathname` (strips query / fragment / trailing /)
+      // so no `/mcp?x=` or `/mcp/` form can bypass the auth gate.
+      if (pathname === "/mcp") {
         if (!checkAuth(req)) {
           res.writeHead(401, { "content-type": "text/plain; charset=utf-8", "www-authenticate": "Bearer" });
           res.end("unauthorized");
