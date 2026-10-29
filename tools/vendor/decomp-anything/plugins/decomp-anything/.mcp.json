@@ -1,9 +1,0 @@
-{
-  "mcpServers": {
-    "decomp": {
-      "command": "decomp",
-      "args": ["mcp"],
-      "env": {"DECOMP_AGENT_NAME": "claude-code"}
-    }
-  }
-}

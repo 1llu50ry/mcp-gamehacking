@@ -1,5 +1,0 @@
-# Storage Directory
-
-This directory contains the SQLite database file for MCP Local Memory.
-
-The database file (`memory.db`) is excluded from git via `.gitignore`.

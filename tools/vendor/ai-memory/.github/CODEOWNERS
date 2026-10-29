@@ -1,7 +1,0 @@
-# Nix packaging and NixOS module — maintained by the nix owner.
-/nix/ @rubenlr
-/flake.nix @rubenlr
-/flake.lock @rubenlr
-/scripts/check-nix-packaging.sh @rubenlr
-/scripts/test-nixos-systemd-container.sh @rubenlr
-/.github/workflows/nix.yml @rubenlr

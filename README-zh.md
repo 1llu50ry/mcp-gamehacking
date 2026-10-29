@@ -4,9 +4,9 @@
 
 ### 让 Claude、Codex 和 Cursor 组队做逆向工程的 MCP 服务器。
 
-**180+ 个 MCP 工具 · 73 个 RE/调试后端 · 9 个宿主插件 · 4,200+ 技能 · 多智能体网格 · x86-64 + ARM64 原生模拟器**
+**180+ 个 MCP 工具 · 56 个 RE/调试后端 · 9 个宿主插件 · 4,200+ 技能 · 多智能体网格 · x86-64 + ARM64 原生模拟器**
 
-[![version](https://img.shields.io/badge/version-5.0.0-blue)](CHANGELOG.md) [![tests](https://img.shields.io/badge/tests-91%2F91-success)](tests/) [![tools](https://img.shields.io/badge/MCP%20tools-180%2B-blue)](src/) [![skills](https://img.shields.io/badge/skills-4%2C200%2B-orange)](db/) [![docker](https://img.shields.io/badge/docker-multi--arch-informational)](Dockerfile) [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![version](https://img.shields.io/badge/version-5.0.1-blue)](CHANGELOG.md) [![tests](https://img.shields.io/badge/tests-91%2F91-success)](tests/) [![tools](https://img.shields.io/badge/MCP%20tools-180%2B-blue)](src/) [![skills](https://img.shields.io/badge/skills-4%2C200%2B-orange)](db/) [![docker](https://img.shields.io/badge/docker-multi--arch-informational)](Dockerfile) [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 > **v5.0.0 已发布。** 仓库体积:19 GiB → 18 MiB(全部收进 SQLite + FTS5)。四波特性:宿主插件构建系统、Frida 桥接 + 动态分析、ARM64 模拟器 + 反编译缓存 + 分块、bindiff / ROP / 游戏引擎元数据 / MCP sampling / SVG 可视化。详见 [CHANGELOG](CHANGELOG.md)。
 

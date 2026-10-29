@@ -1,3 +1,0 @@
-[submodule "ghidra-mcp"]
-	path = ghidra-mcp
-	url = git@github.com:bethington/ghidra-mcp.git

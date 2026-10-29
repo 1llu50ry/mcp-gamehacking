@@ -29,7 +29,6 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 export type ReBackendId =
   | "ghidra-mcp"
   | "superghidra-mcp"
-  | "ida-pro-mcp"
   | "ida-pro-mcp-hexrays"
   | "binary-ninja-mcp"
   | "radare2-mcp"
@@ -39,7 +38,6 @@ export type ReBackendId =
   | "frida-mcp"
   | "hopper-mcp"
   | "rea"
-  | "vibe-re"
   | "jadx-mcp"
   | "angr-mcp"
   | "capstone-mcp"
@@ -85,21 +83,21 @@ export type ReBackendId =
   | "pwndbg-mcp"
   | "retdec-mcp"
   | "snowman-mcp"
-  | "fakepdb"
-  | "yaraflux"
-  | "antirea"
-  | "cheat-engine-python"
-  | "decomp-anything"
-  | "local-memory-mcp"
-  | "re-universe"
-  | "reva"
-  | "rzweb"
-  | "vscode-lldb"
-  | "tencentdb-agent-memory"
-  | "reclass-net-mcp"
-  | "ai-memory"
-  | "cheatengine-mcp-bridge"
-  | "claude-code-best-practice";
+  | "reverse-slop"
+  // Previously-vendored entries removed in v5.0.1 — their behaviour
+  // is now covered by this server's native implementations:
+  //   yaraflux          -> src/native-yara.ts
+  //   fakepdb (read)    -> src/native-pdb.ts
+  //   ai-memory + local-memory-mcp + tencentdb-agent-memory
+  //                     -> src/native-memory.ts
+  //   ida-pro-mcp       -> plugins-side/ida-pro/mcp_bridge.py
+  //   reclass-net-mcp   -> plugins-side/reclass-net/
+  //   cheat-engine-python + cheatengine-mcp-bridge
+  //                     -> plugins-side/cheat-engine/mcp_bridge.lua
+  //   vibe-re / antirea / rzweb / decomp-anything / re-universe /
+  //   reva / vscode-lldb / claude-code-best-practice
+  //     — external tools users install themselves if they need them.
+  ;
 
 export interface ReBackend {
   id: ReBackendId;
@@ -182,30 +180,6 @@ const BACKENDS: Record<ReBackendId, ReBackend> = {
     },
     tags: ["ghidra", "pyghidra", "chromadb", "semantic-search", "static", "project-wide"],
     notes: "38-tool server; semantic code search over decompiled functions. --gui attaches to a live Ghidra GUI session.",
-  },
-  "ida-pro-mcp": {
-    id: "ida-pro-mcp",
-    name: "ida-pro-mcp (mrexodia)",
-    kind: "static",
-    os: ["windows", "linux", "macos"],
-    requires: "IDA Pro 8.3+ or 9 (NOT IDA Free), Python 3.11+.",
-    install: [
-      "pip install ida-pro-mcp",
-      "run `ida-pro-mcp --install` to drop ida-plugin.json and the python bridge into IDA's plugins dir",
-      "restart IDA; Edit > Plugins > IDA Pro MCP to confirm",
-    ],
-    launch: {
-      cmd: "ida-pro-mcp",
-      args: [],
-    },
-    mcpConfig: {
-      "ida-pro-mcp": {
-        command: "ida-pro-mcp",
-        args: [],
-      },
-    },
-    tags: ["ida", "hex-rays", "static", "decompile"],
-    notes: "Deprecated by the author in favor of Hex-Rays' official server, but still works. Vendored copy under tools/vendor/ida-pro-mcp.",
   },
   "ida-pro-mcp-hexrays": {
     id: "ida-pro-mcp-hexrays",
@@ -417,30 +391,6 @@ const BACKENDS: Record<ReBackendId, ReBackend> = {
     },
     tags: ["cross-tool", "electron", "javascript", "dotnet", "native"],
     notes: "Native + JavaScript/Electron + .NET + websites in one MCP. Dispatches to the configured backend (Hopper/Ghidra/IDA).",
-  },
-  "vibe-re": {
-    id: "vibe-re",
-    name: "Vibe Reverse Engineering",
-    kind: "both",
-    os: ["windows"],
-    requires: "Python 3.10+, Visual Studio 2022+ with C++ Desktop (only when building ASI patches).",
-    install: [
-      "cd tools/vendor/vibe-re && python -m venv .venv && .\\.venv\\Scripts\\activate && pip install -r requirements.txt",
-    ],
-    launch: {
-      cmd: "python",
-      args: ["-m", "retools"],
-      cwd: "tools/vendor/vibe-re",
-    },
-    mcpConfig: {
-      "vibe-re": {
-        command: "python",
-        args: ["-m", "retools"],
-        cwd: "tools/vendor/vibe-re",
-      },
-    },
-    tags: ["pe", "static", "dynamic", "radare2", "windows", "asi"],
-    notes: "Vendored under tools/vendor/vibe-re. Includes Frida-style agent.js for live tooling.",
   },
   "jadx-mcp": {
     id: "jadx-mcp",
@@ -1169,243 +1119,35 @@ const BACKENDS: Record<ReBackendId, ReBackend> = {
     tags: ["snowman", "decompile", "static", "x86"],
     notes: "Lightweight C-like decompiler for x86. Good for quick triage.",
   },
-  "fakepdb": {
-    id: "fakepdb",
-    name: "FakePDB (IDA Pro plugin)",
-    kind: "static",
-    os: ["windows", "linux", "macos"],
-    requires: "IDA Pro 7.5+ (not IDA Free). The plugin + its win32 PDB emitter run in-process in IDA.",
+  "reverse-slop": {
+    id: "reverse-slop",
+    name: "reverse-slop",
+    kind: "both",
+    os: ["windows"],
+    requires: "Windows 10/11, Visual Studio 2022 with C++, CMake 3.26+. Optional kernel bridge needs admin + driver signing (test-signed OK).",
+    // Not vendored — users clone and build upstream themselves. The hub
+    // then talks to it over HTTP (default 127.0.0.1:8765) or we drive its
+    // JSON-RPC `/mcp` endpoint via the `slop_call` native tool.
     install: [
-      "copy tools/vendor/fakepdb/fakepdb.py and tools/vendor/fakepdb/fakepdb/ to %IDAUSR%/plugins/",
-      "(headless) run via `idat64 -A -S<script>` -- see fakepdb_run tool below",
+      "git clone https://github.com/kaizer1308/reverse-slap %USERPROFILE%\\\\dev\\\\reverse-slop",
+      "cmake --preset=release",
+      "cmake --build --preset=release",
     ],
     launch: {
-      cmd: "echo",
-      args: ["FakePDB is an IDA plugin -- use fakepdb_run tool to drive headlessly"],
+      cmd: "reverse-slop-engine",
+      args: ["--headless", "--mcp"],
+      http: { port: 8765, path: "/mcp" },
     },
     mcpConfig: {
-      "fakepdb": {
-        command: "idat64",
-        args: ["-A", "-S<path-to-fakepdb-script>", "<binary>"],
+      "reverse-slop": {
+        url: "http://127.0.0.1:8765/mcp",
+        headers: { Authorization: "Bearer ${env:MCP_SLOP_TOKEN}" },
       },
     },
-    tags: ["fakepdb", "ida", "pdb", "symbols", "static", "windows"],
-    notes: "Vendored under tools/vendor/fakepdb (Apache-2.0, mixaill). Generates a Microsoft PDB from an IDA database.",
-  },
-  "yaraflux": {
-    id: "yaraflux",
-    name: "YaraFlux MCP (ThreatFlux)",
-    kind: "static",
-    os: ["windows", "linux", "macos"],
-    requires: "Python 3.11+, yara-python >= 4.5.",
-    install: [
-      "pip install -e tools/vendor/yaraflux",
-    ],
-    launch: { cmd: "python", args: ["-m", "yaraflux_mcp_server"], cwd: "tools/vendor/yaraflux", http: { port: 48672 } },
-    mcpConfig: { "yaraflux": { command: "python", args: ["-m", "yaraflux_mcp_server"], cwd: "tools/vendor/yaraflux" } },
-    tags: ["yaraflux", "yara", "threatflux", "static", "detection", "classification"],
-    notes: "Vendored under tools/vendor/yaraflux. Full YARA rule management (upload, delete, test), scanning on URL/file, result retrieval. Alternative to yara-mcp with richer rule management.",
-  },
-  "antirea": {
-    id: "antirea",
-    name: "antirea (multi-stack RE)",
-    kind: "both",
-    os: ["windows", "linux", "macos"],
-    requires: "Node 20+. For native targets: Hopper / Ghidra / IDA install.",
-    install: [
-      "cd tools/vendor/antirea && npm install",
-    ],
-    launch: { cmd: "node", args: ["tools/vendor/antirea/dist/mcp.js"] },
-    mcpConfig: { "antirea": { command: "node", args: ["tools/vendor/antirea/dist/mcp.js"] } },
-    tags: ["antirea", "cross-tool", "electron", "js", "dotnet", "native", "both"],
-    notes: "Vendored under tools/vendor/antirea. REA-style cross-stack RE across binaries, apps, JS/Electron, .NET.",
-  },
-  "cheat-engine-python": {
-    id: "cheat-engine-python",
-    name: "MCP Cheat Engine Server (Python)",
-    kind: "dynamic",
-    os: ["windows"],
-    requires: "Python 3.10+, Cheat Engine 7.5+, Windows.",
-    install: [
-      "cd tools/vendor/cheat-engine-python && pip install -r requirements.txt",
-    ],
-    launch: { cmd: "python", args: ["-m", "mcp_cheat_engine_server"], cwd: "tools/vendor/cheat-engine-python", http: { port: 48673 } },
-    mcpConfig: { "cheat-engine-python": { command: "python", args: ["-m", "mcp_cheat_engine_server"], cwd: "tools/vendor/cheat-engine-python" } },
-    tags: ["cheat-engine", "python", "dynamic", "aob", "pointer-scan", "memory-rw"],
-    notes: "Vendored under tools/vendor/cheat-engine-python. Python-first alternative to cheat-engine-mcp (Lua bridge). Easier scripting for pointer scans + value watching.",
-  },
-  "decomp-anything": {
-    id: "decomp-anything",
-    name: "decomp.anything (matching-decompilation workbench)",
-    kind: "static",
-    os: ["windows", "linux", "macos"],
-    requires: "Python 3.11+. The original compiler toolchain for the target (MSVC / GCC / clang).",
-    install: [
-      "cd tools/vendor/decomp-anything && pip install -e .",
-    ],
-    launch: { cmd: "python", args: ["-m", "decomp_anything.server"], cwd: "tools/vendor/decomp-anything", http: { port: 48674 } },
-    mcpConfig: { "decomp-anything": { command: "python", args: ["-m", "decomp_anything.server"], cwd: "tools/vendor/decomp-anything" } },
-    tags: ["matching-decompilation", "static", "games", "windows", "linux", "firmware"],
-    notes: "Vendored under tools/vendor/decomp-anything. Agent writes C/C++ against the real binary; original compiler builds it; result checked byte-for-byte. Primary matching-decomp workbench for game-RE scene.",
-  },
-  "local-memory-mcp": {
-    id: "local-memory-mcp",
-    name: "local-memory-mcp (@vheins) — persistent agent memory",
-    kind: "static",
-    os: ["windows", "linux", "macos"],
-    requires: "Node 20+.",
-    install: [
-      "cd tools/vendor/local-memory-mcp && npm install",
-    ],
-    launch: { cmd: "node", args: ["tools/vendor/local-memory-mcp/src/index.js"] },
-    mcpConfig: { "local-memory-mcp": { command: "node", args: ["tools/vendor/local-memory-mcp/src/index.js"] } },
-    tags: ["memory", "persistence", "agent", "kv", "note"],
-    notes: "Vendored under tools/vendor/local-memory-mcp. Durable KV + notes memory for an agent across sessions. Pairs with agent-mesh for mesh-in / long-term-out.",
-  },
-  "re-universe": {
-    id: "re-universe",
-    name: "Ghidra BSim PostgreSQL (RE-Universe)",
-    kind: "static",
-    os: ["windows", "linux", "macos"],
-    requires: "Docker; Ghidra 11+; PostgreSQL 15. BSim database must be seeded with reference binaries (binaries/ pruned from vendor; download separately).",
-    install: [
-      "cd tools/vendor/re-universe && docker compose up -d",
-    ],
-    launch: { cmd: "docker", args: ["compose", "up", "-d"], cwd: "tools/vendor/re-universe", http: { port: 5432 } },
-    mcpConfig: { "re-universe": { url: "postgresql://127.0.0.1:5432/bsim" } },
-    tags: ["bsim", "ghidra", "similarity", "postgres", "static", "function-matching"],
-    notes: "Vendored under tools/vendor/re-universe (binaries/ dropped — fetch upstream for reference libs). Ghidra BSim + PostgreSQL for cross-binary function similarity. Identifies statically-linked libs + known malware families + leaked SDK symbols.",
-  },
-  "reva": {
-    id: "reva",
-    name: "ReVa (Reverse Engineering Assistant for Ghidra)",
-    kind: "static",
-    os: ["windows", "linux", "macos"],
-    requires: "Ghidra 11.3+. The extension builds from source or installs via Ghidra's Extensions menu.",
-    install: [
-      "cd tools/vendor/reva && gradle buildExtension   # or use the extension ZIP from upstream releases",
-      "Ghidra -> File -> Install Extensions... -> + -> pick the built ZIP -> restart",
-      "enable the ReVa MCP server tool in CodeBrowser",
-    ],
-    launch: {
-      cmd: "echo",
-      args: ["ReVa runs inside Ghidra -- enable the MCP server tool after installing"],
-      http: { port: 8080 },
-    },
-    mcpConfig: { "reva": { url: "http://127.0.0.1:8080/mcp" } },
-    tags: ["ghidra", "reva", "mcp", "static", "ai-assisted", "cyberkaida"],
-    notes: "Vendored under tools/vendor/reva (cyberkaida). Modern alternative to GhidraMCP; richer surface (decompiler + xrefs + comments + function + data type management).",
-  },
-  "rzweb": {
-    id: "rzweb",
-    name: "RzWeb (rizin web UI + MCP)",
-    kind: "both",
-    os: ["windows", "linux", "macos"],
-    requires: "rizin >= 0.7, Node 20+.",
-    install: [
-      "cd tools/vendor/rzweb && npm install && npm run build",
-    ],
-    launch: { cmd: "node", args: ["tools/vendor/rzweb/dist/mcp-server.js"], http: { port: 48675 } },
-    mcpConfig: { "rzweb": { command: "node", args: ["tools/vendor/rzweb/dist/mcp-server.js"] } },
-    tags: ["rizin", "radare2-fork", "web-ui", "static", "dynamic"],
-    notes: "Vendored under tools/vendor/rzweb. rizin is the maintained radare2 fork; RzWeb bundles a web UI + MCP server exposing `rz` commands.",
-  },
-  "vscode-lldb": {
-    id: "vscode-lldb",
-    name: "vscode-lldb (LLDB DAP + MCP bridge)",
-    kind: "dynamic",
-    os: ["linux", "macos", "windows"],
-    requires: "lldb-dap binary (LLVM 18+) on PATH or configured path.",
-    install: [
-      "install LLVM 18+ (ships lldb-dap)",
-      "cd tools/vendor/vscode-lldb && npm install && npm run build",
-    ],
-    launch: { cmd: "node", args: ["tools/vendor/vscode-lldb/out/mcp.js"], http: { port: 48676 } },
-    mcpConfig: { "vscode-lldb": { command: "node", args: ["tools/vendor/vscode-lldb/out/mcp.js"] } },
-    tags: ["lldb", "dap", "mcp", "dynamic", "cross-platform", "ios", "macos", "linux"],
-    notes: "Vendored under tools/vendor/vscode-lldb. The VSCode LLDB extension doubles as an MCP server (bridges DAP → MCP for Claude/Codex/Cursor to drive LLDB directly). Replaces the previous `lldb-dap` catalog alias.",
-  },
-  "tencentdb-agent-memory": {
-    id: "tencentdb-agent-memory",
-    name: "TencentDB Agent Memory (team-shared memory)",
-    kind: "static",
-    os: ["windows", "linux", "macos"],
-    requires: "Node >= 22.16, Docker (for memory-core + memory-hub + proxy), two LLM endpoints (memory + proxy groups), optional MongoDB.",
-    install: [
-      "cd tools/vendor/tencentdb-agent-memory/deploy/global-images && cp .env.example .env",
-      "fill in .env with the memory-group + proxy-group LLM parameters",
-      "./start-all.sh  # brings up memory-core + memory-hub + proxy; prints a one-liner for client config",
-    ],
-    launch: {
-      cmd: "bash",
-      args: ["./start-all.sh"],
-      cwd: "tools/vendor/tencentdb-agent-memory/deploy/global-images",
-      http: { port: 8125 },
-    },
-    mcpConfig: {
-      "tencentdb-agent-memory": {
-        // Zero-code integration: point the agent's BASE URL at the proxy
-        // (OpenAI-compatible). No plugin or MCP server needed on the client.
-        url: "http://127.0.0.1:8125",
-      },
-    },
-    tags: ["memory", "team", "shared", "proxy", "tencent", "openclaw", "hermes"],
-    notes: "Vendored under tools/vendor/tencentdb-agent-memory (assets/ dropped — fetch upstream for the UI video/images). Shared memory server where every agent (Claude, Codex, Cursor, …) sees the same memory. Pairs with our built-in agent-mesh: mesh for coordination, TencentDB-Agent-Memory for durable long-term team memory.",
-  },
-  "reclass-net-mcp": {
-    id: "reclass-net-mcp",
-    name: "ReClass.NET MCP (upstream server)",
-    kind: "dynamic",
-    os: ["windows"],
-    requires: "ReClass.NET running; the plugin exposes an HTTP MCP endpoint from the live process.",
-    install: [
-      "copy tools/vendor/reclass-net-mcp/ReClassNET-MCP.dll into ReClass.NET/Plugins/",
-      "open ReClass.NET → Plugins → enable 'ReClass.NET MCP'",
-    ],
-    launch: { cmd: "echo", args: ["ReClass.NET must be running; MCP exposed from the GUI"], http: { port: 48669 } },
-    mcpConfig: { "reclass-net-mcp": { url: "http://127.0.0.1:48669/mcp" } },
-    tags: ["reclass", "struct-recovery", "windows", "dynamic", "upstream"],
-    notes: "Full upstream server. For offline .rcnet → C++ header conversion the built-in `reclass_to_cpp` tool now covers common node types without needing ReClass.NET to be running.",
-  },
-  "ai-memory": {
-    id: "ai-memory",
-    name: "ai-memory (Rust vector memory)",
-    kind: "static",
-    os: ["windows", "linux", "macos"],
-    requires: "Rust toolchain (vendored crates/ builds locally).",
-    install: [
-      "cd tools/vendor/ai-memory && cargo build --release",
-    ],
-    launch: { cmd: "cargo", args: ["run", "--release"], cwd: "tools/vendor/ai-memory" },
-    mcpConfig: { "ai-memory": { command: "cargo", args: ["run", "--release", "--manifest-path", "tools/vendor/ai-memory/Cargo.toml"] } },
-    tags: ["memory", "rust", "vector", "embeddings", "persistence"],
-    notes: "Rust-backed vector memory server. Pairs with our native memory_* tools: ai-memory for semantic / embedding search, native memory_search for keyword hits.",
-  },
-  "cheatengine-mcp-bridge": {
-    id: "cheatengine-mcp-bridge",
-    name: "Cheat Engine MCP bridge (Python)",
-    kind: "dynamic",
-    os: ["windows"],
-    requires: "Python 3.10+, Cheat Engine 7.5+, ceserver running.",
-    install: [
-      "cd tools/vendor/cheatengine-mcp-bridge && pip install -r requirements.txt",
-    ],
-    launch: { cmd: "python", args: ["-m", "cheatengine_mcp_bridge"], cwd: "tools/vendor/cheatengine-mcp-bridge", http: { port: 52736 } },
-    mcpConfig: { "cheatengine-mcp-bridge": { command: "python", args: ["-m", "cheatengine_mcp_bridge"], cwd: "tools/vendor/cheatengine-mcp-bridge" } },
-    tags: ["cheat-engine", "bridge", "ceserver", "dynamic"],
-    notes: "Vendored. Our native ce_* tools (ce_attach / ce_aob_scan / ce_pointer_scan / ce_read_memory / ce_write_memory / ce_lua / ce_status) talk to the same ceserver HTTP surface this bridge exposes; set MCP_CESERVER_HOST / MCP_CESERVER_PORT (default 127.0.0.1:52736) and use the native tools directly.",
-  },
-  "claude-code-best-practice": {
-    id: "claude-code-best-practice",
-    name: "Claude Code best-practice docs (reference, not server)",
-    kind: "static",
-    os: ["windows", "linux", "macos"],
-    requires: "nothing; documentation.",
-    install: ["browse tools/vendor/claude-code-best-practice/"],
-    launch: { cmd: "echo", args: ["Documentation only — see tools/vendor/claude-code-best-practice/README.md"] },
-    mcpConfig: {},
-    tags: ["claude-code", "docs", "best-practice", "reference"],
-    notes: "Not an MCP backend. Vendored for inclusion in the skill library — tips, changelogs, and practice patterns that inform the agent prompts.",
+    tags: ["imgui", "tauri", "pe", "macho", "ipa", "x86", "x64", "arm64", "disasm", "decompile", "aob", "kernel", "mcp-native", "windows"],
+    notes:
+      "Windows RE workbench with its own MCP server at /mcp (JSON-RPC 2.0, 23 domain tools: target/memory/disasm/debugger/driver/xray/patch/devirt/types/notes/analyze/network/proxy/persist/decomp/dotnet/detect/fs/web/script/frida/emulate/re). " +
+      "Prefer this server's `slop_health` / `slop_tools` / `slop_call` native tools once it's running; set MCP_SLOP_TOKEN for Bearer auth. Not vendored — the project owns its own repo.",
   },
 };
 

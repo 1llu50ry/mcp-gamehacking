@@ -1,9 +1,0 @@
-repo-data/
-.git/
-ghidra/
-scripts/
-sql/
-*.log
-.tmp/
-postgres-ssl/data/
-bsim-init/data/

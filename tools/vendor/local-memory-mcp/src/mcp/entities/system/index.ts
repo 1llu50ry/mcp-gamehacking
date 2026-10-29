@@ -1,1 +1,0 @@
-export { SystemEntity } from "./entity";

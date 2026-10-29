@@ -1,9 +1,0 @@
-{
-    "recommendations": [
-        "ms-python.mypy-type-checker",
-        "vscjava.vscode-gradle",
-        "ms-python.vscode-pylance",
-        "ms-python.python",
-        "vscjava.vscode-java-pack"
-    ]
-}

@@ -4,9 +4,9 @@
 
 ### MCP-сервер, превращающий Claude, Codex и Cursor в команду reverse-engineering.
 
-**180+ MCP-инструментов · 73 RE/debug бэкенда · 9 host-плагинов · 4,200+ скиллов · multi-agent mesh · x86-64 + ARM64 эмуляторы**
+**180+ MCP-инструментов · 56 RE/debug бэкендов · 9 host-плагинов · 4,200+ скиллов · multi-agent mesh · x86-64 + ARM64 эмуляторы**
 
-[![version](https://img.shields.io/badge/version-5.0.0-blue)](CHANGELOG.md) [![tests](https://img.shields.io/badge/tests-91%2F91-success)](tests/) [![tools](https://img.shields.io/badge/MCP%20tools-180%2B-blue)](src/) [![skills](https://img.shields.io/badge/skills-4%2C200%2B-orange)](db/) [![docker](https://img.shields.io/badge/docker-multi--arch-informational)](Dockerfile) [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![version](https://img.shields.io/badge/version-5.0.1-blue)](CHANGELOG.md) [![tests](https://img.shields.io/badge/tests-91%2F91-success)](tests/) [![tools](https://img.shields.io/badge/MCP%20tools-180%2B-blue)](src/) [![skills](https://img.shields.io/badge/skills-4%2C200%2B-orange)](db/) [![docker](https://img.shields.io/badge/docker-multi--arch-informational)](Dockerfile) [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 > **v5.0.0 выпущен.** Вес репо: 19 GiB → 18 MiB (всё в SQLite + FTS5). Четыре волны фич: build-системы для host-плагинов, Frida bridge + динамический анализ, ARM64 эмулятор + кеш декомпиляции + chunking, bindiff / ROP / метадата игровых движков / MCP sampling / SVG visualization. [CHANGELOG](CHANGELOG.md).
 

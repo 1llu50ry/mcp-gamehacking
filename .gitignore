@@ -13,6 +13,12 @@ Thumbs.db
 # via the vendoring process. Do not publish the raw clones.
 /better-options/
 
+# tools/vendor/ was removed in v5.0.1. Keep the path ignored so a stray
+# `git clone` into tools/vendor/<x> doesn't sneak back into the repo —
+# every piece of functionality we need from those projects now lives
+# natively under src/ or plugins-side/.
+/tools/vendor/
+
 # Server runtime scratch
 /.export/
 /.agent-mesh/
