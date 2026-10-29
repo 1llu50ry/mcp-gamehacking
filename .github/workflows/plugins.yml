@@ -22,7 +22,7 @@ jobs:
       matrix:
         host: [ghidra, ida-pro, binaryninja, frida]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -50,7 +50,7 @@ jobs:
     name: lua cheat-engine
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: install lua
         run: sudo apt-get update && sudo apt-get install -y lua5.3
       - name: luac syntax check
@@ -68,7 +68,7 @@ jobs:
       matrix:
         host: [reclass-net, dnspy, ilspy]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
@@ -93,7 +93,7 @@ jobs:
     name: cpp x64dbg
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
