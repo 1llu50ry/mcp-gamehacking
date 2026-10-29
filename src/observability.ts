@@ -82,7 +82,7 @@ function sanitize(name: string): string {
   return name.replace(/[^a-zA-Z0-9_]/g, "_");
 }
 
-function renderPrometheus(): string {
+export function renderPrometheus(): string {
   const out: string[] = [];
   const uptime = Math.floor((Date.now() - state.started) / 1000);
   out.push("# HELP mcp_gamehacking_uptime_seconds server uptime");
@@ -219,26 +219,44 @@ function renderDashboardJson(): string {
 }
 
 // ---- hook into the HTTP transport -----------------------------
+//
+// Returns a sync handler that the caller invokes INSIDE its own
+// request handler, before the regular routing kicks in. The old
+// implementation attached a second `server.on("request", ...)`
+// listener, which caused ERR_HTTP_HEADERS_SENT when the main
+// handler and the observability handler both tried to answer the
+// same request. The returned function tells the caller via its
+// boolean return whether it handled the request (so the main
+// handler can bail out cleanly).
 
+export function observabilityHandler(req: IncomingMessage, res: ServerResponse): boolean {
+  if (res.headersSent || res.writableEnded) return false;
+  const url = new URL(req.url ?? "/", "http://x");
+  if (url.pathname === "/metrics") {
+    metrics.http("/metrics");
+    res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
+    res.end(renderPrometheus());
+    return true;
+  }
+  if (url.pathname === "/dashboard" || url.pathname === "/dashboard/") {
+    metrics.http("/dashboard");
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.end(DASHBOARD_HTML);
+    return true;
+  }
+  if (url.pathname === "/_dashboard.json") {
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+    res.end(renderDashboardJson());
+    return true;
+  }
+  return false;
+}
+
+/** @deprecated Kept for compatibility; use observabilityHandler() inline instead. */
 export function attachObservabilityRoutes(server: Server) {
   server.on("request", (req: IncomingMessage, res: ServerResponse) => {
-    const url = new URL(req.url ?? "/", "http://x");
-    if (url.pathname === "/metrics") {
-      metrics.http("/metrics");
-      res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
-      res.end(renderPrometheus());
-      return;
-    }
-    if (url.pathname === "/dashboard" || url.pathname === "/dashboard/") {
-      metrics.http("/dashboard");
-      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      res.end(DASHBOARD_HTML);
-      return;
-    }
-    if (url.pathname === "/_dashboard.json") {
-      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
-      res.end(renderDashboardJson());
-      return;
-    }
+    // writableEnded / headersSent guards avoid double-writing when the
+    // main createServer handler already answered.
+    observabilityHandler(req, res);
   });
 }

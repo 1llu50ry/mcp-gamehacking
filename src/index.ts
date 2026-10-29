@@ -31,7 +31,7 @@ import { registerEmulator } from "./native-emulator.js";
 import { registerNativeDwarf } from "./native-dwarf.js";
 import { registerNativePdb } from "./native-pdb.js";
 import { registerSignatureDb } from "./signature-db.js";
-import { attachObservabilityRoutes, metrics } from "./observability.js";
+import { observabilityHandler, metrics, renderPrometheus } from "./observability.js";
 import { registerArm64 } from "./native-arm64.js";
 import { registerCacheTools, getCache } from "./decompile-cache.js";
 import { registerChunkTools } from "./chunking.js";
@@ -579,6 +579,36 @@ const server = new McpServer({
   instructions:
     "mcp-gamehacking exposes 180+ tools for binary RE: Ghidra/IDA/Binja/CE/ReClass/dnSpy/x64dbg bridges, Frida dynamic instrumentation, native PE/ELF/Mach-O/DEX/.NET/Unity/UE/IL2CPP parsers, YARA, FLIRT-light signatures, native x86-64 + ARM64 emulators, agent-mesh (multi-model chat), MCP hub (smart decompile fail-over), content-addressable decompile cache. Prefer the `smart_*` composite tools when uncertain which backend to use. Use `cache_stats` + `chunk_fetch` for large results.",
 });
+
+// Wrap server.tool so every registered handler feeds the observability
+// counters + latency histogram. Previously only HTTP-middleware wrote to
+// metrics; /dashboard's "top tools" and the Prometheus
+// mcp_tool_calls_total series were empty by construction. This runs ONCE
+// before any registerXxx() so all 200+ handlers get instrumented at once.
+{
+  // The SDK's method signature is overloaded; the two shapes we actually
+  // hit from this file are (name, description, schema, handler) and
+  // (name, description, handler) with no schema. We just need the last
+  // argument when it's a function.
+  const origTool = server.tool.bind(server);
+  (server as unknown as { tool: (...a: unknown[]) => unknown }).tool = (...args: unknown[]) => {
+    const i = args.findIndex(a => typeof a === "function");
+    if (i >= 0) {
+      const name = String(args[0] ?? "unknown");
+      const orig = args[i] as (...xs: unknown[]) => unknown;
+      args[i] = async (...xs: unknown[]) => {
+        const t0 = performance.now();
+        let ok = true;
+        try { return await orig(...xs); }
+        catch (e) { ok = false; throw e; }
+        finally {
+          metrics.toolCall(name, performance.now() - t0, { ok });
+        }
+      };
+    }
+    return (origTool as (...a: unknown[]) => unknown)(...args);
+  };
+}
 
 // ============================================================
 // MCP RESOURCES
@@ -2020,7 +2050,10 @@ async function main() {
         res.end(JSON.stringify({ status: "ok", pid: process.pid, uptime: process.uptime(), version: PKG_VERSION, auth: authRequired ? "on" : "off" }));
         return;
       }
-      // /metrics: Prometheus-style — gated when auth is on
+      // /metrics: Prometheus-style — gated when auth is on. Combines
+      // the process gauges (RSS / heap / uptime / active_transports)
+      // with the per-tool counters + latency histograms + bridge_up
+      // gauges that live in src/observability.ts.
       if (req.method === "GET" && pathname === "/metrics") {
         if (!checkAuth(req)) {
           res.writeHead(401, { "content-type": "text/plain; charset=utf-8", "www-authenticate": "Bearer" });
@@ -2028,24 +2061,25 @@ async function main() {
           return;
         }
         const mu = process.memoryUsage();
-        const metrics = [
+        const processLines = [
           `# HELP mcp_gamehacking_rss_bytes Process RSS`,
           `# TYPE mcp_gamehacking_rss_bytes gauge`,
           `mcp_gamehacking_rss_bytes ${mu.rss}`,
           `# HELP mcp_gamehacking_heap_used_bytes V8 heap used`,
           `# TYPE mcp_gamehacking_heap_used_bytes gauge`,
           `mcp_gamehacking_heap_used_bytes ${mu.heapUsed}`,
-          `# HELP mcp_gamehacking_uptime_seconds Process uptime`,
-          `# TYPE mcp_gamehacking_uptime_seconds counter`,
-          `mcp_gamehacking_uptime_seconds ${process.uptime().toFixed(3)}`,
           `# HELP mcp_gamehacking_active_transports Active HTTP MCP sessions`,
           `# TYPE mcp_gamehacking_active_transports gauge`,
           `mcp_gamehacking_active_transports ${transports.size}`,
         ].join("\n") + "\n";
         res.writeHead(200, { "content-type": "text/plain; version=0.0.4" });
-        res.end(metrics);
+        res.end(processLines + renderPrometheus());
         return;
       }
+      // /dashboard + /_dashboard.json: handled by the observability
+      // module. Returns true when it answered so we can bail; false
+      // means the request wasn't for one of its routes.
+      if (observabilityHandler(req, res)) return;
       // MCP endpoint: use streamable HTTP transport. Gated when auth is on.
       // Uses the normalised `pathname` (strips query / fragment / trailing /)
       // so no `/mcp?x=` or `/mcp/` form can bypass the auth gate.
@@ -2081,7 +2115,6 @@ async function main() {
       res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
       res.end("not found. endpoints: /mcp, /healthz, /metrics");
     });
-    attachObservabilityRoutes(httpServer);
     httpServer.listen(port, host, () => {
       console.error(`[mcp-gamehacking] HTTP transport on http://${host}:${port}/mcp (health: /healthz, metrics: /metrics, dashboard: /dashboard)`);
     });
