@@ -21,6 +21,7 @@ import { z } from "zod";
 import { spawn } from "node:child_process";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requirePathAllowed } from "./fs-sandbox.js";
+import { openSession, sendCommand, closeSession, listSessions } from "./native-lldb-session.js";
 
 interface LldbOpts { timeoutMs?: number; maxBytes?: number }
 
@@ -135,4 +136,117 @@ export function registerNativeLldb(server: McpServer): void {
       return { content: [{ type: "text" as const, text: `# lldb_run_script ${path} (${commands.length} commands)\n\n\`\`\`\n${out.trim().slice(0, 100_000)}\n\`\`\`` }] };
     },
   );
+
+  // ---------- interactive debugging (persistent session) ------------
+
+  server.tool(
+    "lldb_session_open",
+    "Open a persistent lldb session. Supply either `attachPid` (debug a running process) or `launch` (path to spawn). Returns a session id for the follow-up tools.",
+    {
+      attachPid: z.number().int().min(1).max(1 << 24).optional(),
+      launch: z.string().optional(),
+      args: z.array(z.string()).default([]),
+    },
+    async ({ attachPid, launch, args }) => {
+      if (!attachPid && !launch) throw new Error("either attachPid or launch is required");
+      if (launch) requirePathAllowed(launch);
+      const id = await openSession({ attachPid, launch, args });
+      return { content: [{ type: "text" as const, text: `# lldb_session_open\n\n**session:** \`${id}\`\n\nAttached. Use lldb_session_cmd with session=${id}.` }] };
+    });
+
+  server.tool(
+    "lldb_session_cmd",
+    "Run a command in a live lldb session. Same safety gate as lldb_run_script (`script`/`shell` refused unless allowUnsafe=true).",
+    { session: z.string(), cmd: z.string(), timeoutMs: z.number().min(1000).max(600_000).default(30_000), allowUnsafe: z.boolean().default(false) },
+    async ({ session, cmd, timeoutMs, allowUnsafe }) => {
+      if (!allowUnsafe) assertSafe(cmd);
+      const out = await sendCommand(session, cmd, timeoutMs);
+      return { content: [{ type: "text" as const, text: `# lldb_session_cmd \`${cmd}\`\n\n\`\`\`\n${out.slice(0, 50_000)}\n\`\`\`` }] };
+    });
+
+  server.tool(
+    "lldb_breakpoint",
+    "Set a breakpoint by symbol name or address. `op=set` or `op=clear` (clear takes a bp id). Returns the breakpoint id lldb assigned.",
+    { session: z.string(), op: z.enum(["set", "clear", "list"]).default("set"), at: z.string().optional(), id: z.number().int().optional() },
+    async ({ session, op, at, id }) => {
+      let cmd: string;
+      if (op === "list") cmd = "breakpoint list";
+      else if (op === "clear") cmd = `breakpoint delete ${id ?? "--all"}`;
+      else {
+        if (!at) throw new Error("`at` required for set");
+        cmd = /^0x[0-9a-f]+$|^\d+$/i.test(at) ? `breakpoint set --address ${at}` : `breakpoint set --name ${JSON.stringify(at)}`;
+      }
+      const out = await sendCommand(session, cmd, 10_000);
+      return { content: [{ type: "text" as const, text: `# lldb_breakpoint ${op}${at ? " " + at : ""}\n\n\`\`\`\n${out}\n\`\`\`` }] };
+    });
+
+  server.tool(
+    "lldb_step",
+    "Step: into / over / out / instruction (single-step one asm insn).",
+    { session: z.string(), mode: z.enum(["into", "over", "out", "instruction"]).default("over") },
+    async ({ session, mode }) => {
+      const cmd = mode === "into" ? "thread step-in" : mode === "over" ? "thread step-over" : mode === "out" ? "thread step-out" : "thread step-inst";
+      const out = await sendCommand(session, cmd, 30_000);
+      return { content: [{ type: "text" as const, text: `# lldb_step ${mode}\n\n\`\`\`\n${out}\n\`\`\`` }] };
+    });
+
+  server.tool(
+    "lldb_continue",
+    "Resume execution until next breakpoint / signal / exit.",
+    { session: z.string(), timeoutMs: z.number().min(1000).max(600_000).default(120_000) },
+    async ({ session, timeoutMs }) => {
+      const out = await sendCommand(session, "process continue", timeoutMs);
+      return { content: [{ type: "text" as const, text: `# lldb_continue\n\n\`\`\`\n${out}\n\`\`\`` }] };
+    });
+
+  server.tool(
+    "lldb_registers",
+    "Dump CPU register state for the current thread.",
+    { session: z.string() },
+    async ({ session }) => {
+      const out = await sendCommand(session, "register read -a", 10_000);
+      return { content: [{ type: "text" as const, text: `# lldb_registers\n\n\`\`\`\n${out}\n\`\`\`` }] };
+    });
+
+  server.tool(
+    "lldb_memory",
+    "Read or write process memory. `op=read` returns hex+ascii; `op=write` takes `bytes` as space-separated hex.",
+    { session: z.string(), op: z.enum(["read", "write"]).default("read"), addr: z.string(), size: z.number().min(1).max(1 << 20).default(256), bytes: z.string().optional() },
+    async ({ session, op, addr, size, bytes }) => {
+      let cmd: string;
+      if (op === "read") cmd = `memory read --count ${size} --format x --size 1 ${addr}`;
+      else {
+        if (!bytes) throw new Error("bytes required for write");
+        cmd = `memory write ${addr} ${bytes}`;
+      }
+      const out = await sendCommand(session, cmd, 15_000);
+      return { content: [{ type: "text" as const, text: `# lldb_memory ${op} ${addr}\n\n\`\`\`\n${out}\n\`\`\`` }] };
+    });
+
+  server.tool(
+    "lldb_backtrace",
+    "Print the call stack of the stopped thread.",
+    { session: z.string(), limit: z.number().min(1).max(1024).default(32) },
+    async ({ session, limit }) => {
+      const out = await sendCommand(session, `thread backtrace --count ${limit}`, 10_000);
+      return { content: [{ type: "text" as const, text: `# lldb_backtrace\n\n\`\`\`\n${out}\n\`\`\`` }] };
+    });
+
+  server.tool(
+    "lldb_session_close",
+    "Quit an lldb session cleanly (detach + exit).",
+    { session: z.string() },
+    async ({ session }) => {
+      await closeSession(session);
+      return { content: [{ type: "text" as const, text: `# lldb_session_close\n\nclosed \`${session}\`` }] };
+    });
+
+  server.tool(
+    "lldb_sessions",
+    "List live lldb sessions with their id, alive bit, and queued-command depth.",
+    {},
+    async () => {
+      const list = listSessions();
+      return { content: [{ type: "text" as const, text: `# lldb_sessions\n\n${list.length ? list.map(s => `- \`${s.id}\`  alive=${s.alive}  queue=${s.queued}`).join("\n") : "(none)"}` }] };
+    });
 }

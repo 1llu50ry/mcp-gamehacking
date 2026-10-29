@@ -184,4 +184,115 @@ export function registerNativeR2(server: McpServer): void {
       return { content: [{ type: "text" as const, text: `# r2_cmd \`${cmd}\`\n\n${out.trim().slice(0, 100_000)}` }] };
     },
   );
+
+  server.tool(
+    "r2_libs",
+    "r2 ilj — libraries the binary links against (PE imports table level, ELF DT_NEEDED, Mach-O LC_LOAD_DYLIB).",
+    { path: z.string() },
+    async ({ path }: { path: string }) => {
+      requirePathAllowed(path);
+      const out = await r2Run("ilj", { binary: path });
+      return { content: [{ type: "text" as const, text: `# r2_libs ${path}\n\n\`\`\`json\n${out.trim()}\n\`\`\`` }] };
+    });
+
+  server.tool(
+    "r2_syms",
+    "r2 isj — full symbol table (exports, defined, undefined). PE exports / ELF .dynsym+.symtab / Mach-O stabs.",
+    { path: z.string(), limit: z.number().min(1).max(100_000).default(2000) },
+    async ({ path, limit }: { path: string; limit: number }) => {
+      requirePathAllowed(path);
+      const out = await r2Run(`isj~{[0:${limit}]}`, { binary: path });
+      return { content: [{ type: "text" as const, text: `# r2_syms ${path}\n\n\`\`\`json\n${out.trim()}\n\`\`\`` }] };
+    });
+
+  server.tool(
+    "r2_classes",
+    "r2 icj — C++ / Obj-C / Swift / Java classes with RTTI. Use after r2_functions so analysis is primed.",
+    { path: z.string() },
+    async ({ path }: { path: string }) => {
+      requirePathAllowed(path);
+      const [, cls] = await r2Bulk(path, ["aaa", "icj"], { timeoutMs: 180_000 });
+      return { content: [{ type: "text" as const, text: `# r2_classes ${path}\n\n\`\`\`json\n${cls?.trim()}\n\`\`\`` }] };
+    });
+
+  server.tool(
+    "r2_relocs",
+    "r2 irj — relocations table. Reads PE .reloc or ELF SHT_REL/SHT_RELA.",
+    { path: z.string(), limit: z.number().min(1).max(100_000).default(1000) },
+    async ({ path, limit }: { path: string; limit: number }) => {
+      requirePathAllowed(path);
+      const out = await r2Run(`irj~{[0:${limit}]}`, { binary: path });
+      return { content: [{ type: "text" as const, text: `# r2_relocs ${path}\n\n\`\`\`json\n${out.trim()}\n\`\`\`` }] };
+    });
+
+  server.tool(
+    "r2_entropy_sections",
+    "r2 p=e — per-section Shannon entropy (packed sections have entropy > 7.0; UPX/VMP tells here).",
+    { path: z.string() },
+    async ({ path }: { path: string }) => {
+      requirePathAllowed(path);
+      const out = await r2Run("p=e", { binary: path });
+      return { content: [{ type: "text" as const, text: `# r2_entropy_sections ${path}\n\n\`\`\`\n${out.trim()}\n\`\`\`` }] };
+    });
+
+  server.tool(
+    "r2_crypto_signatures",
+    "r2 /c — scan for crypto constants (SHA-1 / MD5 / AES SBOX / RC4 init / CRC32 tables).",
+    { path: z.string() },
+    async ({ path }: { path: string }) => {
+      requirePathAllowed(path);
+      const out = await r2Run("/c", { binary: path });
+      return { content: [{ type: "text" as const, text: `# r2_crypto_signatures ${path}\n\n\`\`\`\n${out.trim() || "(no matches)"}\n\`\`\`` }] };
+    });
+
+  server.tool(
+    "r2_search_pattern",
+    "r2 /x — byte-pattern AoB search. Supports hex with `.` wildcards and masks via /c /i /e variants.",
+    { path: z.string(), pattern: z.string(), mode: z.enum(["bytes", "ci-string", "regex"]).default("bytes") },
+    async ({ path, pattern, mode }: { path: string; pattern: string; mode: "bytes" | "ci-string" | "regex" }) => {
+      requirePathAllowed(path);
+      const cmd = mode === "bytes" ? `/xj ${pattern}` : mode === "regex" ? `/ej ${pattern}` : `/ij ${pattern}`;
+      const out = await r2Run(cmd, { binary: path });
+      return { content: [{ type: "text" as const, text: `# r2_search_pattern ${path} /${pattern}/\n\n\`\`\`json\n${out.trim() || "[]"}\n\`\`\`` }] };
+    });
+
+  server.tool(
+    "r2_graph_fn",
+    "r2 agfd — DOT-format control-flow graph for a function (feed into viz_cfg or Graphviz).",
+    { path: z.string(), addr: z.string() },
+    async ({ path, addr }: { path: string; addr: string }) => {
+      requirePathAllowed(path);
+      const [, dot] = await r2Bulk(path, ["aaa", `agfd @ ${addr}`], { timeoutMs: 180_000 });
+      return { content: [{ type: "text" as const, text: `# r2_graph_fn ${path} @ ${addr}\n\n\`\`\`dot\n${dot?.trim() || "(empty)"}\n\`\`\`` }] };
+    });
+
+  server.tool(
+    "r2_hooks",
+    "r2 /ad — scan for indirect jmp/call sites (candidate hooking locations for Detours/MinHook/Frida).",
+    { path: z.string(), limit: z.number().min(1).max(10_000).default(200) },
+    async ({ path, limit }: { path: string; limit: number }) => {
+      requirePathAllowed(path);
+      const [, scan] = await r2Bulk(path, ["aa", `/ad call reg; /ad jmp reg`], { timeoutMs: 90_000 });
+      const lines = (scan ?? "").split(/\r?\n/).filter(Boolean).slice(0, limit);
+      return { content: [{ type: "text" as const, text: `# r2_hooks ${path}\n\n${lines.map(l => `- \`${l}\``).join("\n") || "(none)"}` }] };
+    });
+
+  server.tool(
+    "r2_asm",
+    "r2 pa — assemble one or more instructions for the detected arch (needs no sample; pass `arch`+`bits` if standalone).",
+    { code: z.string(), arch: z.string().default("x86"), bits: z.number().min(8).max(64).default(64) },
+    async ({ code, arch, bits }) => {
+      const out = await r2Run(`e asm.arch=${arch}; e asm.bits=${bits}; pa ${code}`);
+      return { content: [{ type: "text" as const, text: `# r2_asm ${arch} ${bits}\n\n\`\`\`\n${out.trim()}\n\`\`\`` }] };
+    });
+
+  server.tool(
+    "r2_memdump",
+    "r2 px <size> @ <addr> — hex dump of file bytes at an offset.",
+    { path: z.string(), addr: z.string(), size: z.number().min(16).max(1 << 20).default(256) },
+    async ({ path, addr, size }: { path: string; addr: string; size: number }) => {
+      requirePathAllowed(path);
+      const out = await r2Run(`px ${size} @ ${addr}`, { binary: path });
+      return { content: [{ type: "text" as const, text: `# r2_memdump ${path} @ ${addr}\n\n\`\`\`\n${out.trim().slice(0, 50_000)}\n\`\`\`` }] };
+    });
 }
