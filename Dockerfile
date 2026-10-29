@@ -1,9 +1,10 @@
 # syntax=docker/dockerfile:1.7
 
 # ---- stage 1: build -----------------------------------------
-# Pin to Node 22 LTS; the server declares engines >=20.0.0 but we
-# publish on the same major as the test matrix.
-FROM node:22-bookworm-slim AS build
+# Pin to Node 24 LTS: that's the floor for stable node:sqlite
+# (the DB backing of this project). Node 22 can run with
+# --experimental-sqlite but the extra flag isn't worth the risk.
+FROM node:24-bookworm-slim AS build
 
 WORKDIR /src
 
@@ -23,7 +24,7 @@ RUN npx tsc
 # -slim gets us a Debian base with glibc; needed because Frida and
 # some plugin tooling expect dynamic linker/libstdc++ at runtime,
 # which Alpine would make awkward. Still only ~75 MiB base.
-FROM node:22-bookworm-slim AS runtime
+FROM node:24-bookworm-slim AS runtime
 
 # dumb-init turns Node into a well-behaved PID 1 inside the
 # container — correct SIGTERM/SIGINT handling so `docker stop`

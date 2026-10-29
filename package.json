@@ -53,7 +53,7 @@
     "url": "https://github.com/1llu50ry/mcp-gamehacking/issues"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=24.0.0"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1"

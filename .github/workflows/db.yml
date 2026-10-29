@@ -26,7 +26,7 @@ jobs:
       - uses: actions/checkout@v4
         with: { lfs: false }
       - uses: actions/setup-node@v4
-        with: { node-version: '22' }
+        with: { node-version: '24' }
       - run: npm ci || npm install
       - run: npx tsc
       - name: open DB + check schema + counts + FTS integrity
@@ -76,10 +76,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '22' }
+        with: { node-version: '24' }
       - run: npm ci || npm install
       - run: npx tsc
       - name: Rebuild with a tiny synthetic fixture
+        # The content trees are gitignored on main, so we materialise a
+        # single-skill fixture under a *runner-local* path, then build
+        # against it. Nothing from this step is committed back; it only
+        # proves the build-db -> SQLite -> FTS5 pipeline is wired right.
         run: |
           mkdir -p skills/smoke-fixture
           cat > skills/smoke-fixture/SKILL.md <<'EOF'
