@@ -4,9 +4,9 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { z } from "zod";
-import { readdir, readFile, stat } from "fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import { join, resolve } from "path";
-import { createReadStream } from "fs";
+import { createReadStream } from "node:fs";
 import { createInterface } from "readline";
 import { registerReTools } from "./retools.js";
 import { registerNativeReTools } from "./native-re.js";

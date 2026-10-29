@@ -18,7 +18,7 @@
 // ============================================================
 
 import { z } from "zod";
-import { readFile } from "fs/promises";
+import { readFile } from "node:fs/promises";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requirePathAllowed } from "./fs-sandbox.js";
 
