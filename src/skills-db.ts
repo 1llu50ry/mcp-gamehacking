@@ -79,6 +79,41 @@ export async function openDbIfPresent(path: string): Promise<DatabaseSync | null
   } catch { return null; }
 }
 
+// --- shared read-only handle ---
+// Opening a 18 MiB SQLite file + preparing statements + sanity probe
+// takes ~2-5 ms. The server previously paid that cost six times per
+// request because every tool handler called openDbIfPresent + close.
+// Node caches the dynamic import; this cache caches the DB handle,
+// so the second call forward returns the same handle in <1 µs.
+//
+// Safety: node:sqlite is reentrant from a single process; a readOnly
+// handle has no write locks so WAL / shared-cache concerns don't
+// apply here. The handle is intentionally never closed — the server
+// outlives every tool invocation, and the OS reclaims the fd on exit.
+// If a build-db step replaces the DB on disk, call resetSharedDb()
+// so the next call reopens from scratch.
+let _shared: { path: string; db: DatabaseSync } | "miss" | null = null;
+
+export async function getSharedDb(path: string): Promise<DatabaseSync | null> {
+  if (_shared === null) {
+    const db = await openDbIfPresent(path);
+    _shared = db ? { path, db } : "miss";
+  } else if (_shared !== "miss" && _shared.path !== path) {
+    // path changed (MCP_SKILLS_DB flipped at runtime): drop + reopen.
+    try { _shared.db.close(); } catch { /* ignore */ }
+    const db = await openDbIfPresent(path);
+    _shared = db ? { path, db } : "miss";
+  }
+  return _shared === "miss" ? null : _shared.db;
+}
+
+export function resetSharedDb(): void {
+  if (_shared && _shared !== "miss") {
+    try { _shared.db.close(); } catch { /* ignore */ }
+  }
+  _shared = null;
+}
+
 /** Fresh read-write DB with the schema applied. */
 export function createEmptyDb(path: string): DatabaseSync {
   const db = new DatabaseSync(path);

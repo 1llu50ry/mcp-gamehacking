@@ -102,35 +102,32 @@ async function buildIndex(): Promise<Map<string, SkillIndex>> {
   // the server opens it read-only and never writes back.
   const dbMod = await import("./skills-db.js").catch(() => null);
   if (dbMod) {
-    const dbPath = dbMod.defaultDbPath(ROOT);
-    const h = await dbMod.openDbIfPresent(dbPath);
+    const h = await dbMod.getSharedDb(dbMod.defaultDbPath(ROOT));
     if (h) {
       const idx = new Map<string, SkillIndex>();
-      try {
-        // Walk every skill row — a single SELECT reads them all. The hasSource
-        // bit is already materialised in the row (source_gz IS NOT NULL).
-        let offset = 0;
-        const PAGE = 5000;
-        while (true) {
-          const batch = dbMod.listSkills(h, PAGE, offset);
-          if (batch.length === 0) break;
-          for (const s of batch) {
-            const searchText = [
-              s.name, s.description ?? "", ...s.topics,
-            ].join(" ").toLowerCase();
-            idx.set(s.name, {
-              name: s.name,
-              description: s.description ?? "",
-              type: s.type ?? "unknown",
-              topics: s.topics,
-              hasSource: s.hasSource,
-              searchText,
-            });
-          }
-          offset += batch.length;
-          if (batch.length < PAGE) break;
+      // Walk every skill row — a single SELECT reads them all. The hasSource
+      // bit is already materialised in the row (source_gz IS NOT NULL).
+      let offset = 0;
+      const PAGE = 5000;
+      while (true) {
+        const batch = dbMod.listSkills(h, PAGE, offset);
+        if (batch.length === 0) break;
+        for (const s of batch) {
+          const searchText = [
+            s.name, s.description ?? "", ...s.topics,
+          ].join(" ").toLowerCase();
+          idx.set(s.name, {
+            name: s.name,
+            description: s.description ?? "",
+            type: s.type ?? "unknown",
+            topics: s.topics,
+            hasSource: s.hasSource,
+            searchText,
+          });
         }
-      } finally { h.close(); }
+        offset += batch.length;
+        if (batch.length < PAGE) break;
+      }
       return idx;
     }
   }
@@ -255,17 +252,15 @@ async function safeRead(path: string): Promise<string | null> {
     if (m) {
       try {
         const dbMod = await import("./skills-db.js");
-        const h = await dbMod.openDbIfPresent(dbMod.defaultDbPath(ROOT));
+        const h = await dbMod.getSharedDb(dbMod.defaultDbPath(ROOT));
         if (h) {
-          try {
-            if (m[2] === "SKILL.md") {
-              const row = dbMod.getSkill(h, m[1]);
-              if (row) return `---\nname: ${row.name}\ndescription: "${(row.description ?? "").replace(/"/g, '\\"')}"\nmetadata:\n  type: ${row.type ?? "reference"}\n---\n\n${row.body}`;
-            } else {
-              const text = dbMod.getSkillSource(h, m[1]);
-              if (text) return text;
-            }
-          } finally { h.close(); }
+          if (m[2] === "SKILL.md") {
+            const row = dbMod.getSkill(h, m[1]);
+            if (row) return `---\nname: ${row.name}\ndescription: "${(row.description ?? "").replace(/"/g, '\\"')}"\nmetadata:\n  type: ${row.type ?? "reference"}\n---\n\n${row.body}`;
+          } else {
+            const text = dbMod.getSkillSource(h, m[1]);
+            if (text) return text;
+          }
         }
       } catch { /* missing deps or sql error — give up quietly */ }
     }
@@ -327,39 +322,37 @@ async function listMdFromDb(dir: string): Promise<CategorizedFile[] | null> {
   if (!table) return null;
   try {
     const dbMod = await import("./skills-db.js");
-    const h = await dbMod.openDbIfPresent(dbMod.defaultDbPath(ROOT));
+    const h = await dbMod.getSharedDb(dbMod.defaultDbPath(ROOT));
     if (!h) return null;
-    try {
-      if (table === "plugins") {
-        const rows = dbMod.listPlugins(h);
-        const out: CategorizedFile[] = [];
-        for (const r of rows) {
-          const body = dbMod.getPlugin(h, r.category, r.name);
-          if (!body) continue;
-          out.push({ ...parseFrontmatter(body.body), category: r.category });
-        }
-        return out;
-      }
-      if (table === "prompts") {
-        const rows = dbMod.listPrompts(h);
-        const out: CategorizedFile[] = [];
-        for (const r of rows) {
-          const body = dbMod.getPromptBody(h, r.category, r.name);
-          if (!body) continue;
-          out.push({ ...parseFrontmatter(body), category: r.category });
-        }
-        return out;
-      }
-      // agents / subagents (no category)
-      const names = dbMod.listAgents(h, table);
+    if (table === "plugins") {
+      const rows = dbMod.listPlugins(h);
       const out: CategorizedFile[] = [];
-      for (const n of names) {
-        const body = dbMod.getAgentBody(h, table, n);
+      for (const r of rows) {
+        const body = dbMod.getPlugin(h, r.category, r.name);
         if (!body) continue;
-        out.push({ ...parseFrontmatter(body) });
+        out.push({ ...parseFrontmatter(body.body), category: r.category });
       }
       return out;
-    } finally { h.close(); }
+    }
+    if (table === "prompts") {
+      const rows = dbMod.listPrompts(h);
+      const out: CategorizedFile[] = [];
+      for (const r of rows) {
+        const body = dbMod.getPromptBody(h, r.category, r.name);
+        if (!body) continue;
+        out.push({ ...parseFrontmatter(body), category: r.category });
+      }
+      return out;
+    }
+    // agents / subagents (no category)
+    const names = dbMod.listAgents(h, table);
+    const out: CategorizedFile[] = [];
+    for (const n of names) {
+      const body = dbMod.getAgentBody(h, table, n);
+      if (!body) continue;
+      out.push({ ...parseFrontmatter(body) });
+    }
+    return out;
   } catch { return null; }
 }
 
@@ -384,28 +377,28 @@ async function readBodyFromDb(dir: string, name: string): Promise<string | null>
   if (!table) return null;
   try {
     const dbMod = await import("./skills-db.js");
-    const h = await dbMod.openDbIfPresent(dbMod.defaultDbPath(ROOT));
+    const h = await dbMod.getSharedDb(dbMod.defaultDbPath(ROOT));
     if (!h) return null;
-    try {
-      if (table === "plugins") {
-        for (const row of dbMod.listPlugins(h)) {
-          if (row.name === name) {
-            const r = dbMod.getPlugin(h, row.category, row.name);
-            if (r) return r.body;
-          }
+    if (table === "plugins") {
+      // The plugins table is keyed by (category, name); scan via the
+      // name index to find the right (cat, name) pair.
+      for (const row of dbMod.listPlugins(h)) {
+        if (row.name === name) {
+          const r = dbMod.getPlugin(h, row.category, row.name);
+          if (r) return r.body;
         }
-        return null;
       }
-      if (table === "prompts") {
-        for (const row of dbMod.listPrompts(h)) {
-          if (row.name === name) {
-            return dbMod.getPromptBody(h, row.category, row.name);
-          }
+      return null;
+    }
+    if (table === "prompts") {
+      for (const row of dbMod.listPrompts(h)) {
+        if (row.name === name) {
+          return dbMod.getPromptBody(h, row.category, row.name);
         }
-        return null;
       }
-      return dbMod.getAgentBody(h, table, name);
-    } finally { h.close(); }
+      return null;
+    }
+    return dbMod.getAgentBody(h, table, name);
   } catch { return null; }
 }
 
@@ -1940,18 +1933,16 @@ server.tool(
   async ({ query, limit }: { query: string; limit: number }) => {
     try {
       const dbMod = await import("./skills-db.js");
-      const h = await dbMod.openDbIfPresent(dbMod.defaultDbPath(ROOT));
+      const h = await dbMod.getSharedDb(dbMod.defaultDbPath(ROOT));
       if (!h) return { content: [{ type: "text" as const, text: "# db_search\n\nNo db/skills.db present. Build it with `node scripts/build-db.mjs` or set MCP_SKILLS_DB." }] };
-      try {
-        const hits = dbMod.searchSkills(h, query, limit);
-        const text = [
-          `# db_search \`${query}\``,
-          `**hits:** ${hits.length}`,
-          ``,
-          ...hits.map(h => `- \`${h.name}\` — ${h.description ?? ""} _bm25=${h.rank.toFixed(2)}_\n  ${h.snippet.replace(/\s+/g, " ").trim()}`),
-        ].join("\n");
-        return { content: [{ type: "text" as const, text }] };
-      } finally { h.close(); }
+      const hits = dbMod.searchSkills(h, query, limit);
+      const text = [
+        `# db_search \`${query}\``,
+        `**hits:** ${hits.length}`,
+        ``,
+        ...hits.map(hit => `- \`${hit.name}\` — ${hit.description ?? ""} _bm25=${hit.rank.toFixed(2)}_\n  ${hit.snippet.replace(/\s+/g, " ").trim()}`),
+      ].join("\n");
+      return { content: [{ type: "text" as const, text }] };
     } catch (e) {
       return { content: [{ type: "text" as const, text: `db_search error: ${(e as Error).message}` }], isError: true as const };
     }
@@ -1966,15 +1957,13 @@ server.tool(
     try {
       const dbMod = await import("./skills-db.js");
       const p = dbMod.defaultDbPath(ROOT);
-      const h = await dbMod.openDbIfPresent(p);
+      const h = await dbMod.getSharedDb(p);
       if (!h) return { content: [{ type: "text" as const, text: `# db_stats\n\nNo DB at \`${p}\`. Build with: \`node scripts/build-db.mjs\`` }] };
-      try {
-        const s = dbMod.stats(h);
-        return { content: [{ type: "text" as const, text:
-          `# db_stats\n\n**path:** \`${p}\`\n\n` +
-          Object.entries(s).map(([k, v]) => `- ${k}: **${v}**`).join("\n")
-        }] };
-      } finally { h.close(); }
+      const s = dbMod.stats(h);
+      return { content: [{ type: "text" as const, text:
+        `# db_stats\n\n**path:** \`${p}\`\n\n` +
+        Object.entries(s).map(([k, v]) => `- ${k}: **${v}**`).join("\n")
+      }] };
     } catch (e) {
       return { content: [{ type: "text" as const, text: `db_stats error: ${(e as Error).message}` }], isError: true as const };
     }
