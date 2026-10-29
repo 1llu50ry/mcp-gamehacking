@@ -25,7 +25,7 @@
 // ============================================================
 
 import { z } from "zod";
-import { readFile, readdir, writeFile, mkdir } from "fs/promises";
+import { readFile, readdir, writeFile, mkdir } from "node:fs/promises";
 import { join } from "path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requirePathAllowed } from "./fs-sandbox.js";

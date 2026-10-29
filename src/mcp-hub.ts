@@ -61,7 +61,7 @@ export function registerMcpHub(server: McpServer): void {
     async ({ id, transport, cmd, args, env, url }: { id: string; transport: "stdio" | "http"; cmd?: string; args?: string[]; env?: Record<string, string>; url?: string }) => {
       if (connected.has(id)) return err(`already connected: ${id}`);
       try {
-        const client = new Client({ name: `mcp-gamehacking-hub`, version: "4.4.0" }, { capabilities: {} });
+        const client = new Client({ name: `mcp-reverse-hub`, version: "4.4.0" }, { capabilities: {} });
         let be: HubBackend = { id, kind: transport };
         if (transport === "stdio") {
           if (!cmd) return err("stdio transport requires `cmd`");

@@ -1,9 +1,10 @@
 # syntax=docker/dockerfile:1.7
 
 # ---- stage 1: build -----------------------------------------
-# Pin to Node 22 LTS; the server declares engines >=20.0.0 but we
-# publish on the same major as the test matrix.
-FROM node:22-bookworm-slim AS build
+# Pin to Node 24 LTS: that's the floor for stable node:sqlite
+# (the DB backing of this project). Node 22 can run with
+# --experimental-sqlite but the extra flag isn't worth the risk.
+FROM node:24-bookworm-slim AS build
 
 WORKDIR /src
 
@@ -23,7 +24,7 @@ RUN npx tsc
 # -slim gets us a Debian base with glibc; needed because Frida and
 # some plugin tooling expect dynamic linker/libstdc++ at runtime,
 # which Alpine would make awkward. Still only ~75 MiB base.
-FROM node:22-bookworm-slim AS runtime
+FROM node:24-bookworm-slim AS runtime
 
 # dumb-init turns Node into a well-behaved PID 1 inside the
 # container — correct SIGTERM/SIGINT handling so `docker stop`
@@ -40,17 +41,16 @@ COPY package.json package-lock.json* ./
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --omit=dev --no-audit --no-fund --ignore-scripts
 
-# Compiled JS + static assets. We ship the gzipped source archives
-# (skills/*/source.txt.gz) under skills/ — the server's safeRead
-# helper decompresses them on demand, so no unpack step at startup.
+# Compiled JS + static assets. All of the content library (skills,
+# plugins, agents, subagents, prompts) lives in a single SQLite file
+# under db/skills.db — the server opens it read-only on boot and
+# every list/search/read goes through FTS5 instead of walking
+# 10,000+ files. ~18 MiB vs the 19 GiB raw tree.
 COPY --from=build /src/dist ./dist
 COPY bin/        ./bin/
-COPY skills/     ./skills/
-COPY agents/     ./agents/
-COPY subagents/  ./subagents/
-COPY plugins/    ./plugins/
-COPY prompts/    ./prompts/
+COPY db/         ./db/
 COPY signatures/ ./signatures/
+COPY scripts/    ./scripts/
 
 # Drop to the non-root `node` user baked into the base image.
 # All of /app is owned by this user already (COPY --chown would

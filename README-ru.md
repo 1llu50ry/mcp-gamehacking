@@ -1,10 +1,14 @@
 <div align="center">
 
-# 🎮 mcp-gamehacking
+# 🎮 mcp-reverse
 
 ### MCP-сервер, превращающий Claude, Codex и Cursor в команду reverse-engineering.
 
-**111 MCP-инструментов · 59 RE/debug бэкендов · 4,200+ скиллов · multi-agent mesh · zero-dep парсеры**
+**180+ MCP-инструментов · 73 RE/debug бэкенда · 9 host-плагинов · 4,200+ скиллов · multi-agent mesh · x86-64 + ARM64 эмуляторы**
+
+[![version](https://img.shields.io/badge/version-5.0.0-blue)](CHANGELOG.md) [![tests](https://img.shields.io/badge/tests-91%2F91-success)](tests/) [![tools](https://img.shields.io/badge/MCP%20tools-180%2B-blue)](src/) [![skills](https://img.shields.io/badge/skills-4%2C200%2B-orange)](db/) [![docker](https://img.shields.io/badge/docker-multi--arch-informational)](Dockerfile) [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+> **v5.0.0 выпущен.** Вес репо: 19 GiB → 18 MiB (всё в SQLite + FTS5). Четыре волны фич: build-системы для host-плагинов, Frida bridge + динамический анализ, ARM64 эмулятор + кеш декомпиляции + chunking, bindiff / ROP / метадата игровых движков / MCP sampling / SVG visualization. [CHANGELOG](CHANGELOG.md).
 
 [Быстрый старт](#быстрый-старт) · [Архитектура](docs/architecture.md) · [Agent Mesh](docs/agent-mesh.md) · [MCP Hub](docs/mcp-hub.md) · [Этика](#этика)
 
@@ -28,19 +32,19 @@
 ## Быстрый старт
 
 ```bash
-git clone https://github.com/1llu50ry/mcp-gamehacking
-cd mcp-gamehacking
+git clone https://github.com/1llu50ry/mcp-reverse
+cd mcp-reverse
 npm install && npx tsc
 npm test            # 20/20 должны пройти
 
-./bin/mcp-gamehacking.mjs stats
-./bin/mcp-gamehacking.mjs search battleye
-./bin/mcp-gamehacking.mjs tools
+./bin/mcp-reverse.mjs stats
+./bin/mcp-reverse.mjs search battleye
+./bin/mcp-reverse.mjs tools
 ```
 
 Для Claude Code / Codex / Cursor добавь в MCP-конфиг:
 ```json
-{ "mcp-gamehacking": { "command": "node", "args": ["/path/to/dist/index.js"] } }
+{ "mcp-reverse": { "command": "node", "args": ["/path/to/dist/index.js"] } }
 ```
 
 Или через Docker:

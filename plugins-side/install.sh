@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# mcp-gamehacking :: plugins-side installer (Linux / macOS)
+# mcp-reverse :: plugins-side installer (Linux / macOS)
 # ---------------------------------------------------------
 # Auto-detects IDA Pro, Ghidra, Binary Ninja and installs the matching
 # Python bridge into each host's conventional plugins directory.

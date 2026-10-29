@@ -50,8 +50,8 @@
   </g>
 
   <!-- Project name -->
-  <text x="60" y="140" class="sans" font-size="54" font-weight="900" fill="#F0F6FC" letter-spacing="-1.5">mcp-gamehacking</text>
-  <text x="60" y="138" class="sans" font-size="54" font-weight="900" fill="none" stroke="url(#orange)" stroke-width="0.5" opacity="0.6" letter-spacing="-1.5">mcp-gamehacking</text>
+  <text x="60" y="140" class="sans" font-size="54" font-weight="900" fill="#F0F6FC" letter-spacing="-1.5">mcp-reverse</text>
+  <text x="60" y="138" class="sans" font-size="54" font-weight="900" fill="none" stroke="url(#orange)" stroke-width="0.5" opacity="0.6" letter-spacing="-1.5">mcp-reverse</text>
 
   <!-- Tagline (IDA Pro-style serif-mono mix) -->
   <text x="60" y="178" class="sans" font-size="20" font-weight="500" fill="#C9D1D9">
@@ -242,5 +242,5 @@
   <circle cx="24" cy="616" r="4" fill="#7CE38B"/>
   <text x="36" y="620" class="mono" font-size="11" fill="#C9D1D9">AU: idle</text>
   <text x="140" y="620" class="mono" font-size="11" fill="#8B9BAD">Down  Disk: 0  Idea! 111 tools · 59 backends · 4.2k skills</text>
-  <text x="1140" y="620" class="mono" font-size="11" fill="#F18808" text-anchor="end" font-weight="700">github.com/whory/mcp-gamehacking</text>
+  <text x="1140" y="620" class="mono" font-size="11" fill="#F18808" text-anchor="end" font-weight="700">github.com/whory/mcp-reverse</text>
 </svg>

@@ -34,7 +34,7 @@ metadata:
 EOF
 
 npm run build
-./bin/mcp-gamehacking.mjs search your-skill-name   # confirm it shows up
+./bin/mcp-reverse.mjs search your-skill-name   # confirm it shows up
 ```
 
 **Good-first-issue skills we want:**
@@ -92,8 +92,8 @@ Add it to the id union at the top of `src/retools.ts`.
 npm install
 npx tsc           # typecheck
 npm test          # 20+ node:test cases
-./bin/mcp-gamehacking.mjs stats
-./bin/mcp-gamehacking.mjs tools      # inventory
+./bin/mcp-reverse.mjs stats
+./bin/mcp-reverse.mjs tools      # inventory
 ```
 
 ## Code style

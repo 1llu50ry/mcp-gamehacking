@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: 💬 Discussions
-    url: https://github.com/1llu50ry/mcp-gamehacking/discussions
+    url: https://github.com/1llu50ry/mcp-reverse/discussions
     about: Ask a question, share a workflow, show-and-tell.
   - name: 🔐 Security advisory
-    url: https://github.com/1llu50ry/mcp-gamehacking/security/advisories/new
+    url: https://github.com/1llu50ry/mcp-reverse/security/advisories/new
     about: Report a vulnerability privately (see SECURITY.md).

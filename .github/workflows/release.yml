@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
       - run: npm ci || npm install
       - run: npx tsc
@@ -59,8 +59,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/mcp-gamehacking:${{ steps.ver.outputs.version }}
-            ghcr.io/${{ github.repository_owner }}/mcp-gamehacking:latest
+            ghcr.io/${{ github.repository_owner }}/mcp-reverse:${{ steps.ver.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/mcp-reverse:latest
 
   github-release:
     name: GitHub Release notes

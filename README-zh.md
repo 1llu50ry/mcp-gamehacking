@@ -1,10 +1,14 @@
 <div align="center">
 
-# 🎮 mcp-gamehacking
+# 🎮 mcp-reverse
 
 ### 让 Claude、Codex 和 Cursor 组队做逆向工程的 MCP 服务器。
 
-**111 个 MCP 工具 · 59 个 RE/调试后端 · 4,200+ 技能 · 多智能体协作网格 · 零依赖本地解析器**
+**180+ 个 MCP 工具 · 73 个 RE/调试后端 · 9 个宿主插件 · 4,200+ 技能 · 多智能体网格 · x86-64 + ARM64 原生模拟器**
+
+[![version](https://img.shields.io/badge/version-5.0.0-blue)](CHANGELOG.md) [![tests](https://img.shields.io/badge/tests-91%2F91-success)](tests/) [![tools](https://img.shields.io/badge/MCP%20tools-180%2B-blue)](src/) [![skills](https://img.shields.io/badge/skills-4%2C200%2B-orange)](db/) [![docker](https://img.shields.io/badge/docker-multi--arch-informational)](Dockerfile) [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+> **v5.0.0 已发布。** 仓库体积:19 GiB → 18 MiB(全部收进 SQLite + FTS5)。四波特性:宿主插件构建系统、Frida 桥接 + 动态分析、ARM64 模拟器 + 反编译缓存 + 分块、bindiff / ROP / 游戏引擎元数据 / MCP sampling / SVG 可视化。详见 [CHANGELOG](CHANGELOG.md)。
 
 [快速开始](#快速开始) · [架构](docs/architecture.md) · [Agent Mesh](docs/agent-mesh.md) · [MCP Hub](docs/mcp-hub.md) · [伦理](#伦理)
 
@@ -28,19 +32,19 @@
 ## 快速开始
 
 ```bash
-git clone https://github.com/1llu50ry/mcp-gamehacking
-cd mcp-gamehacking
+git clone https://github.com/1llu50ry/mcp-reverse
+cd mcp-reverse
 npm install && npx tsc
 npm test            # 20/20 全过
 
-./bin/mcp-gamehacking.mjs stats
-./bin/mcp-gamehacking.mjs search battleye
-./bin/mcp-gamehacking.mjs tools
+./bin/mcp-reverse.mjs stats
+./bin/mcp-reverse.mjs search battleye
+./bin/mcp-reverse.mjs tools
 ```
 
 在 Claude Code / Codex / Cursor 的 MCP 配置里加:
 ```json
-{ "mcp-gamehacking": { "command": "node", "args": ["/path/to/dist/index.js"] } }
+{ "mcp-reverse": { "command": "node", "args": ["/path/to/dist/index.js"] } }
 ```
 
 或者用 Docker:

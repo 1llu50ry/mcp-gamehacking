@@ -4,8 +4,8 @@ Rolling list of what we want to build next. Order is best-effort; priority follo
 
 ## v4.7 — polish & distribution
 
-- [ ] Publish `mcp-gamehacking` to npm (automated via tag `v*`).
-- [ ] Ship multi-arch Docker image to `ghcr.io/<org>/mcp-gamehacking:latest`.
+- [ ] Publish `mcp-reverse` to npm (automated via tag `v*`).
+- [ ] Ship multi-arch Docker image to `ghcr.io/<org>/mcp-reverse:latest`.
 - [ ] Awesome-list submissions: `awesome-mcp-servers`, `awesome-reverse-engineering`, `awesome-game-security`.
 - [ ] Dev.to launch post.
 - [ ] 3-minute YouTube demo of the agent-mesh orchestration.

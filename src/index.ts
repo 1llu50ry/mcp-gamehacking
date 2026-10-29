@@ -4,9 +4,9 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { z } from "zod";
-import { readdir, readFile, stat } from "fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import { join, resolve } from "path";
-import { createReadStream } from "fs";
+import { createReadStream } from "node:fs";
 import { createInterface } from "readline";
 import { registerReTools } from "./retools.js";
 import { registerNativeReTools } from "./native-re.js";
@@ -31,7 +31,7 @@ import { registerEmulator } from "./native-emulator.js";
 import { registerNativeDwarf } from "./native-dwarf.js";
 import { registerNativePdb } from "./native-pdb.js";
 import { registerSignatureDb } from "./signature-db.js";
-import { attachObservabilityRoutes, metrics } from "./observability.js";
+import { observabilityHandler, metrics, renderPrometheus } from "./observability.js";
 import { registerArm64 } from "./native-arm64.js";
 import { registerCacheTools, getCache } from "./decompile-cache.js";
 import { registerChunkTools } from "./chunking.js";
@@ -95,6 +95,44 @@ const INDEX_TTL = 120_000;
 const INDEX_CHUNK = 64;
 
 async function buildIndex(): Promise<Map<string, SkillIndex>> {
+  // DB-first path: if db/skills.db (or MCP_SKILLS_DB) is present, pull the
+  // index from SQLite in one shot. 10,000+ skills get listed in <50 ms
+  // instead of walking the filesystem and reading every SKILL.md. The DB
+  // writer (scripts/build-db.mjs) is responsible for keeping it current;
+  // the server opens it read-only and never writes back.
+  const dbMod = await import("./skills-db.js").catch(() => null);
+  if (dbMod) {
+    const h = await dbMod.getSharedDb(dbMod.defaultDbPath(ROOT));
+    if (h) {
+      const idx = new Map<string, SkillIndex>();
+      // Walk every skill row — a single SELECT reads them all. The hasSource
+      // bit is already materialised in the row (source_gz IS NOT NULL).
+      let offset = 0;
+      const PAGE = 5000;
+      while (true) {
+        const batch = dbMod.listSkills(h, PAGE, offset);
+        if (batch.length === 0) break;
+        for (const s of batch) {
+          const searchText = [
+            s.name, s.description ?? "", ...s.topics,
+          ].join(" ").toLowerCase();
+          idx.set(s.name, {
+            name: s.name,
+            description: s.description ?? "",
+            type: s.type ?? "unknown",
+            topics: s.topics,
+            hasSource: s.hasSource,
+            searchText,
+          });
+        }
+        offset += batch.length;
+        if (batch.length < PAGE) break;
+      }
+      return idx;
+    }
+  }
+
+  // Filesystem fallback — same behaviour as before the DB existed.
   const entries = await readdir(DIRS.skills, { withFileTypes: true });
   const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
   const idx = new Map<string, SkillIndex>();
@@ -200,18 +238,33 @@ async function safeRead(path: string): Promise<string | null> {
   try {
     return await readFile(path, "utf-8");
   } catch {
-    // Transparent fallback: if `path` is missing but `path.gz` is next
-    // to it on disk, decompress and return. This keeps every tool that
-    // was coded against the uncompressed layout working after we
-    // gzipped the big source.txt files to shrink the repo from 18 GiB
-    // to ~3 GiB. gunzip is in node's zlib — no external deps.
+    // Fallback 1: `path.gz` next to the missing file — gunzip on the fly.
     try {
       const { gunzipSync } = await import("node:zlib");
       const buf = await readFile(path + ".gz");
       return gunzipSync(buf).toString("utf-8");
-    } catch {
-      return null;
+    } catch { /* continue to fallback 2 */ }
+    // Fallback 2: content is in the SQLite DB. We only hit this path for
+    // the two files we actually store there — skills/<name>/SKILL.md and
+    // skills/<name>/source.txt — so a cheap substring check keeps the
+    // happy path fast when the DB is absent.
+    const m = /[\\/]skills[\\/]([^\\/]+)[\\/](SKILL\.md|source\.txt)$/.exec(path);
+    if (m) {
+      try {
+        const dbMod = await import("./skills-db.js");
+        const h = await dbMod.getSharedDb(dbMod.defaultDbPath(ROOT));
+        if (h) {
+          if (m[2] === "SKILL.md") {
+            const row = dbMod.getSkill(h, m[1]);
+            if (row) return `---\nname: ${row.name}\ndescription: "${(row.description ?? "").replace(/"/g, '\\"')}"\nmetadata:\n  type: ${row.type ?? "reference"}\n---\n\n${row.body}`;
+          } else {
+            const text = dbMod.getSkillSource(h, m[1]);
+            if (text) return text;
+          }
+        }
+      } catch { /* missing deps or sql error — give up quietly */ }
     }
+    return null;
   }
 }
 
@@ -224,6 +277,19 @@ async function fileExists(path: string): Promise<boolean> {
     // `path.gz` is next to it on disk.
     try { await stat(path + ".gz"); return true; } catch { return false; }
   }
+}
+
+/**
+ * Map a project directory to the SQLite table name. Returns null for
+ * directories we don't mirror in the DB (notably `skills` — that one
+ * has its own SKILL.md round-trip path through safeRead already).
+ */
+function dirToTable(dir: string): "plugins" | "agents" | "subagents" | "prompts" | null {
+  if (dir === DIRS.plugins)   return "plugins";
+  if (dir === DIRS.agents)    return "agents";
+  if (dir === DIRS.subagents) return "subagents";
+  if (dir === DIRS.prompts)   return "prompts";
+  return null;
 }
 
 async function listMdFiles(dir: string, category?: string): Promise<CategorizedFile[]> {
@@ -242,10 +308,52 @@ async function listMdFiles(dir: string, category?: string): Promise<CategorizedF
         }
       }
     }
-    return results;
+    if (results.length > 0) return results;
+    // Fall through to DB when the directory walk produced nothing.
+    return (await listMdFromDb(dir)) ?? results;
   } catch {
-    return [];
+    // The directory doesn't exist at all — ask the DB directly.
+    return (await listMdFromDb(dir)) ?? [];
   }
+}
+
+async function listMdFromDb(dir: string): Promise<CategorizedFile[] | null> {
+  const table = dirToTable(dir);
+  if (!table) return null;
+  try {
+    const dbMod = await import("./skills-db.js");
+    const h = await dbMod.getSharedDb(dbMod.defaultDbPath(ROOT));
+    if (!h) return null;
+    if (table === "plugins") {
+      const rows = dbMod.listPlugins(h);
+      const out: CategorizedFile[] = [];
+      for (const r of rows) {
+        const body = dbMod.getPlugin(h, r.category, r.name);
+        if (!body) continue;
+        out.push({ ...parseFrontmatter(body.body), category: r.category });
+      }
+      return out;
+    }
+    if (table === "prompts") {
+      const rows = dbMod.listPrompts(h);
+      const out: CategorizedFile[] = [];
+      for (const r of rows) {
+        const body = dbMod.getPromptBody(h, r.category, r.name);
+        if (!body) continue;
+        out.push({ ...parseFrontmatter(body), category: r.category });
+      }
+      return out;
+    }
+    // agents / subagents (no category)
+    const names = dbMod.listAgents(h, table);
+    const out: CategorizedFile[] = [];
+    for (const n of names) {
+      const body = dbMod.getAgentBody(h, table, n);
+      if (!body) continue;
+      out.push({ ...parseFrontmatter(body) });
+    }
+    return out;
+  } catch { return null; }
 }
 
 async function findMdByName(dir: string, name: string): Promise<string | null> {
@@ -263,11 +371,48 @@ async function findMdByName(dir: string, name: string): Promise<string | null> {
   return null;
 }
 
+/** DB-side alternative: returns the body text directly if present. */
+async function readBodyFromDb(dir: string, name: string): Promise<string | null> {
+  const table = dirToTable(dir);
+  if (!table) return null;
+  try {
+    const dbMod = await import("./skills-db.js");
+    const h = await dbMod.getSharedDb(dbMod.defaultDbPath(ROOT));
+    if (!h) return null;
+    if (table === "plugins") {
+      // The plugins table is keyed by (category, name); scan via the
+      // name index to find the right (cat, name) pair.
+      for (const row of dbMod.listPlugins(h)) {
+        if (row.name === name) {
+          const r = dbMod.getPlugin(h, row.category, row.name);
+          if (r) return r.body;
+        }
+      }
+      return null;
+    }
+    if (table === "prompts") {
+      for (const row of dbMod.listPrompts(h)) {
+        if (row.name === name) {
+          return dbMod.getPromptBody(h, row.category, row.name);
+        }
+      }
+      return null;
+    }
+    return dbMod.getAgentBody(h, table, name);
+  } catch { return null; }
+}
+
 async function readMdByName(dir: string, name: string): Promise<ParsedFile | null> {
   const path = await findMdByName(dir, name);
-  if (!path) return null;
-  const content = await safeRead(path);
-  return content ? parseFrontmatter(content) : null;
+  if (path) {
+    const content = await safeRead(path);
+    if (content) return parseFrontmatter(content);
+  }
+  // DB fallback — for when the plugins/agents/etc. tree has been
+  // reaped and only db/skills.db remains.
+  const body = await readBodyFromDb(dir, name);
+  if (!body) return null;
+  return parseFrontmatter(body);
 }
 
 async function readSkill(name: string): Promise<ParsedFile | null> {
@@ -414,9 +559,9 @@ const PKG_VERSION = JSON.parse(
 ).version as string;
 
 const server = new McpServer({
-  name: "mcp-gamehacking",
+  name: "mcp-reverse",
   version: PKG_VERSION,
-  title: "mcp-gamehacking: reverse-engineering mega-brain",
+  title: "mcp-reverse: reverse-engineering mega-brain",
 }, {
   // Capabilities we actively support. The MCP SDK derives these from
   // registered primitives too, but declaring them explicitly makes the
@@ -432,8 +577,38 @@ const server = new McpServer({
     logging:   {},
   },
   instructions:
-    "mcp-gamehacking exposes 180+ tools for binary RE: Ghidra/IDA/Binja/CE/ReClass/dnSpy/x64dbg bridges, Frida dynamic instrumentation, native PE/ELF/Mach-O/DEX/.NET/Unity/UE/IL2CPP parsers, YARA, FLIRT-light signatures, native x86-64 + ARM64 emulators, agent-mesh (multi-model chat), MCP hub (smart decompile fail-over), content-addressable decompile cache. Prefer the `smart_*` composite tools when uncertain which backend to use. Use `cache_stats` + `chunk_fetch` for large results.",
+    "mcp-reverse exposes 180+ tools for binary RE: Ghidra/IDA/Binja/CE/ReClass/dnSpy/x64dbg bridges, Frida dynamic instrumentation, native PE/ELF/Mach-O/DEX/.NET/Unity/UE/IL2CPP parsers, YARA, FLIRT-light signatures, native x86-64 + ARM64 emulators, agent-mesh (multi-model chat), MCP hub (smart decompile fail-over), content-addressable decompile cache. Prefer the `smart_*` composite tools when uncertain which backend to use. Use `cache_stats` + `chunk_fetch` for large results.",
 });
+
+// Wrap server.tool so every registered handler feeds the observability
+// counters + latency histogram. Previously only HTTP-middleware wrote to
+// metrics; /dashboard's "top tools" and the Prometheus
+// mcp_tool_calls_total series were empty by construction. This runs ONCE
+// before any registerXxx() so all 200+ handlers get instrumented at once.
+{
+  // The SDK's method signature is overloaded; the two shapes we actually
+  // hit from this file are (name, description, schema, handler) and
+  // (name, description, handler) with no schema. We just need the last
+  // argument when it's a function.
+  const origTool = server.tool.bind(server);
+  (server as unknown as { tool: (...a: unknown[]) => unknown }).tool = (...args: unknown[]) => {
+    const i = args.findIndex(a => typeof a === "function");
+    if (i >= 0) {
+      const name = String(args[0] ?? "unknown");
+      const orig = args[i] as (...xs: unknown[]) => unknown;
+      args[i] = async (...xs: unknown[]) => {
+        const t0 = performance.now();
+        let ok = true;
+        try { return await orig(...xs); }
+        catch (e) { ok = false; throw e; }
+        finally {
+          metrics.toolCall(name, performance.now() - t0, { ok });
+        }
+      };
+    }
+    return (origTool as (...a: unknown[]) => unknown)(...args);
+  };
+}
 
 // ============================================================
 // MCP RESOURCES
@@ -1274,7 +1449,7 @@ server.tool(
     const sorted = [...allOffsets.values()].sort((a, b) => b.contexts.length - a.contexts.length);
 
     let header = `// ${game.toUpperCase()} offsets -- aggregated from ${gameProjects.length} projects\n`;
-    header += `// Generated by mcp-gamehacking\n`;
+    header += `// Generated by mcp-reverse\n`;
     header += `// Offsets found in multiple projects are more likely current\n\n`;
     header += `#pragma once\n\nnamespace ${game.replace(/[^a-zA-Z0-9]/g, "_")}_offsets {\n\n`;
 
@@ -1777,6 +1952,54 @@ registerGameEngine(server);
 registerSampling(server);
 registerViz(server);
 
+// SQLite-backed skills store: ships a single db/skills.db alongside
+// dist/, replacing the 19 GiB on-disk tree with a ~20 MiB queryable
+// file. `db_search` is FTS5 (bm25 ranking) over every skill name +
+// description + body in one indexed sweep.
+server.tool(
+  "db_search",
+  "Full-text search over the SQLite skills DB (FTS5 + bm25). Returns up to `limit` hits ranked by relevance. Falls back to the legacy filesystem index when db/skills.db is absent.",
+  { query: z.string().min(1), limit: z.number().min(1).max(200).default(20) },
+  async ({ query, limit }: { query: string; limit: number }) => {
+    try {
+      const dbMod = await import("./skills-db.js");
+      const h = await dbMod.getSharedDb(dbMod.defaultDbPath(ROOT));
+      if (!h) return { content: [{ type: "text" as const, text: "# db_search\n\nNo db/skills.db present. Build it with `node scripts/build-db.mjs` or set MCP_SKILLS_DB." }] };
+      const hits = dbMod.searchSkills(h, query, limit);
+      const text = [
+        `# db_search \`${query}\``,
+        `**hits:** ${hits.length}`,
+        ``,
+        ...hits.map(hit => `- \`${hit.name}\` — ${hit.description ?? ""} _bm25=${hit.rank.toFixed(2)}_\n  ${hit.snippet.replace(/\s+/g, " ").trim()}`),
+      ].join("\n");
+      return { content: [{ type: "text" as const, text }] };
+    } catch (e) {
+      return { content: [{ type: "text" as const, text: `db_search error: ${(e as Error).message}` }], isError: true as const };
+    }
+  },
+);
+
+server.tool(
+  "db_stats",
+  "Show the SQLite skills DB counts, build timestamp, and whether source blobs are embedded.",
+  {},
+  async () => {
+    try {
+      const dbMod = await import("./skills-db.js");
+      const p = dbMod.defaultDbPath(ROOT);
+      const h = await dbMod.getSharedDb(p);
+      if (!h) return { content: [{ type: "text" as const, text: `# db_stats\n\nNo DB at \`${p}\`. Build with: \`node scripts/build-db.mjs\`` }] };
+      const s = dbMod.stats(h);
+      return { content: [{ type: "text" as const, text:
+        `# db_stats\n\n**path:** \`${p}\`\n\n` +
+        Object.entries(s).map(([k, v]) => `- ${k}: **${v}**`).join("\n")
+      }] };
+    } catch (e) {
+      return { content: [{ type: "text" as const, text: `db_stats error: ${(e as Error).message}` }], isError: true as const };
+    }
+  },
+);
+
 // ============================================================
 // MAIN
 // ============================================================
@@ -1827,7 +2050,10 @@ async function main() {
         res.end(JSON.stringify({ status: "ok", pid: process.pid, uptime: process.uptime(), version: PKG_VERSION, auth: authRequired ? "on" : "off" }));
         return;
       }
-      // /metrics: Prometheus-style — gated when auth is on
+      // /metrics: Prometheus-style — gated when auth is on. Combines
+      // the process gauges (RSS / heap / uptime / active_transports)
+      // with the per-tool counters + latency histograms + bridge_up
+      // gauges that live in src/observability.ts.
       if (req.method === "GET" && pathname === "/metrics") {
         if (!checkAuth(req)) {
           res.writeHead(401, { "content-type": "text/plain; charset=utf-8", "www-authenticate": "Bearer" });
@@ -1835,24 +2061,25 @@ async function main() {
           return;
         }
         const mu = process.memoryUsage();
-        const metrics = [
+        const processLines = [
           `# HELP mcp_gamehacking_rss_bytes Process RSS`,
           `# TYPE mcp_gamehacking_rss_bytes gauge`,
           `mcp_gamehacking_rss_bytes ${mu.rss}`,
           `# HELP mcp_gamehacking_heap_used_bytes V8 heap used`,
           `# TYPE mcp_gamehacking_heap_used_bytes gauge`,
           `mcp_gamehacking_heap_used_bytes ${mu.heapUsed}`,
-          `# HELP mcp_gamehacking_uptime_seconds Process uptime`,
-          `# TYPE mcp_gamehacking_uptime_seconds counter`,
-          `mcp_gamehacking_uptime_seconds ${process.uptime().toFixed(3)}`,
           `# HELP mcp_gamehacking_active_transports Active HTTP MCP sessions`,
           `# TYPE mcp_gamehacking_active_transports gauge`,
           `mcp_gamehacking_active_transports ${transports.size}`,
         ].join("\n") + "\n";
         res.writeHead(200, { "content-type": "text/plain; version=0.0.4" });
-        res.end(metrics);
+        res.end(processLines + renderPrometheus());
         return;
       }
+      // /dashboard + /_dashboard.json: handled by the observability
+      // module. Returns true when it answered so we can bail; false
+      // means the request wasn't for one of its routes.
+      if (observabilityHandler(req, res)) return;
       // MCP endpoint: use streamable HTTP transport. Gated when auth is on.
       // Uses the normalised `pathname` (strips query / fragment / trailing /)
       // so no `/mcp?x=` or `/mcp/` form can bypass the auth gate.
@@ -1888,9 +2115,8 @@ async function main() {
       res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
       res.end("not found. endpoints: /mcp, /healthz, /metrics");
     });
-    attachObservabilityRoutes(httpServer);
     httpServer.listen(port, host, () => {
-      console.error(`[mcp-gamehacking] HTTP transport on http://${host}:${port}/mcp (health: /healthz, metrics: /metrics, dashboard: /dashboard)`);
+      console.error(`[mcp-reverse] HTTP transport on http://${host}:${port}/mcp (health: /healthz, metrics: /metrics, dashboard: /dashboard)`);
     });
   } else {
     const transport = new StdioServerTransport();

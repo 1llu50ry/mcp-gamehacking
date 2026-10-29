@@ -1,4 +1,4 @@
-# mcp-gamehacking cookbook
+# mcp-reverse cookbook
 
 End-to-end scenarios showing how the pieces fit together. Each recipe
 is self-contained: the tools used, the host plugins touched, and the

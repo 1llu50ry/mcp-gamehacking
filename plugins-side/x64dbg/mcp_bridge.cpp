@@ -1,4 +1,4 @@
-// mcp-gamehacking :: x64dbg plugin
+// mcp-reverse :: x64dbg plugin
 // ---------------------------------------------------------------
 // Build as a standard x64dbg plugin (link against pluginsdk/x64dbg.lib
 // and x64bridge.lib). Drop mcp_bridge.dp64 into x64dbg/x64/plugins/

@@ -2,6 +2,51 @@
 
 All notable changes to this project. Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [5.0.1] — 2026-10-29
+
+Follow-up fixes + repo rename. The fat DB (`skills-full.db`) release
+assets are still attached to the v5.0.0 tag — code-only release.
+
+### Fixed
+- **CI/CodeQL were failing on main** with 150+ `TS2591 Cannot find name 'node:fs/promises'` errors.
+  `tsconfig.json` didn't declare `types: ["node"]` or an explicit `lib`,
+  so tsc on the runner couldn't resolve node built-ins. Add both.
+- **Node 20/22 can't run the DB layer**: `node:sqlite` is behind
+  `--experimental-sqlite` on 22 and absent on 20. Bump the floor to
+  Node 24 (`package.json#engines`, Dockerfile base image, every
+  workflow's `node-version`).
+- **`ERR_HTTP_HEADERS_SENT` on /metrics**: `attachObservabilityRoutes`
+  installed a second `request` listener on the HTTP server, which
+  raced with the inline handler and double-wrote the response.
+  Replaced with a sync `observabilityHandler(req, res) → bool` the
+  caller invokes inline. The old export remains as a shim with a
+  `writableEnded` guard.
+- **Duplicate `/metrics` endpoints** (one in `index.ts` with process
+  stats, one in `observability.ts` with the Prometheus render) merged
+  — the inline handler now serves both.
+- **`mcp_tool_calls_total` was always zero**. `metrics.toolCall` was
+  only called from HTTP middleware; the 208 tool handlers themselves
+  were never timed. Wrap `server.tool` once at registration so every
+  handler feeds the histogram automatically.
+
+### Changed
+- **Repo renamed** `mcp-gamehacking` → `mcp-reverse`. The project
+  outgrew its original framing (malware triage, mobile RE, firmware,
+  CTF/pwn are now first-class use cases alongside game hacking).
+  Every git-tracked reference was replaced, including the CLI entry
+  (`bin/mcp-reverse.mjs`), the systemd unit (`mcp-reverse.service`),
+  Docker image name, package.json fields, and README banners in all
+  three languages. SKILL.md bodies inside `db/skills.db` were
+  rebuilt against the renamed content tree — 0 skills still carry
+  the old name, 3,986 carry the new one.
+- `src/skills-db.ts`: new `getSharedDb(path)` memoises a read-only
+  SQLite handle instead of the previous open/close-per-tool-call
+  pattern. Benchmark against the real 18 MiB DB on 100 FTS queries:
+  2.17 ms/q → 1.11 ms/q (**2× faster**). `resetSharedDb()` is
+  exported for the rare in-place rebuild path.
+- `src/*`: fs imports normalised to the `node:` prefix across the
+  four modules that still used the unprefixed form.
+
 ## [5.0.0] — 2026-10-28
 
 Major release — four feature waves plus a weight-cut that takes the
@@ -41,7 +86,7 @@ down to a few MiB).
 
 ### Changed
 - **`source.txt` → `source.txt.gz`** for every skill. Working tree
-  drops from 19 GiB → ~3 GiB; new `bin/mcp-gamehacking unpack` /
+  drops from 19 GiB → ~3 GiB; new `bin/mcp-reverse unpack` /
   `pack` subcommands manage both layouts. The read helpers in the
   server (`safeRead`, `fileExists`, `grepFile`) transparently fall
   back to the `.gz` file, so every existing tool keeps working.
@@ -57,7 +102,7 @@ down to a few MiB).
 - **BM25 search** `bm25_search` + `bm25_rebuild` — zero-dep inverted index over 4,200 skills with 10-minute TTL. Smoke-tested: `"battleye kernel shellcode"` → 1,095 hits across 4,230 docs; top-3 all relevant.
 - **Audit log + rate limit** `audit_tail`, `audit_log`, `rate_limit_check`, `rate_limit_status` — JSONL rolling file; token-bucket per `(tool, agent)` opt-in via `MCP_RATE_LIMIT=1`.
 - **Dynamic MCP Resources** — URI-addressable `gamehacking://skills/{name}`, `gamehacking://ags/{name}/source`, `gamehacking://plugins/{category}/{name}`, and more.
-- **GitHub Release workflow** — tag `v*` → npm publish with provenance + multi-arch Docker to `ghcr.io/<owner>/mcp-gamehacking:<ver>` + release notes.
+- **GitHub Release workflow** — tag `v*` → npm publish with provenance + multi-arch Docker to `ghcr.io/<owner>/mcp-reverse:<ver>` + release notes.
 
 ### Changed
 - Server registers 111 MCP tools (+9 vs 4.5).
@@ -70,7 +115,7 @@ down to a few MiB).
 - Native container parsers: `zip_parse`, `apk_scan`, `dotnet_parse`, `cat_sniff`.
 - Meta tools: `fs_sandbox_status`, `wiki_link_check`, `training_jsonl_export`, `symsrv_download`, `pattern_mine`, `mesh_orchestrate`.
 - `Dockerfile` (multi-stage, non-root `node`, dumb-init), `docker-compose.yml`, `.dockerignore`.
-- CLI `bin/mcp-gamehacking` with `serve / stats / lookup / search / tools / health`.
+- CLI `bin/mcp-reverse` with `serve / stats / lookup / search / tools / health`.
 - 10 fresh game skills: Marvel Rivals, THE FINALS, Delta Force, Palworld, Deadlock, Arena Breakout, Grey Zone Warfare, Hunt: Showdown 1896, Blood Strike, XDefiant.
 
 ## [4.4.0] — 2026-10-26

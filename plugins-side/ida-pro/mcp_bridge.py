@@ -1,4 +1,4 @@
-# mcp-gamehacking :: IDA Pro plugin
+# mcp-reverse :: IDA Pro plugin
 # ---------------------------------------------------------------
 # Save as `<ida>/plugins/mcp_bridge.py` and restart IDA. The plugin
 # auto-loads via PLUG_INITSTRUCT with PLUGIN_FIX. HTTP MCP on
@@ -303,8 +303,8 @@ class Handler(BaseHTTPRequestHandler):
 # ----- plugin lifecycle ---------------------------------------------
 class McpBridgePlugin(idaapi.plugin_t):
     flags = idaapi.PLUGIN_FIX
-    comment = "mcp-gamehacking bridge"
-    help = "https://github.com/1llu50ry/mcp-gamehacking/tree/main/plugins-side/ida-pro"
+    comment = "mcp-reverse bridge"
+    help = "https://github.com/1llu50ry/mcp-reverse/tree/main/plugins-side/ida-pro"
     wanted_name = "MCP Bridge"
     wanted_hotkey = ""
 

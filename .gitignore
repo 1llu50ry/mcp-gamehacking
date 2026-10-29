@@ -23,9 +23,23 @@ Thumbs.db
 /.index-cache/
 /.cache/
 
-# Skill source dumps. Both the raw text and its gzip are kept OFF
-# the git repo — the uncompressed form was 18 GiB and even the
-# gzipped form (3.3 GiB) exceeds GitHub's per-push + free-tier LFS
-# quota. See RELEASE.md for how users opt into fetching them.
-skills/*/source.txt
-skills/*/source.txt.gz
+# The whole content library lives in db/skills.db (SQLite + FTS5).
+# These directories are the pre-DB source of truth; the writer in
+# scripts/build-db.mjs reads them when regenerating the DB. They are
+# NOT shipped in the repo — see RELEASE.md for how to fetch them if
+# you want to rebuild the DB locally.
+/skills/
+/plugins/
+/agents/
+/subagents/
+/prompts/
+
+# SQLite side-car files (WAL + SHM). The main .db is tracked.
+db/*.db-wal
+db/*.db-shm
+# The fat DB (with source blobs embedded) and its release-asset
+# chunks + checksum are hosted on GitHub Releases, not git. See
+# RELEASE.md for the fetch recipe.
+db/skills-full.db
+db/skills-full.db.part-*
+db/skills-full.db.sha256

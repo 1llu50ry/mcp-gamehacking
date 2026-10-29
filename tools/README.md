@@ -1,6 +1,6 @@
 # tools/
 
-Local tool scaffolding for the mcp-gamehacking server's RE/debug integrations.
+Local tool scaffolding for the mcp-reverse server's RE/debug integrations.
 
 ## Layout
 

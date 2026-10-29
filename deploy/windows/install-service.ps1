@@ -1,4 +1,4 @@
-# Install mcp-gamehacking as a Windows service using NSSM.
+# Install mcp-reverse as a Windows service using NSSM.
 #
 #   .\deploy\windows\install-service.ps1 -Install  [-Port 7777] [-Token <secret>]
 #   .\deploy\windows\install-service.ps1 -Uninstall
@@ -14,7 +14,7 @@ param(
   [int]$Port = 7777,
   [string]$Token = "",
   [string]$FsAllow = "C:\samples;C:\reverse-projects",
-  [string]$ServiceName = "mcp-gamehacking"
+  [string]$ServiceName = "mcp-reverse"
 )
 
 $ErrorActionPreference = "Stop"

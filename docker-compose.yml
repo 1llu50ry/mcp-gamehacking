@@ -1,18 +1,18 @@
-# Compose file for running mcp-gamehacking as a long-lived HTTP service.
+# Compose file for running mcp-reverse as a long-lived HTTP service.
 # Clients (Claude Desktop, Cursor, etc.) point at http://localhost:7777/mcp
 # with the bearer token below in Authorization: Bearer <token>.
 #
 #   docker compose up -d
 #   docker compose logs -f
-#   docker compose exec mcp-gamehacking node bin/mcp-gamehacking.mjs stats
+#   docker compose exec mcp-reverse node bin/mcp-reverse.mjs stats
 
 services:
-  mcp-gamehacking:
-    image: ghcr.io/1llu50ry/mcp-gamehacking:latest
+  mcp-reverse:
+    image: ghcr.io/1llu50ry/mcp-reverse:latest
     # To build locally instead of pulling:
     #build:
     #  context: .
-    container_name: mcp-gamehacking
+    container_name: mcp-reverse
     restart: unless-stopped
     ports:
       - "127.0.0.1:7777:7777"

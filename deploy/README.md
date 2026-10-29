@@ -12,9 +12,9 @@ Choose the one that matches your host.
 ## Linux systemd
 
 ```bash
-sudo ./deploy/systemd/install.sh                   # defaults: /opt/mcp-gamehacking + user "mcp"
-sudo systemctl status mcp-gamehacking
-journalctl -u mcp-gamehacking -f
+sudo ./deploy/systemd/install.sh                   # defaults: /opt/mcp-reverse + user "mcp"
+sudo systemctl status mcp-reverse
+journalctl -u mcp-reverse -f
 ```
 
 The unit file hardens the service: `ProtectSystem=strict`,
@@ -26,7 +26,7 @@ The unit file hardens the service: `ProtectSystem=strict`,
 ```powershell
 # Elevated PowerShell:
 .\deploy\windows\install-service.ps1 -Install -Port 7777 -Token (New-Guid).Guid -FsAllow "C:\samples"
-Get-Service mcp-gamehacking
+Get-Service mcp-reverse
 ```
 
 Uninstall:

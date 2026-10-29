@@ -13,7 +13,7 @@ embedded strings, and hand the clean binary to Ghidra.
 
 ```yara
 rule vmprotect_3x {
-    meta: author = "mcp-gamehacking"
+    meta: author = "mcp-reverse"
     strings:
         $vmp_sig = { 68 ?? ?? ?? ?? E8 00 00 00 00 83 04 24 ?? C3 }
         $vmp_sec = ".vmp0" ascii

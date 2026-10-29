@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Install mcp-gamehacking as a systemd service.
+# Install mcp-reverse as a systemd service.
 #
 # Usage (as root):
-#   sudo ./deploy/systemd/install.sh [--prefix /opt/mcp-gamehacking] [--user mcp]
+#   sudo ./deploy/systemd/install.sh [--prefix /opt/mcp-reverse] [--user mcp]
 set -euo pipefail
 
-PREFIX="/opt/mcp-gamehacking"
+PREFIX="/opt/mcp-reverse"
 SVC_USER="mcp"
 
 while [[ $# -gt 0 ]]; do
@@ -31,9 +31,9 @@ echo "[+] installing deps + building"
 sudo -u "$SVC_USER" sh -c "cd '$PREFIX' && npm ci --production && npm run build"
 
 echo "[+] installing unit"
-sed "s#/opt/mcp-gamehacking#$PREFIX#g" "$(dirname "$0")/mcp-gamehacking.service" >/etc/systemd/system/mcp-gamehacking.service
-sed -i "s#User=mcp#User=$SVC_USER#; s#Group=mcp#Group=$SVC_USER#" /etc/systemd/system/mcp-gamehacking.service
+sed "s#/opt/mcp-reverse#$PREFIX#g" "$(dirname "$0")/mcp-reverse.service" >/etc/systemd/system/mcp-reverse.service
+sed -i "s#User=mcp#User=$SVC_USER#; s#Group=mcp#Group=$SVC_USER#" /etc/systemd/system/mcp-reverse.service
 
 systemctl daemon-reload
-systemctl enable --now mcp-gamehacking
-echo "[+] done. systemctl status mcp-gamehacking"
+systemctl enable --now mcp-reverse
+echo "[+] done. systemctl status mcp-reverse"

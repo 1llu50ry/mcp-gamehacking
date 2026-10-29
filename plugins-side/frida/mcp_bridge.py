@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-mcp-gamehacking :: Frida host-side bridge.
+mcp-reverse :: Frida host-side bridge.
 
 Standalone — unlike IDA / Ghidra / Binja this is not loaded by a GUI
 host, it's a thin HTTP server that drives the `frida` Python module

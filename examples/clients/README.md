@@ -1,7 +1,7 @@
 # Client configurations
 
 Ready-to-paste snippets for the clients people actually use. Replace
-the absolute paths with wherever you have `mcp-gamehacking` installed.
+the absolute paths with wherever you have `mcp-reverse` installed.
 
 ## Claude Desktop (`claude_desktop_config.json`)
 
