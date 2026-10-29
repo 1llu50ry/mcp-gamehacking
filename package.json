@@ -1,6 +1,6 @@
 {
   "name": "mcp-reverse",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "bin": {
     "mcp-reverse": "bin/mcp-reverse.mjs"
   },
