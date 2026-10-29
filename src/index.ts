@@ -34,6 +34,9 @@ import { registerSignatureDb } from "./signature-db.js";
 import { observabilityHandler, metrics, renderPrometheus } from "./observability.js";
 import { onShutdown, installSignalHandlers, isDraining } from "./shutdown.js";
 import { wrapToolError, cleanErrorMessage } from "./error-sanitizer.js";
+import { registerNativeR2 } from "./native-r2.js";
+import { registerAntiRe } from "./native-antire.js";
+import { registerNativeLldb } from "./native-lldb.js";
 import { registerArm64 } from "./native-arm64.js";
 import { registerCacheTools, getCache } from "./decompile-cache.js";
 import { registerChunkTools } from "./chunking.js";
@@ -1970,6 +1973,14 @@ registerRop(server);
 registerGameEngine(server);
 registerSampling(server);
 registerViz(server);
+
+// Native replacements for previously-vendored third-party servers.
+// User installs the underlying CLI (r2 / lldb) themselves; we drive it
+// as a subprocess over its headless mode. antire is pure-TS and needs
+// nothing beyond the file to scan.
+registerNativeR2(server);
+registerAntiRe(server);
+registerNativeLldb(server);
 
 // SQLite-backed skills store: ships a single db/skills.db alongside
 // dist/, replacing the 19 GiB on-disk tree with a ~20 MiB queryable
