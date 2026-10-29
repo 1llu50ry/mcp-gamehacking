@@ -37,6 +37,8 @@ import { wrapToolError, cleanErrorMessage } from "./error-sanitizer.js";
 import { registerNativeR2 } from "./native-r2.js";
 import { registerAntiRe } from "./native-antire.js";
 import { registerNativeLldb } from "./native-lldb.js";
+import { registerNativeGdb } from "./native-gdb.js";
+import { registerNativeTriage } from "./native-triage.js";
 import { registerArm64 } from "./native-arm64.js";
 import { registerCacheTools, getCache } from "./decompile-cache.js";
 import { registerChunkTools } from "./chunking.js";
@@ -1981,6 +1983,8 @@ registerViz(server);
 registerNativeR2(server);
 registerAntiRe(server);
 registerNativeLldb(server);
+registerNativeGdb(server);
+registerNativeTriage(server);
 
 // SQLite-backed skills store: ships a single db/skills.db alongside
 // dist/, replacing the 19 GiB on-disk tree with a ~20 MiB queryable
