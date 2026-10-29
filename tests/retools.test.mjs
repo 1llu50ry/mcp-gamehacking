@@ -4,8 +4,12 @@ import { BACKENDS } from "../dist/retools.js";
 
 const ids = Object.keys(BACKENDS);
 
-test("catalog has at least 60 backends", () => {
-  assert.ok(ids.length >= 60, `expected >= 60, got ${ids.length}`);
+test("catalog has at least 50 backends", () => {
+  // Floor lowered from 60 to 50 in v5.0.1 after reaping the 17 vendored
+  // entries whose behaviour this server now covers natively (yaraflux ->
+  // native-yara, memory servers -> native-memory, cheat-engine-python ->
+  // plugins-side/cheat-engine, etc.). The current count hovers around 56.
+  assert.ok(ids.length >= 50, `expected >= 50, got ${ids.length}`);
 });
 
 test("every backend id matches its outer map key", () => {
@@ -39,18 +43,14 @@ test("http backends declare a numeric port", () => {
   }
 });
 
-test("vendored backends point at an existing tools/vendor/<name> path", async () => {
-  const { access } = await import("node:fs/promises");
-  const { join } = await import("node:path");
-  const { fileURLToPath } = await import("node:url");
-  const root = join(fileURLToPath(new URL(".", import.meta.url)), "..");
+test("no backend references tools/vendor/", () => {
+  // tools/vendor/ was removed in v5.0.1. The replacement for every
+  // vendored entry is listed in src/retools.ts next to the deleted
+  // ReBackendId union line. No surviving backend should point at it.
   for (const id of ids) {
     const b = BACKENDS[id];
     const cwd = b.launch?.cwd;
-    if (!cwd || !cwd.startsWith("tools/vendor/")) continue;
-    const abs = join(root, cwd);
-    try { await access(abs); }
-    catch { assert.fail(`${id}: cwd ${cwd} does not exist`); }
+    if (cwd) assert.ok(!cwd.startsWith("tools/vendor/"), `${id} still points at ${cwd}`);
   }
 });
 
