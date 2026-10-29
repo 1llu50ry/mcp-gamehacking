@@ -83,6 +83,7 @@ export type ReBackendId =
   | "pwndbg-mcp"
   | "retdec-mcp"
   | "snowman-mcp"
+  | "reverse-slop"
   // Previously-vendored entries removed in v5.0.1 — their behaviour
   // is now covered by this server's native implementations:
   //   yaraflux          -> src/native-yara.ts
@@ -1117,6 +1118,36 @@ const BACKENDS: Record<ReBackendId, ReBackend> = {
     mcpConfig: { "snowman-mcp": { command: "snowman-mcp", args: [] } },
     tags: ["snowman", "decompile", "static", "x86"],
     notes: "Lightweight C-like decompiler for x86. Good for quick triage.",
+  },
+  "reverse-slop": {
+    id: "reverse-slop",
+    name: "reverse-slop",
+    kind: "both",
+    os: ["windows"],
+    requires: "Windows 10/11, Visual Studio 2022 with C++, CMake 3.26+. Optional kernel bridge needs admin + driver signing (test-signed OK).",
+    // Not vendored — users clone and build upstream themselves. The hub
+    // then talks to it over HTTP (default 127.0.0.1:8765) or we drive its
+    // JSON-RPC `/mcp` endpoint via the `slop_call` native tool.
+    install: [
+      "git clone https://github.com/kaizer1308/reverse-slap %USERPROFILE%\\\\dev\\\\reverse-slop",
+      "cmake --preset=release",
+      "cmake --build --preset=release",
+    ],
+    launch: {
+      cmd: "reverse-slop-engine",
+      args: ["--headless", "--mcp"],
+      http: { port: 8765, path: "/mcp" },
+    },
+    mcpConfig: {
+      "reverse-slop": {
+        url: "http://127.0.0.1:8765/mcp",
+        headers: { Authorization: "Bearer ${env:MCP_SLOP_TOKEN}" },
+      },
+    },
+    tags: ["imgui", "tauri", "pe", "macho", "ipa", "x86", "x64", "arm64", "disasm", "decompile", "aob", "kernel", "mcp-native", "windows"],
+    notes:
+      "Windows RE workbench with its own MCP server at /mcp (JSON-RPC 2.0, 23 domain tools: target/memory/disasm/debugger/driver/xray/patch/devirt/types/notes/analyze/network/proxy/persist/decomp/dotnet/detect/fs/web/script/frida/emulate/re). " +
+      "Prefer this server's `slop_health` / `slop_tools` / `slop_call` native tools once it's running; set MCP_SLOP_TOKEN for Bearer auth. Not vendored — the project owns its own repo.",
   },
 };
 
