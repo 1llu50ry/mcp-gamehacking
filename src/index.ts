@@ -32,6 +32,8 @@ import { registerNativeDwarf } from "./native-dwarf.js";
 import { registerNativePdb } from "./native-pdb.js";
 import { registerSignatureDb } from "./signature-db.js";
 import { observabilityHandler, metrics, renderPrometheus } from "./observability.js";
+import { onShutdown, installSignalHandlers, isDraining } from "./shutdown.js";
+import { wrapToolError, cleanErrorMessage } from "./error-sanitizer.js";
 import { registerArm64 } from "./native-arm64.js";
 import { registerCacheTools, getCache } from "./decompile-cache.js";
 import { registerChunkTools } from "./chunking.js";
@@ -590,6 +592,20 @@ const server = new McpServer({
   // hit from this file are (name, description, schema, handler) and
   // (name, description, handler) with no schema. We just need the last
   // argument when it's a function.
+  //
+  // Two cross-cutting concerns live in this wrapper:
+  //
+  //   1. metrics.toolCall feeds the Prometheus counters + latency
+  //      histogram the /dashboard reads, so every handler shows up
+  //      without each one having to opt in.
+  //
+  //   2. Any thrown exception is caught here and run through the
+  //      error-sanitiser before being surfaced to the client. That
+  //      strips filesystem paths, CR/LF (CodeQL's js/xss-through-
+  //      exception finding), ANSI escapes, and over-long payloads;
+  //      the raw text + stack is still logged to stderr with a
+  //      trace-id so operators can grep the real exception, and the
+  //      client gets a non-leaky summary + the same trace-id.
   const origTool = server.tool.bind(server);
   (server as unknown as { tool: (...a: unknown[]) => unknown }).tool = (...args: unknown[]) => {
     const i = args.findIndex(a => typeof a === "function");
@@ -600,7 +616,10 @@ const server = new McpServer({
         const t0 = performance.now();
         let ok = true;
         try { return await orig(...xs); }
-        catch (e) { ok = false; throw e; }
+        catch (e) {
+          ok = false;
+          return wrapToolError(e, name);
+        }
         finally {
           metrics.toolCall(name, performance.now() - t0, { ok });
         }
@@ -2118,10 +2137,43 @@ async function main() {
     httpServer.listen(port, host, () => {
       console.error(`[mcp-reverse] HTTP transport on http://${host}:${port}/mcp (health: /healthz, metrics: /metrics, dashboard: /dashboard)`);
     });
+    // Drain order (LIFO when hooks fire): close every live transport
+    // first (so no new tool handler can race the DB close), then the
+    // HTTP server (so no new sockets land). The DB handle is closed by
+    // the skills-db hook registered on its first open.
+    onShutdown("http-server", () => new Promise<void>((res) => {
+      httpServer.close(() => res());
+      // Nudge keep-alive connections to disconnect; otherwise close
+      // waits for them to idle out which can exceed the drain budget.
+      httpServer.closeAllConnections?.();
+    }));
+    onShutdown("mcp-transports", async () => {
+      await Promise.allSettled(Array.from(transports.values()).map(t => Promise.resolve(t.close?.())));
+      transports.clear();
+    });
   } else {
     const transport = new StdioServerTransport();
     await server.connect(transport);
+    onShutdown("stdio-transport", () => transport.close?.());
   }
 }
 
-main().catch(console.error);
+installSignalHandlers();
+// A shared-DB hook so skills-db.getSharedDb's handle is closed cleanly
+// on drain. We import lazily to avoid materialising the DB on servers
+// that never touch it.
+onShutdown("skills-db", async () => {
+  try {
+    const m = await import("./skills-db.js");
+    m.resetSharedDb();
+  } catch { /* module never loaded — nothing to flush */ }
+});
+
+main().catch((e) => {
+  if (isDraining()) return; // drain path raises on close — ignore
+  // Top-level crash: route through the same sanitiser the tool
+  // wrapper uses, so install paths and stacks don't flood stderr.
+  // The raw stack is already logged inside cleanErrorMessage.
+  cleanErrorMessage(e);
+  process.exitCode = 1;
+});

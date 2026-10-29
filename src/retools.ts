@@ -1832,13 +1832,17 @@ export function registerReTools(server: McpServer, projectRoot: string): void {
   );
 }
 
-// Shutdown hook -- kill child procs when parent dies
-process.on("exit", () => {
-  for (const proc of running.values()) {
-    try { proc.child.kill("SIGTERM"); } catch { /* ignore */ }
-  }
+// Shutdown orchestration lives in src/shutdown.ts. Register a hook
+// that SIGTERMs every child subprocess we launched so they get the
+// same drain budget the parent does. The old inline SIGINT/SIGTERM
+// handlers did `process.exit()` immediately — they bypassed the HTTP
+// drain + flush path entirely.
+import { onShutdown as _onShutdown } from "./shutdown.js";
+_onShutdown("re-backends", async () => {
+  await Promise.all(Array.from(running.values()).map(proc => new Promise<void>(res => {
+    try { proc.child.once("exit", () => res()); proc.child.kill("SIGTERM"); }
+    catch { res(); }
+  })));
 });
-process.on("SIGINT", () => { process.exit(130); });
-process.on("SIGTERM", () => { process.exit(143); });
 
 export { BACKENDS };

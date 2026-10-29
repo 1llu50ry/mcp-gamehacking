@@ -14,6 +14,17 @@ on:
       - "src/skills-db.ts"
       - "scripts/build-db.mjs"
   workflow_dispatch:
+    inputs:
+      rebuild:
+        description: "Rebuild db/skills.db from an uploaded content-tree artifact and commit back"
+        required: false
+        default: "no"
+        type: choice
+        options: ["no", "yes"]
+      artifact-run-id:
+        description: "Run id of the Actions run that produced the content-tree artifact"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -107,3 +118,54 @@ jobs:
           if (n < 1) { console.error('smoke failed: no rows'); process.exit(1); }
           console.log('smoke OK, rows:', n);
           "
+
+  # ----------------------------------------------------------------
+  # Auto-rebuild: on pushes to main that touch SKILL / plugin / agent
+  # content under a PR branch that uploaded a 'content-tree' artifact,
+  # rebuild db/skills.db from that tree and commit it back on main.
+  # The artifact lets contributors ship their own local skills/ tree
+  # into CI without having to maintain it in the repo (where it was
+  # 19 GiB before the SQLite migration).
+  # ----------------------------------------------------------------
+  rebuild-from-artifact:
+    name: rebuild DB from uploaded content tree
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.rebuild == 'yes'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with: { node-version: '24' }
+      - run: npm ci || npm install
+      - run: npx tsc
+      - name: Download content-tree artifact
+        if: inputs.artifact-run-id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: content-tree
+          run-id: ${{ inputs.artifact-run-id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: .
+      - name: Rebuild DB
+        run: |
+          rm -f db/skills.db db/skills.db-wal db/skills.db-shm
+          node scripts/build-db.mjs
+          ls -la db/
+      - name: Commit if DB changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- db/skills.db; then
+            echo "DB unchanged — nothing to commit."
+            exit 0
+          fi
+          git add db/skills.db
+          git commit -m "chore(db): auto-rebuild skills.db from content tree
+
+          Rebuilt by .github/workflows/db.yml::rebuild-from-artifact.
+          Triggered by workflow_dispatch (artifact-run-id=${{ inputs.artifact-run-id || 'none' }})."
+          git push
