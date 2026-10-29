@@ -39,6 +39,10 @@ import { registerAntiRe } from "./native-antire.js";
 import { registerNativeLldb } from "./native-lldb.js";
 import { registerNativeGdb } from "./native-gdb.js";
 import { registerNativeTriage } from "./native-triage.js";
+import { registerNativeDecoder } from "./native-decoder.js";
+import { registerNativePePatch } from "./native-pe-patch.js";
+import { registerNativePcap } from "./native-pcap.js";
+import { registerToolMeta, recordTool } from "./native-tool-meta.js";
 import { registerArm64 } from "./native-arm64.js";
 import { registerCacheTools, getCache } from "./decompile-cache.js";
 import { registerChunkTools } from "./chunking.js";
@@ -616,6 +620,10 @@ const server = new McpServer({
     const i = args.findIndex(a => typeof a === "function");
     if (i >= 0) {
       const name = String(args[0] ?? "unknown");
+      // Record for tool_search / tool_help / tool_catalog. The second
+      // arg is conventionally the description string in this file.
+      const desc = typeof args[1] === "string" ? args[1] : undefined;
+      recordTool(name, desc);
       const orig = args[i] as (...xs: unknown[]) => unknown;
       args[i] = async (...xs: unknown[]) => {
         const t0 = performance.now();
@@ -1985,6 +1993,10 @@ registerAntiRe(server);
 registerNativeLldb(server);
 registerNativeGdb(server);
 registerNativeTriage(server);
+registerNativeDecoder(server);
+registerNativePePatch(server);
+registerNativePcap(server);
+registerToolMeta(server);
 
 // SQLite-backed skills store: ships a single db/skills.db alongside
 // dist/, replacing the 19 GiB on-disk tree with a ~20 MiB queryable
