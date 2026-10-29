@@ -1,5 +1,5 @@
 [Unit]
-Description=mcp-gamehacking MCP server (HTTP transport)
+Description=mcp-reverse MCP server (HTTP transport)
 After=network-online.target
 Wants=network-online.target
 
@@ -7,7 +7,7 @@ Wants=network-online.target
 Type=simple
 User=mcp
 Group=mcp
-WorkingDirectory=/opt/mcp-gamehacking
+WorkingDirectory=/opt/mcp-reverse
 Environment=NODE_ENV=production
 Environment=MCP_TRANSPORT=http
 Environment=MCP_HTTP_HOST=127.0.0.1
@@ -23,19 +23,19 @@ Environment=MCP_RATE_LIMIT_PER_USER_SEC=30
 Environment=MCP_FS_ALLOW=/srv/samples:/srv/reverse-projects
 Environment=MCP_FS_DENY=/etc:/root:/home
 
-ExecStart=/usr/bin/node /opt/mcp-gamehacking/dist/index.js
+ExecStart=/usr/bin/node /opt/mcp-reverse/dist/index.js
 Restart=on-failure
 RestartSec=5
 # Give the server a fair budget to decompile large functions.
 TimeoutStopSec=30
 
-# Hardening — mcp-gamehacking only needs to read samples and write to
+# Hardening — mcp-reverse only needs to read samples and write to
 # its own .cache / .audit / .agent-mesh directories under WorkingDirectory.
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/opt/mcp-gamehacking/.cache /opt/mcp-gamehacking/.audit /opt/mcp-gamehacking/.agent-mesh /opt/mcp-gamehacking/.index-cache
+ReadWritePaths=/opt/mcp-reverse/.cache /opt/mcp-reverse/.audit /opt/mcp-reverse/.agent-mesh /opt/mcp-reverse/.index-cache
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes

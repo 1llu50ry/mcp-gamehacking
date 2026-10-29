@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🎮 mcp-gamehacking
+# 🎮 mcp-reverse
 
 ### The MCP server that turns Claude, Codex, and Cursor into a reverse-engineering team.
 
@@ -33,26 +33,26 @@ If you're on security-research, cheat-detection, defensive-engineering, or game-
 
 ## 30-second quickstart
 
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/1llu50ry/mcp-gamehacking?quickstart=1)
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/1llu50ry/mcp-reverse?quickstart=1)
 
 
 ```bash
 # clone + build
-git clone https://github.com/1llu50ry/mcp-gamehacking && cd mcp-gamehacking
+git clone https://github.com/1llu50ry/mcp-reverse && cd mcp-reverse
 npm install && npx tsc
 npm test            # 20/20 should pass
 
 # wire into Claude Code / Codex / Cursor (stdio mode)
 # (add this JSON to your client's MCP config)
-#   { "mcp-gamehacking": { "command": "node", "args": ["/path/to/dist/index.js"] } }
+#   { "mcp-reverse": { "command": "node", "args": ["/path/to/dist/index.js"] } }
 
 # OR run over HTTP (Docker-friendly)
 docker compose up
 
 # OR drive it from the CLI (no MCP client needed)
-./bin/mcp-gamehacking.mjs stats
-./bin/mcp-gamehacking.mjs search battleye
-./bin/mcp-gamehacking.mjs tools    # list every registered MCP tool
+./bin/mcp-reverse.mjs stats
+./bin/mcp-reverse.mjs search battleye
+./bin/mcp-reverse.mjs tools    # list every registered MCP tool
 ```
 
 Point your MCP client at it, then ask any of:
@@ -74,7 +74,7 @@ flowchart LR
     C5[custom]
   end
 
-  subgraph server[" mcp-gamehacking (this repo) "]
+  subgraph server[" mcp-reverse (this repo) "]
     direction TB
     T[111 MCP tools]
     M[Agent Mesh<br/>DM · channels · tasks · votes · KB · locks]
@@ -111,7 +111,7 @@ The game-hacking framing is historical — the tooling covers every RE disciplin
 
 | Project | Scope | Tools | Backends | Multi-agent | Skills archive |
 |---|---|---:|---:|:---:|---:|
-| **mcp-gamehacking** (this repo) | Game RE + anti-cheat + mesh orchestration | **111** | **59** | ✅ | **4,200+** |
+| **mcp-reverse** (this repo) | Game RE + anti-cheat + mesh orchestration | **111** | **59** | ✅ | **4,200+** |
 | [GhidraMCP](https://github.com/LaurieWired/GhidraMCP) | Ghidra bridge | 5 | 1 | — | — |
 | [ida-pro-mcp](https://github.com/mrexodia/ida-pro-mcp) | IDA bridge | ~50 | 1 | — | — |
 | [SuperghidraMCP](https://github.com/yuatemycat/SuperGhidraMCP) | pyghidra | 38 | 1 | — | — |
@@ -343,12 +343,12 @@ Tools (6): `hub_connect`, `hub_list`, `hub_call`, `hub_disconnect`, `smart_decom
 ### CLI
 
 ```bash
-mcp-gamehacking stats                 # library counts
-mcp-gamehacking lookup battleye       # print SKILL.md
-mcp-gamehacking search anti-cheat     # keyword search
-mcp-gamehacking tools                 # list every MCP tool
-mcp-gamehacking health [url]          # probe /healthz
-mcp-gamehacking serve                 # start the MCP server
+mcp-reverse stats                 # library counts
+mcp-reverse lookup battleye       # print SKILL.md
+mcp-reverse search anti-cheat     # keyword search
+mcp-reverse tools                 # list every MCP tool
+mcp-reverse health [url]          # probe /healthz
+mcp-reverse serve                 # start the MCP server
 ```
 
 ### Path sandbox (security)
@@ -388,7 +388,7 @@ CI runs on push + PR (Node 18/20/22 matrix): [.github/workflows/ci.yml](.github/
 ### Build
 
 ```bash
-cd mcp-gamehacking
+cd mcp-reverse
 npm install
 npm run build
 ```
@@ -402,7 +402,7 @@ Add to your MCP settings:
   "mcpServers": {
     "gamehacking": {
       "command": "node",
-      "args": ["/path/to/mcp-gamehacking/dist/index.js"]
+      "args": ["/path/to/mcp-reverse/dist/index.js"]
     }
   }
 }
@@ -417,7 +417,7 @@ Add to `claude_desktop_config.json`:
   "mcpServers": {
     "gamehacking": {
       "command": "node",
-      "args": ["/path/to/mcp-gamehacking/dist/index.js"]
+      "args": ["/path/to/mcp-reverse/dist/index.js"]
     }
   }
 }
@@ -432,7 +432,7 @@ Add to `.cursor/mcp.json`:
   "mcpServers": {
     "gamehacking": {
       "command": "node",
-      "args": ["/path/to/mcp-gamehacking/dist/index.js"]
+      "args": ["/path/to/mcp-reverse/dist/index.js"]
     }
   }
 }
@@ -489,7 +489,7 @@ Kernel exploit and driver development agent...
 ## Project Structure
 
 ```
-mcp-gamehacking/
+mcp-reverse/
 +-- src/index.ts              # MCP server (16 tools)
 +-- dist/                      # Compiled JS
 +-- skills/                    # 4,161 skill directories
@@ -576,7 +576,7 @@ This project aggregates publicly available research materials and open-source pr
 
 ---
 
-# mcp-gamehacking (RU)
+# mcp-reverse (RU)
 
 MCP-сервер для геймхакинга и реверс-инжиниринга. База знаний из **4,100+ скиллов** с полными архивами исходного кода, специализированными агентами и инструментами.
 
@@ -604,7 +604,7 @@ npm run build
   "mcpServers": {
     "gamehacking": {
       "command": "node",
-      "args": ["/path/to/mcp-gamehacking/dist/index.js"]
+      "args": ["/path/to/mcp-reverse/dist/index.js"]
     }
   }
 }

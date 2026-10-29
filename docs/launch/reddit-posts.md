@@ -2,7 +2,7 @@
 
 ## r/ReverseEngineering
 
-**Title**: `[Tool Release] mcp-gamehacking v4.6 — 111 MCP tools + 59 RE backends under one connection`
+**Title**: `[Tool Release] mcp-reverse v4.6 — 111 MCP tools + 59 RE backends under one connection`
 
 **Body**:
 
@@ -13,7 +13,7 @@ I built an MCP (Model Context Protocol) server that unifies the RE / debugging t
 - **Agent mesh**: Claude Code, Codex, Cursor, Copilot and custom agents collaborate on the same binary via DM / channels / tasks / votes / KB / locks.
 - **BM25 search** over 4,200+ curated skill docs on BattlEye, EAC, Vanguard, VAC, FACEIT, Byfron, Ricochet, mhyprot internals.
 
-Repo: https://github.com/1llu50ry/mcp-gamehacking
+Repo: https://github.com/1llu50ry/mcp-reverse
 
 MIT licensed. For security research, cheat detection, defensive work, education. Would love your eyes on the Debug Directory walker.
 
@@ -31,13 +31,13 @@ Dropping an MCP server that lets different models work on the same binary. Core 
 
 Includes native parsers (PE/ELF/Mach-O/DEX/WASM/Minidump), BM25 search over 4,200 skills, symsrv auto-URL from PDB70, PCILeech/MemProcFS launcher, 59-backend hub. Zero npm deps for mesh persistence (JSON on disk).
 
-https://github.com/1llu50ry/mcp-gamehacking
+https://github.com/1llu50ry/mcp-reverse
 
 Looking for critique on the voting algorithm — currently just sum of confidence per verdict. Should it be weighted by past accuracy?
 
 ## r/gamedev
 
-**Title**: `[Tool] mcp-gamehacking — reverse-engineer game binaries with Claude / Cursor / Codex collaborating`
+**Title**: `[Tool] mcp-reverse — reverse-engineer game binaries with Claude / Cursor / Codex collaborating`
 
 **Body**:
 
@@ -50,6 +50,6 @@ Shipped a tool that helps game developers:
 
 Hooks into Ghidra / IDA / Binja / x64dbg / WinDbg / Frida / Cheat Engine via one MCP connection. Native parsers for PE / ELF / Mach-O / DEX / Unity AssetBundle / UE `.pak` / IL2CPP metadata built in.
 
-https://github.com/1llu50ry/mcp-gamehacking
+https://github.com/1llu50ry/mcp-reverse
 
 MIT. Would love feedback on the Unity + UE workflows.

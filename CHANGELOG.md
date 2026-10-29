@@ -41,7 +41,7 @@ down to a few MiB).
 
 ### Changed
 - **`source.txt` → `source.txt.gz`** for every skill. Working tree
-  drops from 19 GiB → ~3 GiB; new `bin/mcp-gamehacking unpack` /
+  drops from 19 GiB → ~3 GiB; new `bin/mcp-reverse unpack` /
   `pack` subcommands manage both layouts. The read helpers in the
   server (`safeRead`, `fileExists`, `grepFile`) transparently fall
   back to the `.gz` file, so every existing tool keeps working.
@@ -57,7 +57,7 @@ down to a few MiB).
 - **BM25 search** `bm25_search` + `bm25_rebuild` — zero-dep inverted index over 4,200 skills with 10-minute TTL. Smoke-tested: `"battleye kernel shellcode"` → 1,095 hits across 4,230 docs; top-3 all relevant.
 - **Audit log + rate limit** `audit_tail`, `audit_log`, `rate_limit_check`, `rate_limit_status` — JSONL rolling file; token-bucket per `(tool, agent)` opt-in via `MCP_RATE_LIMIT=1`.
 - **Dynamic MCP Resources** — URI-addressable `gamehacking://skills/{name}`, `gamehacking://ags/{name}/source`, `gamehacking://plugins/{category}/{name}`, and more.
-- **GitHub Release workflow** — tag `v*` → npm publish with provenance + multi-arch Docker to `ghcr.io/<owner>/mcp-gamehacking:<ver>` + release notes.
+- **GitHub Release workflow** — tag `v*` → npm publish with provenance + multi-arch Docker to `ghcr.io/<owner>/mcp-reverse:<ver>` + release notes.
 
 ### Changed
 - Server registers 111 MCP tools (+9 vs 4.5).
@@ -70,7 +70,7 @@ down to a few MiB).
 - Native container parsers: `zip_parse`, `apk_scan`, `dotnet_parse`, `cat_sniff`.
 - Meta tools: `fs_sandbox_status`, `wiki_link_check`, `training_jsonl_export`, `symsrv_download`, `pattern_mine`, `mesh_orchestrate`.
 - `Dockerfile` (multi-stage, non-root `node`, dumb-init), `docker-compose.yml`, `.dockerignore`.
-- CLI `bin/mcp-gamehacking` with `serve / stats / lookup / search / tools / health`.
+- CLI `bin/mcp-reverse` with `serve / stats / lookup / search / tools / health`.
 - 10 fresh game skills: Marvel Rivals, THE FINALS, Delta Force, Palworld, Deadlock, Arena Breakout, Grey Zone Warfare, Hunt: Showdown 1896, Blood Strike, XDefiant.
 
 ## [4.4.0] — 2026-10-26

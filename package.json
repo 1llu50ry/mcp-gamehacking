@@ -1,8 +1,8 @@
 {
-  "name": "mcp-gamehacking",
+  "name": "mcp-reverse",
   "version": "5.0.0",
   "bin": {
-    "mcp-gamehacking": "bin/mcp-gamehacking.mjs"
+    "mcp-reverse": "bin/mcp-reverse.mjs"
   },
   "description": "MCP server for game hacking & reverse engineering — 4,200+ skills, 78 agents, 163 subagents, 117 plugins, 150 prompts, full-text grep, offset cross-ref, similarity search, offset export, function finder, native TS binary parsers (PE/ELF/Mach-O/DEX/WASM) and launchable RE/debug MCP integrations for 43 backends (Ghidra, IDA, Binary Ninja, radare2, x64dbg, WinDbg, Cheat Engine, Frida, Hopper, REA, Vibe-RE, JADX, angr, Capstone, PCILeech, Memflow, Scylla, dnSpy, ReClass, Volatility, Wireshark, mitmproxy, Ghidrathon, BinDiff, Diaphora, Qiling, unidbg, Reko, QEMU-trace, LLDB, GDB, Burp, YARA, ClrMD, Dolphin-DME, Cemu-IPC, and more)",
   "type": "module",
@@ -46,11 +46,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/1llu50ry/mcp-gamehacking.git"
+    "url": "https://github.com/1llu50ry/mcp-reverse.git"
   },
-  "homepage": "https://github.com/1llu50ry/mcp-gamehacking#readme",
+  "homepage": "https://github.com/1llu50ry/mcp-reverse#readme",
   "bugs": {
-    "url": "https://github.com/1llu50ry/mcp-gamehacking/issues"
+    "url": "https://github.com/1llu50ry/mcp-reverse/issues"
   },
   "engines": {
     "node": ">=24.0.0"

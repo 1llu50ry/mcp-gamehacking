@@ -1,10 +1,10 @@
-name: mcp-gamehacking
+name: mcp-reverse
 version: 1.0.0
 schema: v1
 mcpServers:
-  - name: mcp-gamehacking
+  - name: mcp-reverse
     command: node
     args:
-      - /path/to/mcp-gamehacking/dist/index.js
+      - /path/to/mcp-reverse/dist/index.js
     env:
       MCP_FS_ALLOW: /samples:/reverse-projects

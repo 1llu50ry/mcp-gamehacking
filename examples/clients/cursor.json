@@ -1,8 +1,8 @@
 {
   "mcpServers": {
-    "mcp-gamehacking": {
+    "mcp-reverse": {
       "command": "npx",
-      "args": ["-y", "mcp-gamehacking"],
+      "args": ["-y", "mcp-reverse"],
       "env": {
         "MCP_FS_ALLOW": "${workspaceFolder}"
       }

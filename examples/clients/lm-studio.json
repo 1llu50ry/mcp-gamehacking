@@ -1,7 +1,7 @@
 {
-  "name": "mcp-gamehacking",
+  "name": "mcp-reverse",
   "command": "node",
-  "args": ["/path/to/mcp-gamehacking/dist/index.js"],
+  "args": ["/path/to/mcp-reverse/dist/index.js"],
   "env": {
     "MCP_TRANSPORT": "stdio",
     "MCP_FS_ALLOW": "/samples:/reverse"

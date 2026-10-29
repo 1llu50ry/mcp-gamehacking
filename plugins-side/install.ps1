@@ -1,4 +1,4 @@
-# mcp-gamehacking :: plugins-side installer (Windows)
+# mcp-reverse :: plugins-side installer (Windows)
 # ---------------------------------------------------------------
 # Auto-detects IDA Pro, Ghidra, Binary Ninja, ReClass.NET, dnSpy /
 # dnSpyEx, ILSpy, x64dbg, Cheat Engine and drops the right plugin

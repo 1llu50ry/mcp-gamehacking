@@ -37,4 +37,9 @@ Thumbs.db
 # SQLite side-car files (WAL + SHM). The main .db is tracked.
 db/*.db-wal
 db/*.db-shm
+# The fat DB (with source blobs embedded) and its release-asset
+# chunks + checksum are hosted on GitHub Releases, not git. See
+# RELEASE.md for the fetch recipe.
 db/skills-full.db
+db/skills-full.db.part-*
+db/skills-full.db.sha256

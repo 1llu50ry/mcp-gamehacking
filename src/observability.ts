@@ -127,7 +127,7 @@ const DASHBOARD_HTML = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>mcp-gamehacking · dashboard</title>
+<title>mcp-reverse · dashboard</title>
 <style>
   :root { color-scheme: light dark; --bg:#0b0d10; --fg:#e8ecef; --mut:#9aa3ad; --acc:#58a6ff; --ok:#3fb950; --bad:#f85149; --card:#161b22; }
   html,body { background: var(--bg); color: var(--fg); font: 13px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace; margin: 0; }
@@ -148,7 +148,7 @@ const DASHBOARD_HTML = `<!doctype html>
 </head>
 <body>
   <header>
-    <h1>mcp-gamehacking</h1>
+    <h1>mcp-reverse</h1>
     <span id="uptime" class="mono"></span>
     <span id="refresh" style="margin-left:auto;color:var(--mut)">refresh: 5s</span>
   </header>

@@ -10,10 +10,10 @@ so every existing tool keeps working — nothing to opt into.
 ### `npm` — the smallest install
 
 ```bash
-npx -y mcp-gamehacking           # ~a few MiB tarball, no skills/
+npx -y mcp-reverse           # ~a few MiB tarball, no skills/
 # or
-npm i -g mcp-gamehacking
-mcp-gamehacking serve
+npm i -g mcp-reverse
+mcp-reverse serve
 ```
 
 `package.json` `files[]` ships `dist/` + `bin/` + `signatures/` +
@@ -25,9 +25,9 @@ degrades gracefully to "no source" for `grep_sources` /
 To add the skills tree later:
 
 ```bash
-git clone --depth=1 https://github.com/1llu50ry/mcp-gamehacking \
-  --branch claude/mcp-gamehacking-skills-docs-1d668c \
-  --single-branch /path/to/mcp-gamehacking
+git clone --depth=1 https://github.com/1llu50ry/mcp-reverse \
+  --branch claude/mcp-reverse-skills-docs-1d668c \
+  --single-branch /path/to/mcp-reverse
 ```
 
 A shallow clone fetches ~3.3 GiB instead of the full history.
@@ -38,7 +38,7 @@ A shallow clone fetches ~3.3 GiB instead of the full history.
 docker run --rm -p 7777:7777 \
   -e MCP_AUTH_TOKEN=$(openssl rand -hex 32) \
   -v /path/to/samples:/samples:ro \
-  ghcr.io/1llu50ry/mcp-gamehacking:5.0.0
+  ghcr.io/1llu50ry/mcp-reverse:5.0.0
 ```
 
 Or `docker compose up -d` from the compose file in the repo.
@@ -57,7 +57,7 @@ DB attached to the v5.0.0 release:
 ```bash
 # Download the two chunks (each < 2 GiB; GitHub's per-asset limit)
 gh release download v5.0.0 \
-  --repo 1llu50ry/mcp-gamehacking \
+  --repo 1llu50ry/mcp-reverse \
   --pattern "skills-full.db.part-*" \
   --pattern "skills-full.db.sha256" \
   --dir db/
@@ -80,13 +80,13 @@ code path as the slim DB.
 
 ```bash
 # Dump every embedded gzipped source back to skills/<name>/source.txt
-node bin/mcp-gamehacking.mjs unpack
+node bin/mcp-reverse.mjs unpack
 
 # Repack
-node bin/mcp-gamehacking.mjs pack
+node bin/mcp-reverse.mjs pack
 
 # Just one skill
-node bin/mcp-gamehacking.mjs unpack ags-apex-legends-cheat
+node bin/mcp-reverse.mjs unpack ags-apex-legends-cheat
 ```
 
 ## For maintainers
@@ -100,7 +100,7 @@ node bin/mcp-gamehacking.mjs unpack ags-apex-legends-cheat
 
 The `.github/workflows/release.yml` workflow does the rest:
 - `npm publish --provenance` (needs `NPM_TOKEN` secret)
-- `docker buildx build --push` → `ghcr.io/<owner>/mcp-gamehacking:<ver>`
+- `docker buildx build --push` → `ghcr.io/<owner>/mcp-reverse:<ver>`
 - GitHub Release with auto-generated notes
 
 ### Shrinking the git history further
@@ -114,7 +114,7 @@ gzip migration). To rewrite history and strip those blobs:
 # DESTRUCTIVE — force-push will follow, every collaborator must re-clone.
 pip install git-filter-repo
 git filter-repo --path-glob 'skills/*/source.txt' --invert-paths
-git remote add origin https://github.com/1llu50ry/mcp-gamehacking
+git remote add origin https://github.com/1llu50ry/mcp-reverse
 git push --force --all && git push --force --tags
 ```
 

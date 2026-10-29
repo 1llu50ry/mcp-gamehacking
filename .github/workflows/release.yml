@@ -59,8 +59,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/mcp-gamehacking:${{ steps.ver.outputs.version }}
-            ghcr.io/${{ github.repository_owner }}/mcp-gamehacking:latest
+            ghcr.io/${{ github.repository_owner }}/mcp-reverse:${{ steps.ver.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/mcp-reverse:latest
 
   github-release:
     name: GitHub Release notes

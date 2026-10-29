@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Thin CLI for mcp-gamehacking. Subcommands:
+// Thin CLI for mcp-reverse. Subcommands:
 //   serve       - start the MCP server (stdio by default; MCP_TRANSPORT=http for HTTP)
 //   stats       - print skill library stats and exit
 //   lookup NAME - print SKILL.md for one skill by name
@@ -156,7 +156,7 @@ async function cmdServe() {
 }
 
 function usage() {
-  console.log(`mcp-gamehacking <command>
+  console.log(`mcp-reverse <command>
 
 Commands:
   serve                 start the MCP server (stdio; MCP_TRANSPORT=http for HTTP)

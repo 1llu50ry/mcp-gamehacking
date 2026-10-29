@@ -1,5 +1,5 @@
 {
-  "name": "mcp-gamehacking",
+  "name": "mcp-reverse",
   "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
@@ -37,6 +37,6 @@
   },
   "remoteUser": "node",
   "mounts": [
-    "source=mcp-gamehacking-node_modules,target=${containerWorkspaceFolder}/node_modules,type=volume"
+    "source=mcp-reverse-node_modules,target=${containerWorkspaceFolder}/node_modules,type=volume"
   ]
 }

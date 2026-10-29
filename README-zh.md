@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🎮 mcp-gamehacking
+# 🎮 mcp-reverse
 
 ### 让 Claude、Codex 和 Cursor 组队做逆向工程的 MCP 服务器。
 
@@ -32,19 +32,19 @@
 ## 快速开始
 
 ```bash
-git clone https://github.com/1llu50ry/mcp-gamehacking
-cd mcp-gamehacking
+git clone https://github.com/1llu50ry/mcp-reverse
+cd mcp-reverse
 npm install && npx tsc
 npm test            # 20/20 全过
 
-./bin/mcp-gamehacking.mjs stats
-./bin/mcp-gamehacking.mjs search battleye
-./bin/mcp-gamehacking.mjs tools
+./bin/mcp-reverse.mjs stats
+./bin/mcp-reverse.mjs search battleye
+./bin/mcp-reverse.mjs tools
 ```
 
 在 Claude Code / Codex / Cursor 的 MCP 配置里加:
 ```json
-{ "mcp-gamehacking": { "command": "node", "args": ["/path/to/dist/index.js"] } }
+{ "mcp-reverse": { "command": "node", "args": ["/path/to/dist/index.js"] } }
 ```
 
 或者用 Docker:

@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🎮 mcp-gamehacking
+# 🎮 mcp-reverse
 
 ### MCP-сервер, превращающий Claude, Codex и Cursor в команду reverse-engineering.
 
@@ -32,19 +32,19 @@
 ## Быстрый старт
 
 ```bash
-git clone https://github.com/1llu50ry/mcp-gamehacking
-cd mcp-gamehacking
+git clone https://github.com/1llu50ry/mcp-reverse
+cd mcp-reverse
 npm install && npx tsc
 npm test            # 20/20 должны пройти
 
-./bin/mcp-gamehacking.mjs stats
-./bin/mcp-gamehacking.mjs search battleye
-./bin/mcp-gamehacking.mjs tools
+./bin/mcp-reverse.mjs stats
+./bin/mcp-reverse.mjs search battleye
+./bin/mcp-reverse.mjs tools
 ```
 
 Для Claude Code / Codex / Cursor добавь в MCP-конфиг:
 ```json
-{ "mcp-gamehacking": { "command": "node", "args": ["/path/to/dist/index.js"] } }
+{ "mcp-reverse": { "command": "node", "args": ["/path/to/dist/index.js"] } }
 ```
 
 Или через Docker:

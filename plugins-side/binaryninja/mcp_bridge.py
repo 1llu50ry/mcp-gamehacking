@@ -1,4 +1,4 @@
-# mcp-gamehacking :: Binary Ninja plugin
+# mcp-reverse :: Binary Ninja plugin
 # ---------------------------------------------------------------
 # Save as `<binja>/plugins/mcp_bridge.py` or `~/.binaryninja/plugins/
 # mcp_bridge.py`. On start the plugin spins an HTTP server on

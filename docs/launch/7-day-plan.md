@@ -6,15 +6,15 @@ Follow this literally. Order matters. Each step takes 15-60 minutes.
 
 1. [ ] Record a 20-second GIF of `analyze_binary <path>` on `notepad.exe`. Use [`vhs`](https://github.com/charmbracelet/vhs) or OBS. Save as `docs/launch/hero.gif`.
 2. [ ] Record a 30-second GIF of three agents in a mesh — register, send, vote. Save as `docs/launch/mesh.gif`.
-3. [ ] Create an SVG social card (1200×630). Dark background, big "mcp-gamehacking" + "111 tools · 59 backends · 4,200+ skills · multi-agent mesh". Save as `docs/launch/og.svg` + export to PNG.
+3. [ ] Create an SVG social card (1200×630). Dark background, big "mcp-reverse" + "111 tools · 59 backends · 4,200+ skills · multi-agent mesh". Save as `docs/launch/og.svg` + export to PNG.
 4. [ ] Set GitHub repo topics: `mcp`, `reverse-engineering`, `game-hacking`, `anti-cheat`, `claude-code`, `multi-agent`, `cursor`, `codex`, `security-research`, `pe-parser`, `ida-pro`, `ghidra`, `x64dbg`, `frida`.
 5. [ ] Verify the `Code -> About` section has the one-line tagline and a link to the OG image.
 
 ## Day -1 (Monday) — proof points
 
 1. [ ] Publish v4.6.0 tag → auto release workflow fires (npm + ghcr docker).
-2. [ ] Verify `npm view mcp-gamehacking` resolves.
-3. [ ] Verify `docker pull ghcr.io/<you>/mcp-gamehacking:latest`.
+2. [ ] Verify `npm view mcp-reverse` resolves.
+3. [ ] Verify `docker pull ghcr.io/<you>/mcp-reverse:latest`.
 4. [ ] Ask three friendly RE / infosec people on Twitter + Discord for a soft review. They RT on launch.
 5. [ ] Draft the Dev.to blog from `docs/launch/devto-blog.md`.
 6. [ ] Pre-record a 3-minute YouTube screen walkthrough. Private link.

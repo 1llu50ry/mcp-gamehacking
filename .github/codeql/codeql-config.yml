@@ -1,4 +1,4 @@
-name: "mcp-gamehacking CodeQL"
+name: "mcp-reverse CodeQL"
 
 # Only scan our own TypeScript. The vendored upstream repos under
 # tools/vendor/** are OSS projects we track for integration, not code

@@ -1,4 +1,4 @@
-// mcp-gamehacking :: ILSpy plugin
+// mcp-reverse :: ILSpy plugin
 // ---------------------------------------------------------------
 // Build against ICSharpCode.Decompiler + ILSpy.ILSpyX (ILSpy 9+)
 // OR MainWindow (ILSpy 8). The MEF export is the same; the type the

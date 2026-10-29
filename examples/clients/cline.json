@@ -1,9 +1,9 @@
 {
   "mcpServers": {
-    "mcp-gamehacking": {
+    "mcp-reverse": {
       "transportType": "stdio",
       "command": "node",
-      "args": ["/path/to/mcp-gamehacking/dist/index.js"],
+      "args": ["/path/to/mcp-reverse/dist/index.js"],
       "env": {
         "MCP_FS_ALLOW": "/home/you/reverse-projects",
         "MCP_AUDIT_DIR": "/tmp/mcp-audit"

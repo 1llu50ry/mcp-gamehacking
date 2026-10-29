@@ -43,7 +43,7 @@ test("observability: /dashboard serves HTML and /_dashboard.json JSON", async ()
     const dash = await fetchText(`http://127.0.0.1:${port}/dashboard`);
     assert.equal(dash.status, 200);
     assert.match(dash.ct ?? "", /text\/html/);
-    assert.match(dash.body, /<title>mcp-gamehacking · dashboard<\/title>/);
+    assert.match(dash.body, /<title>mcp-reverse · dashboard<\/title>/);
 
     const j = await fetchText(`http://127.0.0.1:${port}/_dashboard.json`);
     assert.equal(j.status, 200);
